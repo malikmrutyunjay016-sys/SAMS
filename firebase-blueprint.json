@@ -1,0 +1,160 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student Record",
+      "description": "SAMS admitted or applicant student record",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "rollNo": { "type": "string" },
+        "samsRegNo": { "type": "string" },
+        "department": { "type": "string" },
+        "stream": { "type": "string" },
+        "isAedp": { "type": "boolean" },
+        "category": { "type": "string" },
+        "marksPercentage": { "type": "number" },
+        "bloodGroup": { "type": "string" },
+        "phone": { "type": "string" },
+        "gender": { "type": "string" },
+        "status": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "samsRegNo", "department", "stream", "category"]
+    },
+    "SeatMatrix": {
+      "title": "Seat Matrix",
+      "description": "Sanctioned vs Admitted vs Vacant seat count per subject/specialization",
+      "type": "object",
+      "properties": {
+        "deptName": { "type": "string" },
+        "stream": { "type": "string" },
+        "isAedp": { "type": "boolean" },
+        "specialization": { "type": "string" },
+        "sanctioned": { "type": "number" },
+        "admitted": { "type": "number" },
+        "vacant": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["deptName", "stream", "sanctioned", "vacant"]
+    },
+    "SpotCandidate": {
+      "title": "Spot Round Candidate",
+      "description": "Candidate applicant for Spot Round Seats with live reported status and merit selection",
+      "type": "object",
+      "properties": {
+        "studentName": { "type": "string" },
+        "samsRegNo": { "type": "string" },
+        "deptId": { "type": "string" },
+        "category": { "type": "string" },
+        "marksPercentage": { "type": "number" },
+        "waitlistRank": { "type": "number" },
+        "reportedStatus": { "type": "string" },
+        "selectionStatus": { "type": "string" },
+        "appliedAt": { "type": "string" }
+      },
+      "required": ["studentName", "samsRegNo", "deptId", "marksPercentage"]
+    },
+    "AuditLog": {
+      "title": "System Audit Log",
+      "description": "Audit trails for administrative actions",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string" },
+        "adminName": { "type": "string" },
+        "actionType": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["timestamp", "actionType", "description"]
+    },
+    "HodAccount": {
+      "title": "HOD Credentials & Info",
+      "description": "Departmental account and HOD information",
+      "type": "object",
+      "properties": {
+        "deptName": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "hodName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["deptName", "username", "password", "hodName"]
+    },
+    "SystemSettings": {
+      "title": "System Settings & Controls",
+      "description": "Global switches including Spot Round toggle, logo, notices",
+      "type": "object",
+      "properties": {
+        "spotRoundEnabled": { "type": "boolean" },
+        "collegeLogoUrl": { "type": "string" },
+        "prospectusUrl": { "type": "string" },
+        "bannerNotice": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Notice": {
+      "title": "Official Notice",
+      "description": "Public and departmental notices",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "deptId": { "type": "string" },
+        "date": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "isImportant": { "type": "boolean" }
+      },
+      "required": ["title", "category", "date"]
+    },
+    "Faculty": {
+      "title": "Faculty Profile",
+      "description": "Departmental faculty directory member",
+      "type": "object",
+      "properties": {
+        "deptId": { "type": "string" },
+        "name": { "type": "string" },
+        "designation": { "type": "string" },
+        "qualification": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "photoUrl": { "type": "string" }
+      },
+      "required": ["deptId", "name", "designation"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "SAMS Student database"
+    },
+    "/seatMatrix/{seatId}": {
+      "schema": { "$ref": "#/entities/SeatMatrix" },
+      "description": "Seat intake matrix"
+    },
+    "/spotCandidates/{candidateId}": {
+      "schema": { "$ref": "#/entities/SpotCandidate" },
+      "description": "Spot round applicant list"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "System administrative logs"
+    },
+    "/hodAccounts/{hodId}": {
+      "schema": { "$ref": "#/entities/HodAccount" },
+      "description": "HOD accounts and department passwords"
+    },
+    "/systemSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/SystemSettings" },
+      "description": "System settings and switches"
+    },
+    "/notices/{noticeId}": {
+      "schema": { "$ref": "#/entities/Notice" },
+      "description": "College notices"
+    },
+    "/faculty/{facultyId}": {
+      "schema": { "$ref": "#/entities/Faculty" },
+      "description": "Faculty profiles"
+    }
+  }
+}

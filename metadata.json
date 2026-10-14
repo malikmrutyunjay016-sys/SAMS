@@ -1,0 +1,6 @@
+{
+  "name": "SAMS Panchayat College Baragada - Govt. of Odisha e-Admission & Portal",
+  "description": "Official SAMS e-Admission, Spot Round merit management, seat matrix, student database, HOD portal, and administrative control system for Panchayat College, Baragada - Govt. of Odisha.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

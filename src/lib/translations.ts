@@ -7,7 +7,7 @@ export const TRANSLATIONS = {
     collegeName: "SAMS Panchayat College, Baragada",
     collegeTagline: "A Premier Odisha Government Degree College & e-Admission Center",
     naacBadge: "NAAC Accredited Grade B++ | Estd. 1960",
-    samsCode: "SAMS College Code: 07022101",
+    samsCode: "SAMS College Code: 03071302",
     helpline: "SAMS Helpline: 155335 / 1800-345-6770",
     
     // Navigation
@@ -66,7 +66,7 @@ export const TRANSLATIONS = {
     collegeName: "ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼",
     collegeTagline: "ଓଡ଼ିଶା ସରକାରଙ୍କ ଏକ ଅଗ୍ରଣୀ ଡିଗ୍ରୀ ମହାବିଦ୍ୟାଳୟ ଓ ଇ-ନାମଲେଖା କେନ୍ଦ୍ର",
     naacBadge: "ନୈକ୍ (NAAC) ଦ୍ୱାରା 'B++' ଗ୍ରେଡ୍ ପ୍ରାପ୍ତ | ସ୍ଥାପିତ: ୧୯୬୦",
-    samsCode: "ସାମ୍ସ କୋଡ୍: ୦୭୦୨୨୧୦୧",
+    samsCode: "ସାମ୍ସ କୋଡ୍: ୦୩୦୭୧୩୦୨",
     helpline: "ସାମ୍ସ ହେଲ୍ପଲାଇନ୍: ୧୫୫୩୩୫ / ୧୮୦୦-୩୪୫-୬୭୭୦",
     
     // Navigation

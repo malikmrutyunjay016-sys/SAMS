@@ -7,7 +7,8 @@ import {
   HodAccount,
   SystemSettings,
   Notice,
-  FacultyMember
+  FacultyMember,
+  FAQItem
 } from '../types';
 import {
   DEFAULT_SETTINGS,
@@ -17,6 +18,7 @@ import {
   DEFAULT_NOTICES,
   DEFAULT_SPOT_CANDIDATES,
   DEFAULT_AUDIT_LOGS,
+  DEFAULT_FAQS,
   generate1100Students
 } from '../lib/defaultData';
 import { TRANSLATIONS, Language } from '../lib/translations';
@@ -34,6 +36,7 @@ interface DataContextType {
   systemSettings: SystemSettings;
   notices: Notice[];
   faculty: FacultyMember[];
+  faqs: FAQItem[];
   isLoading: boolean;
   lang: Language;
   setLang: (lang: Language) => void;
@@ -53,6 +56,9 @@ interface DataContextType {
   runAutomatedMeritSelection: (deptId?: string) => void;
   addNotice: (notice: Omit<Notice, 'id'>) => void;
   deleteNotice: (noticeId: string) => void;
+  addFAQ: (question: string, answer: string, category: string) => void;
+  updateFAQ: (id: string, question: string, answer: string, category: string) => void;
+  deleteFAQ: (id: string) => void;
   addAuditLog: (actionType: string, description: string) => void;
   restoreSystemFromSnapshot: (snapshotData: any) => void;
 }
@@ -105,6 +111,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : DEFAULT_FACULTY;
   });
 
+  const [faqs, setFaqs] = useState<FAQItem[]>(() => {
+    const saved = localStorage.getItem(LS_PREFIX + 'faqs');
+    return saved ? JSON.parse(saved) : DEFAULT_FAQS;
+  });
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
@@ -141,6 +152,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     localStorage.setItem(LS_PREFIX + 'faculty', JSON.stringify(faculty));
   }, [faculty]);
+
+  useEffect(() => {
+    localStorage.setItem(LS_PREFIX + 'faqs', JSON.stringify(faqs));
+  }, [faqs]);
+
+  const addFAQ = (question: string, answer: string, category: string) => {
+    const newFaq: FAQItem = {
+      id: `faq_${Date.now()}`,
+      question,
+      answer,
+      category,
+      updatedAt: new Date().toISOString(),
+    };
+    setFaqs((prev) => [newFaq, ...prev]);
+    addAuditLog('FAQ_ADDED', `New FAQ added: "${question}"`);
+  };
+
+  const updateFAQ = (id: string, question: string, answer: string, category: string) => {
+    setFaqs((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, question, answer, category, updatedAt: new Date().toISOString() } : f))
+    );
+    addAuditLog('FAQ_UPDATED', `FAQ ${id} updated.`);
+  };
+
+  const deleteFAQ = (id: string) => {
+    setFaqs((prev) => prev.filter((f) => f.id !== id));
+    addAuditLog('FAQ_DELETED', `FAQ ${id} deleted.`);
+  };
 
   // Firestore Listeners
   useEffect(() => {
@@ -425,6 +464,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         systemSettings,
         notices,
         faculty,
+        faqs,
         isLoading,
         lang,
         setLang,
@@ -444,6 +484,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         runAutomatedMeritSelection,
         addNotice,
         deleteNotice,
+        addFAQ,
+        updateFAQ,
+        deleteFAQ,
         addAuditLog,
         restoreSystemFromSnapshot,
       }}

@@ -9,6 +9,11 @@ export interface Student {
   name: string;
   rollNo: string; // University Roll Number e.g. BS24-042
   samsRegNo: string; // SAMS Reg No e.g. 24D10829
+  barcode?: string;
+  parentName?: string; // Father / Mother name
+  dob?: string; // Date of Birth
+  maxMarks?: number;
+  marksSecured?: number;
   department: string;
   stream: StreamType;
   isAedp: boolean;
@@ -115,3 +120,12 @@ export interface CollegeInquiry {
   message: string;
   submittedAt: string;
 }
+
+export interface FAQItem {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+  updatedAt: string;
+}
+

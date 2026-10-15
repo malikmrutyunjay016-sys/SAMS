@@ -49,7 +49,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   const { isAdmin, logout } = useAuth();
 
   const [activeAdminTab, setActiveAdminTab] = useState<
-    'control' | 'students' | 'seats' | 'hods' | 'drive' | 'audit'
+    'control' | 'students' | 'add-students' | 'seats' | 'hods' | 'drive' | 'audit'
   >('control');
 
   // Student Manager State
@@ -58,7 +58,6 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [editingRollNo, setEditingRollNo] = useState('');
-  const [editingStatus, setEditingStatus] = useState('');
   const [sheetUrlInput, setSheetUrlInput] = useState(systemSettings.sheetSyncUrl || '');
   const [isSyncingSheet, setIsSyncingSheet] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
@@ -90,7 +89,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         </p>
         <button
           onClick={onOpenAdminModal}
-          className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-lg"
+          className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs shadow-lg"
         >
           Super Admin Login
         </button>
@@ -103,11 +102,37 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     const matchesSearch =
       s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
       s.rollNo.toLowerCase().includes(studentSearch.toLowerCase()) ||
-      s.samsRegNo.toLowerCase().includes(studentSearch.toLowerCase());
+      s.samsRegNo.toLowerCase().includes(studentSearch.toLowerCase()) ||
+      (s.barcode && s.barcode.toLowerCase().includes(studentSearch.toLowerCase()));
     const matchesStream = streamFilter === 'ALL' || s.stream === streamFilter;
     const matchesCat = categoryFilter === 'ALL' || s.category === categoryFilter;
     return matchesSearch && matchesStream && matchesCat;
   });
+
+  // Download Sample Excel Template
+  const handleDownloadExcelTemplate = () => {
+    const templateData = [
+      {
+        'Name': 'Rajesh Kumar Sahoo',
+        'Barcode': 'BAR-982314',
+        'Father Name/Mother Name': 'Bikash Sahoo / Sunita Sahoo',
+        'Category': 'GEN',
+        'Date of Birth': '2005-06-15',
+        'Maximum Marks': 500,
+        'Marks Secured': 430,
+        'Percentage': 86.0,
+        'Stream': 'Science',
+        'Department': 'Physics',
+        'SAMS Reg No': '24D18901',
+        'Roll No': 'BS24-101',
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Student Import Template');
+    XLSX.writeFile(wb, 'SAMS_Student_Import_Template.xlsx');
+  };
 
   // Export Students to Excel
   const handleExportStudentsExcel = () => {
@@ -115,23 +140,27 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       'SAMS Reg No': s.samsRegNo,
       'University Roll No': s.rollNo,
       'Student Name': s.name,
+      'Barcode': s.barcode || '',
+      'Father Name/Mother Name': s.parentName || '',
+      'Category': s.category,
+      'Date of Birth': s.dob || '',
+      'Maximum Marks': s.maxMarks || 500,
+      'Marks Secured': s.marksSecured || 400,
+      'Percentage (%)': s.marksPercentage,
       'Department': s.department,
       'Stream': s.stream,
-      'Category': s.category,
-      'Marks %': s.marksPercentage,
       'Gender': s.gender,
-      'Blood Group': s.bloodGroup,
       'Phone': s.phone,
       'Status': s.status,
     }));
 
     const ws = XLSX.utils.json_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'SAMS Students');
+    XLSX.utils.book_append_sheet(wb, ws, 'SAMS Students Database');
     XLSX.writeFile(wb, `SAMS_Baragada_Students_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  // Upload Excel / CSV file
+  // Upload Excel / CSV file with Name, Barcode, Father/Mother name, Category, DOB, Max Marks, Marks Secured, Percentage
   const handleFileUploadXLSX = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -145,27 +174,39 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         const ws = wb.Sheets[wsname];
         const rawData = XLSX.utils.sheet_to_json<any>(ws);
 
-        const imported: any[] = rawData.map((row, idx) => ({
-          id: `imp_${Date.now()}_${idx}`,
-          name: row['Student Name'] || row['Name'] || 'Student',
-          rollNo: row['University Roll No'] || row['Roll No'] || `BS24-${idx + 500}`,
-          samsRegNo: row['SAMS Reg No'] || row['Reg No'] || `24D${15000 + idx}`,
-          department: row['Department'] || 'Physics',
-          stream: row['Stream'] || 'Science',
-          isAedp: false,
-          category: row['Category'] || 'GEN',
-          marksPercentage: parseFloat(row['Marks %']) || 80.0,
-          bloodGroup: row['Blood Group'] || 'O+',
-          phone: row['Phone'] || '9437000000',
-          gender: row['Gender'] || 'Male',
-          status: row['Status'] || 'Admitted',
-          updatedAt: new Date().toISOString(),
-        }));
+        const imported: any[] = rawData.map((row, idx) => {
+          const maxMarksVal = parseFloat(row['Maximum Marks'] || row['Max Marks'] || row['maxMarks']) || 500;
+          const securedVal = parseFloat(row['Marks Secured'] || row['Secured Marks'] || row['marksSecured']) || 400;
+          const pctVal = parseFloat(row['Percentage'] || row['Marks %'] || row['%'] || row['percentage']) || parseFloat(((securedVal / maxMarksVal) * 100).toFixed(1));
+
+          return {
+            id: `imp_${Date.now()}_${idx}`,
+            name: row['Student Name'] || row['Name'] || row['name'] || 'Student',
+            barcode: row['Barcode'] || row['barcode'] || `BAR-${Math.floor(100000 + Math.random() * 900000)}`,
+            parentName: row['Father Name/Mother Name'] || row['Parent Name'] || row['Father Name'] || row['Mother Name'] || row['parentName'] || 'Parent',
+            category: row['Category'] || row['category'] || 'GEN',
+            dob: row['Date of Birth'] || row['DOB'] || row['dob'] || '2005-01-01',
+            maxMarks: maxMarksVal,
+            marksSecured: securedVal,
+            marksPercentage: pctVal,
+            rollNo: row['University Roll No'] || row['Roll No'] || row['rollNo'] || `BS24-${idx + 500}`,
+            samsRegNo: row['SAMS Reg No'] || row['Reg No'] || row['samsRegNo'] || `24D${15000 + idx}`,
+            department: row['Department'] || row['department'] || 'Physics',
+            stream: row['Stream'] || row['stream'] || 'Science',
+            isAedp: false,
+            bloodGroup: row['Blood Group'] || 'O+',
+            phone: row['Phone'] || row['phone'] || '9437000000',
+            gender: row['Gender'] || 'Male',
+            status: row['Status'] || 'Admitted',
+            updatedAt: new Date().toISOString(),
+          };
+        });
 
         bulkImportStudents(imported);
-        alert(`Successfully imported ${imported.length} student records into database.`);
+        alert(`Successfully imported ${imported.length} student records into database with Name, Barcode, Parent Name, Category, DOB, and Marks.`);
+        setActiveAdminTab('students');
       } catch (err) {
-        alert('Error parsing Excel file. Ensure valid SAMS columns.');
+        alert('Error parsing Excel file. Please ensure valid columns (Name, Barcode, Father Name/Mother Name, Category, DOB, Maximum Marks, Marks Secured, Percentage).');
       }
     };
     reader.readAsBinaryString(file);
@@ -256,7 +297,8 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
         {[
           { id: 'control', label: 'Spot Round Live Switch', icon: Radio },
-          { id: 'students', label: 'Student DB (1,100+ Records)', icon: Database },
+          { id: 'add-students', label: 'Add Students (Excel)', icon: FileSpreadsheet },
+          { id: 'students', label: 'Student DB Records', icon: Database },
           { id: 'seats', label: 'Seat Matrix Editor', icon: Edit2 },
           { id: 'hods', label: 'HOD Credentials Manager', icon: Lock },
           { id: 'drive', label: 'Google Drive Backup', icon: Cloud },
@@ -281,7 +323,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         })}
       </div>
 
-      {/* TAB 1: SPOT ROUND LIVE CONTROL */}
+      {/* TAB: SPOT ROUND LIVE CONTROL */}
       {activeAdminTab === 'control' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-800">
@@ -325,7 +367,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               </div>
 
               <p className="text-xs text-slate-400 leading-relaxed">
-                When enabled, students and visitors can view vacant seat matrix, candidate reported status, and download provisional merit selection lists. When disabled, public access displays an official offline notice.
+                When enabled, students and visitors can view vacant seat matrix, candidate reported status, and download provisional merit selection lists.
               </p>
             </div>
 
@@ -341,29 +383,89 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         </div>
       )}
 
-      {/* TAB 2: STUDENT DATABASE MANAGER */}
+      {/* TAB: ADD STUDENTS (EXCEL UPLOAD FOR SUPER ADMIN) */}
+      {activeAdminTab === 'add-students' && (
+        <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 shadow-2xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div>
+              <h2 className="text-lg font-bold text-white font-serif flex items-center">
+                <FileSpreadsheet className="w-5 h-5 mr-2 text-amber-400" />
+                Add Students via Excel Spreadsheet (Super Admin Exclusive)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Upload an Excel sheet (.xlsx, .xls) or CSV to instantly import students with Barcode, Parent Name, DOB, and Marks into the database.
+              </p>
+            </div>
+
+            <button
+              onClick={handleDownloadExcelTemplate}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center shadow"
+            >
+              <Download className="w-4 h-4 mr-1.5" /> Download Excel Template
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Upload Card */}
+            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4 text-xs">
+              <h3 className="font-bold text-white text-sm flex items-center">
+                <Upload className="w-4 h-4 mr-2 text-emerald-400" /> Upload Student Excel File (.xlsx, .csv)
+              </h3>
+              <p className="text-slate-400 leading-relaxed">
+                Required Excel Columns: <strong className="text-amber-400">Name</strong>, <strong className="text-amber-400">Barcode</strong>, <strong className="text-amber-400">Father Name/Mother Name</strong>, <strong className="text-amber-400">Category</strong>, <strong className="text-amber-400">Date of Birth</strong>, <strong className="text-amber-400">Maximum Marks</strong>, <strong className="text-amber-400">Marks Secured</strong>, <strong className="text-amber-400">Percentage</strong>.
+              </p>
+
+              <label className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold shadow-lg flex items-center justify-center cursor-pointer">
+                <FileSpreadsheet className="w-4 h-4 mr-2" /> Browse & Import Excel Sheet
+                <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUploadXLSX} className="hidden" />
+              </label>
+            </div>
+
+            {/* Schema Guide */}
+            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3 text-xs text-slate-300">
+              <h3 className="font-bold text-amber-400 uppercase tracking-wider font-mono">Excel Schema Specification</h3>
+              <ul className="list-disc list-inside space-y-1.5 text-slate-300">
+                <li><strong>Name</strong>: Student Full Name</li>
+                <li><strong>Barcode</strong>: Unique barcode string or id</li>
+                <li><strong>Father Name/Mother Name</strong>: Parent guardian name</li>
+                <li><strong>Category</strong>: GEN, SC, ST, or SEBC</li>
+                <li><strong>Date of Birth</strong>: Format YYYY-MM-DD or DD/MM/YYYY</li>
+                <li><strong>Maximum Marks</strong>: Total possible marks (e.g., 500)</li>
+                <li><strong>Marks Secured</strong>: Marks obtained by student</li>
+                <li><strong>Percentage</strong>: Calculated percentage (%)</li>
+              </ul>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* TAB: STUDENT DATABASE MANAGER */}
       {activeAdminTab === 'students' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
             <div>
               <h2 className="text-lg font-bold text-white font-serif flex items-center">
                 <Database className="w-5 h-5 mr-2 text-amber-400" />
-                SAMS Student Database Manager (1,100+ Records)
+                SAMS Student Database Manager ({students.length} Total Records)
               </h2>
               <p className="text-xs text-slate-400">
-                Filter by stream/category, edit University Roll Numbers, upload XLSX/CSV sheets, or sync SAMS Google Sheet.
+                Includes Name, Barcode, Parent Name, Category, DOB, Maximum Marks, Marks Secured, and Percentage.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <label className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center cursor-pointer">
-                <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" /> Upload XLSX/CSV Sheet
-                <input type="file" accept=".xlsx, .csv" onChange={handleFileUploadXLSX} className="hidden" />
-              </label>
+              <button
+                onClick={() => setActiveAdminTab('add-students')}
+                className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center shadow"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Students (Excel)
+              </button>
 
               <button
                 onClick={handleExportStudentsExcel}
-                className="px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-xs font-bold flex items-center"
+                className="px-3.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-xs font-bold flex items-center"
               >
                 <Download className="w-3.5 h-3.5 mr-1.5" /> Export Excel
               </button>
@@ -406,7 +508,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="Search name, roll or SAMS reg..."
+                placeholder="Search name, barcode, roll..."
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500"
@@ -441,59 +543,57 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
             </span>
           </div>
 
-          {/* Table */}
+          {/* Table with Barcode, Parent Name, DOB, Marks */}
           <div className="overflow-x-auto rounded-xl border border-slate-800">
             <table className="w-full text-left text-xs text-slate-200">
               <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
                 <tr>
-                  <th className="py-3 px-4">SAMS Reg. No.</th>
-                  <th className="py-3 px-4">Univ Roll No</th>
-                  <th className="py-3 px-4">Student Name</th>
-                  <th className="py-3 px-4">Department</th>
-                  <th className="py-3 px-4">Stream</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4 text-center">Marks %</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-center">Edit Roll</th>
+                  <th className="py-3 px-3">Student Name</th>
+                  <th className="py-3 px-3">Barcode</th>
+                  <th className="py-3 px-3">Father / Mother Name</th>
+                  <th className="py-3 px-3">Category</th>
+                  <th className="py-3 px-3">DOB</th>
+                  <th className="py-3 px-3 text-center">Max Marks</th>
+                  <th className="py-3 px-3 text-center">Secured</th>
+                  <th className="py-3 px-3 text-center">Percentage</th>
+                  <th className="py-3 px-3">SAMS Reg / Roll</th>
+                  <th className="py-3 px-3 text-center">Edit Roll</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {filteredStudents.slice(0, 150).map((stu) => (
-                  <tr key={stu.id} className="hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-mono text-slate-300">{stu.samsRegNo}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-amber-400">
-                      {editingStudentId === stu.id ? (
-                        <input
-                          type="text"
-                          value={editingRollNo}
-                          onChange={(e) => setEditingRollNo(e.target.value)}
-                          className="bg-slate-950 border border-amber-500 rounded px-2 py-0.5 text-xs text-amber-300 focus:outline-none w-24"
-                        />
-                      ) : (
-                        stu.rollNo
-                      )}
+                {filteredStudents.slice(0, 150).map((stu, idx) => (
+                  <tr key={`${stu.id}_${idx}`} className="hover:bg-slate-800/40">
+                    <td className="py-3 px-3 font-bold text-white">{stu.name}</td>
+                    <td className="py-3 px-3 font-mono text-amber-300">{stu.barcode || `BAR-${stu.samsRegNo}`}</td>
+                    <td className="py-3 px-3 text-slate-300">{stu.parentName || 'N/A'}</td>
+                    <td className="py-3 px-3 font-mono text-slate-400">{stu.category}</td>
+                    <td className="py-3 px-3 font-mono text-slate-400">{stu.dob || '2005-01-01'}</td>
+                    <td className="py-3 px-3 text-center font-mono text-slate-300">{stu.maxMarks || 500}</td>
+                    <td className="py-3 px-3 text-center font-mono text-emerald-400">{stu.marksSecured || 400}</td>
+                    <td className="py-3 px-3 text-center font-bold text-amber-400">{stu.marksPercentage}%</td>
+                    <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">
+                      {stu.samsRegNo} <br />
+                      <span className="text-amber-300">{stu.rollNo}</span>
                     </td>
-                    <td className="py-3 px-4 font-bold text-slate-100">{stu.name}</td>
-                    <td className="py-3 px-4 text-slate-300">{stu.department}</td>
-                    <td className="py-3 px-4 text-slate-400">{stu.stream}</td>
-                    <td className="py-3 px-4 font-mono text-slate-400">{stu.category}</td>
-                    <td className="py-3 px-4 text-center font-bold text-emerald-400">{stu.marksPercentage}%</td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">
-                        {stu.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-3 text-center">
                       {editingStudentId === stu.id ? (
-                        <button
-                          onClick={() => {
-                            updateStudentRollNo(stu.id, editingRollNo);
-                            setEditingStudentId(null);
-                          }}
-                          className="px-2.5 py-1 rounded bg-amber-500 text-slate-950 font-bold text-[10px]"
-                        >
-                          Save
-                        </button>
+                        <div className="flex items-center space-x-1">
+                          <input
+                            type="text"
+                            value={editingRollNo}
+                            onChange={(e) => setEditingRollNo(e.target.value)}
+                            className="bg-slate-950 border border-amber-500 rounded px-1.5 py-0.5 text-xs text-amber-300 focus:outline-none w-20"
+                          />
+                          <button
+                            onClick={() => {
+                              updateStudentRollNo(stu.id, editingRollNo);
+                              setEditingStudentId(null);
+                            }}
+                            className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-bold text-[10px]"
+                          >
+                            Save
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => {
@@ -514,7 +614,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         </div>
       )}
 
-      {/* TAB 3: SANCTIONED SEAT MATRIX EDITOR */}
+      {/* TAB: SANCTIONED SEAT MATRIX EDITOR */}
       {activeAdminTab === 'seats' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-800">
@@ -598,7 +698,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         </div>
       )}
 
-      {/* TAB 4: HOD CREDENTIALS MANAGER */}
+      {/* TAB: HOD CREDENTIALS MANAGER */}
       {activeAdminTab === 'hods' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
           <div className="pb-4 border-b border-slate-800">
@@ -607,7 +707,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               HOD Security Credentials Manager
             </h2>
             <p className="text-xs text-slate-400">
-              Manage department login passwords and HOD head contact details across all 16 departments.
+              Manage department login passwords and HOD head contact details across all departments.
             </p>
           </div>
 
@@ -680,7 +780,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         </div>
       )}
 
-      {/* TAB 5: GOOGLE DRIVE CLOUD BACKUP & RESTORE */}
+      {/* TAB: GOOGLE DRIVE CLOUD BACKUP & RESTORE */}
       {activeAdminTab === 'drive' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
           <div className="pb-4 border-b border-slate-800">
@@ -694,14 +794,12 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Backup Box */}
             <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4 text-xs">
               <h3 className="font-bold text-white text-sm flex items-center">
                 <Upload className="w-4 h-4 mr-2 text-amber-400" /> Create Google Drive System Snapshot
               </h3>
               <p className="text-slate-400 leading-relaxed">
-                Generates a complete JSON backup containing all 1,100+ students, seat matrix, faculty, HOD accounts, and audit logs.
+                Generates a complete JSON backup containing all students, barcodes, parent names, max marks, and audit logs.
               </p>
 
               <button
@@ -716,7 +814,6 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               {backupStatusMsg && <p className="text-emerald-400 font-mono text-[11px]">{backupStatusMsg}</p>}
             </div>
 
-            {/* Restore Box */}
             <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4 text-xs">
               <h3 className="font-bold text-white text-sm flex items-center">
                 <Download className="w-4 h-4 mr-2 text-emerald-400" /> Restore System from Snapshot File
@@ -730,12 +827,11 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 <input type="file" accept=".json" onChange={handleRestoreSnapshotFile} className="hidden" />
               </label>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* TAB 6: SYSTEM AUDIT LOGS */}
+      {/* TAB: SYSTEM AUDIT LOGS */}
       {activeAdminTab === 'audit' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="pb-4 border-b border-slate-800">
@@ -744,7 +840,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               Administrative System Audit Trail
             </h2>
             <p className="text-xs text-slate-400">
-              Track administrative actions, sheet syncs, backup restores, and credential changes in real time.
+              Track administrative actions, student excel imports, sheet syncs, and backup restores in real time.
             </p>
           </div>
 

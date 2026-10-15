@@ -1,9 +1,9 @@
 import React from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { Home, BookOpen, UserCheck, Users, BarChart3, Download, PhoneCall, Building2, ShieldCheck, Radio } from 'lucide-react';
+import { Home, BookOpen, UserCheck, Users, BarChart3, Download, PhoneCall, HelpCircle, Building2, ShieldCheck, Radio } from 'lucide-react';
 
-export type TabType = 'home' | 'seats' | 'spot' | 'faculty' | 'stats' | 'downloads' | 'contact' | 'hod' | 'admin';
+export type TabType = 'home' | 'seats' | 'spot' | 'faculty' | 'stats' | 'downloads' | 'contact' | 'faq' | 'hod' | 'admin';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -33,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenP
       ),
     },
     { id: 'faculty' as TabType, label: t.facultyDir, icon: Users },
+    { id: 'faq' as TabType, label: 'FAQs', icon: HelpCircle },
     { id: 'stats' as TabType, label: t.samsStats, icon: BarChart3 },
     { id: 'downloads' as TabType, label: t.downloads, icon: Download },
     { id: 'contact' as TabType, label: t.contactUs, icon: PhoneCall },

@@ -20,20 +20,36 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [role, setRole] = useState<UserRole>('PUBLIC');
+  const [role, setRole] = useState<UserRole>(() => {
+    const saved = localStorage.getItem('sams_user_role');
+    return (saved === 'SUPER_ADMIN' || saved === 'HOD') ? (saved as UserRole) : 'PUBLIC';
+  });
   const [user, setUser] = useState<User | null>(null);
-  const [hodDeptId, setHodDeptId] = useState<string | null>(null);
-  const [hodDeptName, setHodDeptName] = useState<string | null>(null);
+  const [hodDeptId, setHodDeptId] = useState<string | null>(() => {
+    return localStorage.getItem('sams_hod_dept_id');
+  });
+  const [hodDeptName, setHodDeptName] = useState<string | null>(() => {
+    return localStorage.getItem('sams_hod_dept_name');
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser && currentUser.email?.includes('baragada.edu.in')) {
         setRole('SUPER_ADMIN');
+        localStorage.setItem('sams_user_role', 'SUPER_ADMIN');
       }
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('sams_user_role', role);
+    if (hodDeptId) localStorage.setItem('sams_hod_dept_id', hodDeptId);
+    else localStorage.removeItem('sams_hod_dept_id');
+    if (hodDeptName) localStorage.setItem('sams_hod_dept_name', hodDeptName);
+    else localStorage.removeItem('sams_hod_dept_name');
+  }, [role, hodDeptId, hodDeptName]);
 
   const loginAsAdmin = (password: string) => {
     // Default master admin password or Sams@2026!
@@ -67,11 +83,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    firebaseSignOut(auth);
+    firebaseSignOut(auth).catch(() => {});
     setRole('PUBLIC');
     setUser(null);
     setHodDeptId(null);
     setHodDeptName(null);
+    localStorage.removeItem('sams_user_role');
+    localStorage.removeItem('sams_hod_dept_id');
+    localStorage.removeItem('sams_hod_dept_name');
   };
 
   return (

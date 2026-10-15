@@ -74,7 +74,7 @@ export const SpotRoundView: React.FC = () => {
           The SAMS Spot Round Selection Live Reporting Desk is currently turned OFF by the College e-Admission Committee. Please check the official Notice Board for upcoming Spot Phase publication dates.
         </p>
         <div className="pt-2 text-xs font-mono text-amber-400">
-          SAMS College Code: 07022101 &bull; Govt. of Odisha
+          SAMS College Code: 03071302 &bull; Govt. of Odisha
         </div>
       </div>
     );

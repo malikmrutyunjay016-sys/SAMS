@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider } from './context/AuthContext';
-import { DataProvider } from './context/DataContext';
+import { DataProvider, useData } from './context/DataContext';
 import { Header } from './components/Header';
 import { Navbar, TabType } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -17,88 +17,106 @@ import { DownloadsView } from './views/DownloadsView';
 import { ContactView } from './views/ContactView';
 import { HodPortalView } from './views/HodPortalView';
 import { AdminPortalView } from './views/AdminPortalView';
+import { FaqView } from './views/FaqView';
 
-export default function App() {
+function AppContent() {
+  const { themeMode } = useData();
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [showProspectus, setShowProspectus] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showHodModal, setShowHodModal] = useState(false);
 
+  // Dynamic Theme Classes
+  const themeContainerClass =
+    themeMode === 'maroon'
+      ? 'bg-slate-950 text-slate-100'
+      : themeMode === 'navy'
+      ? 'bg-slate-950 text-slate-100'
+      : 'bg-slate-100 text-slate-900';
+
+  return (
+    <div className={`min-h-screen ${themeContainerClass} flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-300`}>
+      
+      {/* Header */}
+      <Header
+        onOpenAdminModal={() => setShowAdminModal(true)}
+        onOpenHodModal={() => setShowHodModal(true)}
+      />
+
+      {/* Navigation Bar */}
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onOpenProspectus={() => setShowProspectus(true)}
+      />
+
+      {/* Main Content Body */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        {activeTab === 'home' && (
+          <HomeView
+            onNavigateTab={setActiveTab}
+            onOpenProspectus={() => setShowProspectus(true)}
+            onOpenAdminModal={() => setShowAdminModal(true)}
+          />
+        )}
+
+        {activeTab === 'seats' && (
+          <SeatMatrixView onNavigateSpot={() => setActiveTab('spot')} />
+        )}
+
+        {activeTab === 'spot' && <SpotRoundView />}
+
+        {activeTab === 'faculty' && <FacultyView />}
+
+        {activeTab === 'faq' && <FaqView />}
+
+        {activeTab === 'stats' && <StatsView />}
+
+        {activeTab === 'downloads' && (
+          <DownloadsView onOpenProspectus={() => setShowProspectus(true)} />
+        )}
+
+        {activeTab === 'contact' && <ContactView />}
+
+        {activeTab === 'hod' && (
+          <HodPortalView onOpenHodModal={() => setShowHodModal(true)} />
+        )}
+
+        {activeTab === 'admin' && (
+          <AdminPortalView onOpenAdminModal={() => setShowAdminModal(true)} />
+        )}
+      </main>
+
+      {/* Footer */}
+      <Footer />
+
+      {/* Modals */}
+      <CommonProspectusModal
+        isOpen={showProspectus}
+        onClose={() => setShowProspectus(false)}
+      />
+
+      <AdminLoginModal
+        isOpen={showAdminModal}
+        onClose={() => setShowAdminModal(false)}
+        onSuccess={() => setActiveTab('admin')}
+      />
+
+      <HodLoginModal
+        isOpen={showHodModal}
+        onClose={() => setShowHodModal(false)}
+        onSuccess={() => setActiveTab('hod')}
+      />
+
+    </div>
+  );
+}
+
+export default function App() {
   return (
     <AuthProvider>
       <DataProvider>
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
-          
-          {/* Header */}
-          <Header
-            onOpenAdminModal={() => setShowAdminModal(true)}
-            onOpenHodModal={() => setShowHodModal(true)}
-          />
-
-          {/* Navigation Bar */}
-          <Navbar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            onOpenProspectus={() => setShowProspectus(true)}
-          />
-
-          {/* Main Content Body */}
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-            {activeTab === 'home' && (
-              <HomeView
-                onNavigateTab={setActiveTab}
-                onOpenProspectus={() => setShowProspectus(true)}
-                onOpenAdminModal={() => setShowAdminModal(true)}
-              />
-            )}
-
-            {activeTab === 'seats' && (
-              <SeatMatrixView onNavigateSpot={() => setActiveTab('spot')} />
-            )}
-
-            {activeTab === 'spot' && <SpotRoundView />}
-
-            {activeTab === 'faculty' && <FacultyView />}
-
-            {activeTab === 'stats' && <StatsView />}
-
-            {activeTab === 'downloads' && (
-              <DownloadsView onOpenProspectus={() => setShowProspectus(true)} />
-            )}
-
-            {activeTab === 'contact' && <ContactView />}
-
-            {activeTab === 'hod' && (
-              <HodPortalView onOpenHodModal={() => setShowHodModal(true)} />
-            )}
-
-            {activeTab === 'admin' && (
-              <AdminPortalView onOpenAdminModal={() => setShowAdminModal(true)} />
-            )}
-          </main>
-
-          {/* Footer */}
-          <Footer />
-
-          {/* Modals */}
-          <CommonProspectusModal
-            isOpen={showProspectus}
-            onClose={() => setShowProspectus(false)}
-          />
-
-          <AdminLoginModal
-            isOpen={showAdminModal}
-            onClose={() => setShowAdminModal(false)}
-            onSuccess={() => setActiveTab('admin')}
-          />
-
-          <HodLoginModal
-            isOpen={showHodModal}
-            onClose={() => setShowHodModal(false)}
-            onSuccess={() => setActiveTab('hod')}
-          />
-
-        </div>
+        <AppContent />
       </DataProvider>
     </AuthProvider>
   );

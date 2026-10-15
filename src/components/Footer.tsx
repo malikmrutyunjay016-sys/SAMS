@@ -16,7 +16,7 @@ export const Footer: React.FC = () => {
               A premier Odisha Government Higher Education Institution established in 1960. NAAC Grade B++ accredited. Dedicated to academic excellence and e-Admission transparency under SAMS Govt. of Odisha.
             </p>
             <div className="text-[10px] text-amber-400 font-mono">
-              SAMS College Code: 07022101 | ESTD: 1960
+              SAMS College Code: 03071302 | ESTD: 1960
             </div>
           </div>
 

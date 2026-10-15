@@ -221,8 +221,8 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filteredDeptStudents.slice(0, 100).map((stu) => (
-                <tr key={stu.id} className="hover:bg-slate-800/40">
+              {filteredDeptStudents.slice(0, 100).map((stu, idx) => (
+                <tr key={`${stu.id}_${idx}`} className="hover:bg-slate-800/40">
                   <td className="py-3 px-4 font-mono font-bold text-amber-400">{stu.rollNo}</td>
                   <td className="py-3 px-4 font-bold text-slate-100">{stu.name}</td>
                   <td className="py-3 px-4 font-mono text-slate-400">{stu.samsRegNo}</td>

@@ -1,4 +1,4 @@
-import { Student, SeatMatrixItem, HodAccount, FacultyMember, Notice, SystemSettings, SpotCandidate, AuditLog, CategoryType } from '../types';
+import { Student, SeatMatrixItem, HodAccount, FacultyMember, Notice, SystemSettings, SpotCandidate, AuditLog, CategoryType, FAQItem } from '../types';
 
 export const DEFAULT_COLLEGE_LOGO = "https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=200&q=80";
 
@@ -139,6 +139,37 @@ export const DEFAULT_AUDIT_LOGS: AuditLog[] = [
   { id: 'log_3', timestamp: new Date(Date.now() - 3600000 * 2).toISOString(), adminName: 'Super Admin', actionType: 'SAMS_SHEET_SYNC', description: 'Synced 1,100+ student records with SAMS Live Google Sheet.' }
 ];
 
+export const DEFAULT_FAQS: FAQItem[] = [
+  {
+    id: 'faq_1',
+    question: 'How do I apply for +3 Degree e-Admission at Panchayat College Baragada?',
+    answer: 'Candidates must apply online through the official SAMS Odisha website (samsodisha.gov.in) by selecting Panchayat College Baragada (College Code: 03071302) as their preferred choice.',
+    category: 'Admission',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'faq_2',
+    question: 'What are AEDP Specialization courses?',
+    answer: 'AEDP (Academic Excellence and Skill Development Program) courses combine regular Honours with industry-aligned skill training in Renewable Energy, Tissue Culture, Computing, and Industrial Chemistry.',
+    category: 'Academics',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'faq_3',
+    question: 'How does the Spot Round Seat reporting work?',
+    answer: 'During Spot Round, vacant seats are displayed live on this portal. Eligible candidates must report physically at SAMS Room No. 12 between 10 AM and 2 PM with original certificates.',
+    category: 'Spot Round',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'faq_4',
+    question: 'How can Super Admin add new FAQs or edit existing answers?',
+    answer: 'Super Admins can log in, navigate to the FAQs tab in the menu, and use the "Add New FAQ" form or edit/delete existing FAQs instantly.',
+    category: 'Administration',
+    updatedAt: new Date().toISOString()
+  }
+];
+
 // Helper to systematically generate 1,100+ Realistic Odisha Student Records
 export function generate1100Students(): Student[] {
   const firstNamesM = ['Aarav', 'Abhishek', 'Amarendra', 'Anil', 'Ashok', 'Bikash', 'Bipin', 'Biswajit', 'Chandan', 'Debasish', 'Dibakar', 'Deepak', 'Ganesh', 'Gautam', 'Hari', 'Hemant', 'Jagannath', 'Jitendra', 'Kalyan', 'Lipu', 'Manas', 'Manoj', 'Nilamadhab', 'Omkar', 'Prakash', 'Prasanta', 'Pravat', 'Rajesh', 'Rakesh', 'Ranjan', 'Ramesh', 'Roshina', 'Sabyasachi', 'Sanjay', 'Santosh', 'Saroj', 'Satya', 'Satyabrata', 'Shiba', 'Soumya', 'Subhash', 'Sudhir', 'Sujan', 'Suman', 'Sunil', 'Suryakanta', 'Tapan', 'Umesh', 'Vikram'];
@@ -171,7 +202,7 @@ export function generate1100Students(): Student[] {
       const phone = `9437${Math.floor(100000 + Math.random() * 900000)}`;
 
       students.push({
-        id: `stu_${studentCounter}`,
+        id: `stu_${studentCounter}_${Math.random().toString(36).substr(2, 5)}`,
         name,
         rollNo,
         samsRegNo,
@@ -206,7 +237,7 @@ export function generate1100Students(): Student[] {
     const category = categories[Math.floor(Math.random() * categories.length)];
 
     students.push({
-      id: `stu_${studentCounter}`,
+      id: `stu_${studentCounter}_${Math.random().toString(36).substr(2, 5)}`,
       name,
       rollNo,
       samsRegNo,

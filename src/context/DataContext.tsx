@@ -215,6 +215,33 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(students.slice(0, 5000)));
   }, [students]);
 
+  // Auto-normalize student classifications to guarantee 100% sync with Subjects & Seats matrix
+  useEffect(() => {
+    if (!students || students.length === 0) return;
+
+    let needsUpdate = false;
+    const normalized = students.map((s) => {
+      const norm = normalizeDepartmentAndStream(s.department, s.stream);
+      if (s.department !== norm.department || s.stream !== norm.stream || s.isAedp !== norm.isAedp) {
+        needsUpdate = true;
+        const updated = {
+          ...s,
+          department: norm.department,
+          stream: norm.stream,
+          isAedp: norm.isAedp,
+          updatedAt: new Date().toISOString(),
+        };
+        setDoc(doc(db, 'students', s.id), updated).catch(() => {});
+        return updated;
+      }
+      return s;
+    });
+
+    if (needsUpdate) {
+      setStudents(normalized);
+    }
+  }, [students]);
+
   useEffect(() => {
     safeSaveLocalStorage(LS_PREFIX + 'faculty', JSON.stringify(faculty));
   }, [faculty]);
@@ -406,8 +433,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // STUDENT ACTIONS
   // ==========================================
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt'>) => {
+    const norm = normalizeDepartmentAndStream(studentData.department, studentData.stream);
     const newStudent: Student = {
       ...studentData,
+      department: norm.department,
+      stream: norm.stream,
+      isAedp: norm.isAedp,
       id: `stu_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       updatedAt: new Date().toISOString(),
     };
@@ -419,7 +450,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateStudent = (id: string, updated: Partial<Student>) => {
     const target = students.find((s) => s.id === id);
     if (!target) return;
-    const updatedStudent = { ...target, ...updated, updatedAt: new Date().toISOString() };
+    const rawDept = updated.department !== undefined ? updated.department : target.department;
+    const rawStream = updated.stream !== undefined ? updated.stream : target.stream;
+    const norm = normalizeDepartmentAndStream(rawDept, rawStream);
+
+    const updatedStudent = {
+      ...target,
+      ...updated,
+      department: norm.department,
+      stream: norm.stream,
+      isAedp: norm.isAedp,
+      updatedAt: new Date().toISOString(),
+    };
     setStudents((prev) => prev.map((s) => (s.id === id ? updatedStudent : s)));
     setDoc(doc(db, 'students', id), updatedStudent).catch(() => {});
     addAuditLog('STUDENT_UPDATED', `Student ${id} record updated.`);
@@ -483,7 +525,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         pct = parseFloat(((parsedSec / parsedMax) * 100).toFixed(2));
       }
 
-      const stream: StreamType = s.stream || 'Arts';
+      const norm = normalizeDepartmentAndStream(s.department || 'Economics', s.stream);
+      const stream: StreamType = norm.stream;
       const prefix =
         stream === 'Arts'
           ? 'BA24'
@@ -506,9 +549,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         maxMarks: parsedMax,
         marksSecured: parsedSec,
         marksPercentage: pct,
-        department: s.department || 'Economics',
-        stream,
-        isAedp: s.isAedp || (s.department || '').toLowerCase().includes('aedp'),
+        department: norm.department,
+        stream: norm.stream,
+        isAedp: norm.isAedp,
         phone: s.phone || '9437123456',
         gender: s.gender || 'Male',
         bloodGroup: s.bloodGroup || 'O+',

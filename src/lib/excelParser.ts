@@ -571,24 +571,13 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         const rawDob = colMap['dob'] !== undefined ? row[colMap['dob']] : '2005-01-01';
         const dob = parseExcelDate(rawDob);
 
-        // Department / Honours
+        // Department / Honours & Stream Normalization
         const rawDept = colMap['department'] !== undefined ? String(row[colMap['department']] || '').trim() : '';
-        const department = rawDept || 'Physics';
-
-        // Stream
-        let stream: StreamType = 'Physical Science';
-        if (colMap['stream'] !== undefined && row[colMap['stream']]) {
-          const stStr = String(row[colMap['stream']]).trim().toLowerCase();
-          if (stStr.includes('bio')) stream = 'Biological Science';
-          else if (stStr.includes('phys')) stream = 'Physical Science';
-          else if (stStr.includes('comp') || stStr.includes('self') || stStr.includes('csa') || stStr.includes('it')) stream = 'Self Financing';
-          else if (stStr.includes('comm') || stStr.includes('b.com') || stStr.includes('bcom')) stream = 'Commerce';
-          else if (stStr.includes('art') || stStr.includes('b.a') || stStr.includes('ba')) stream = 'Arts';
-          else if (stStr.includes('sci')) stream = 'Physical Science';
-          else stream = inferStream(department);
-        } else {
-          stream = inferStream(department);
-        }
+        const rawStream = colMap['stream'] !== undefined ? String(row[colMap['stream']] || '').trim() : undefined;
+        const normDept = normalizeDepartmentAndStream(rawDept, rawStream);
+        const department = normDept.department;
+        const stream = normDept.stream;
+        const isAedp = normDept.isAedp;
 
         // Extract Secured Marks, Max Marks, and Percentage
         let marksSecured = 0;
@@ -740,7 +729,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           marksPercentage: percentage,
           department,
           stream,
-          isAedp: department.toLowerCase().includes('aedp') || department.toLowerCase().includes('renewable'),
+          isAedp,
           category,
           bloodGroup,
           phone,

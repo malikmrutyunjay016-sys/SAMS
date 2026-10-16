@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   Student,
   SeatMatrixItem,
@@ -8,7 +8,8 @@ import {
   SystemSettings,
   Notice,
   FacultyMember,
-  FAQItem
+  FAQItem,
+  StreamType
 } from '../types';
 import {
   DEFAULT_SETTINGS,
@@ -22,12 +23,14 @@ import {
   generate1100Students
 } from '../lib/defaultData';
 import { TRANSLATIONS, Language } from '../lib/translations';
+import { normalizeDepartmentAndStream } from '../lib/excelParser';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, setDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
 
 export type ThemeMode = 'maroon' | 'navy' | 'light';
 
 interface DataContextType {
+  // Data States
   students: Student[];
   seatMatrix: SeatMatrixItem[];
   spotCandidates: SpotCandidate[];
@@ -43,76 +46,163 @@ interface DataContextType {
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
   t: typeof TRANSLATIONS.en;
-  toggleSpotRound: (enabled: boolean) => void;
-  updateCollegeLogo: (url: string) => void;
-  updateSeatMatrixItem: (id: string, sanctioned: number, admitted?: number) => void;
-  resetSeatMatrixToBenchmark: () => void;
-  updateHodPassword: (deptId: string, newPass: string, hodName?: string) => void;
+
+  // Student Actions
+  addStudent: (student: Omit<Student, 'id' | 'updatedAt'>) => void;
+  updateStudent: (id: string, updated: Partial<Student>) => void;
+  deleteStudent: (id: string) => void;
+  clearAllStudents: () => void;
+  bulkImportStudents: (importedStudents: Student[], replace?: boolean) => void;
   updateStudentRollNo: (studentId: string, newRollNo: string, newStatus?: string) => void;
-  bulkImportStudents: (importedStudents: Student[]) => void;
+  loadSampleStudents: () => void;
   syncSamsGoogleSheet: (sheetUrl: string) => Promise<number>;
-  reportSpotCandidate: (candidateId: string, status: 'Reported' | 'Not Reported') => void;
-  registerSpotCandidate: (candidate: Partial<SpotCandidate>) => void;
-  runAutomatedMeritSelection: (deptId?: string) => void;
+  correctStudentClassifications: () => number;
+
+  // Faculty Actions
+  addFaculty: (facultyMember: Omit<FacultyMember, 'id'>) => void;
+  updateFaculty: (id: string, updated: Partial<FacultyMember>) => void;
+  deleteFaculty: (id: string) => void;
+  clearAllFaculty: () => void;
+  loadSampleFaculty: () => void;
+
+  // Seat Matrix Actions
+  addSeatMatrixItem: (item: Omit<SeatMatrixItem, 'id' | 'updatedAt'>) => void;
+  updateSeatMatrixItem: (id: string, sanctioned: number, admitted?: number, deptName?: string, stream?: StreamType) => void;
+  deleteSeatMatrixItem: (id: string) => void;
+  resetSeatMatrixToBenchmark: () => void;
+  clearSeatMatrix: () => void;
+
+  // Notice Actions
   addNotice: (notice: Omit<Notice, 'id'>) => void;
+  updateNotice: (id: string, updated: Partial<Notice>) => void;
   deleteNotice: (noticeId: string) => void;
+
+  // FAQ Actions
   addFAQ: (question: string, answer: string, category: string) => void;
   updateFAQ: (id: string, question: string, answer: string, category: string) => void;
   deleteFAQ: (id: string) => void;
+
+  // HOD Accounts Actions
+  addHodAccount: (acc: Omit<HodAccount, 'id' | 'updatedAt'>) => void;
+  updateHodAccount: (id: string, updated: Partial<HodAccount>) => void;
+  deleteHodAccount: (id: string) => void;
+  updateHodPassword: (deptId: string, newPass: string, hodName?: string) => void;
+
+  // Spot Candidates Actions
+  registerSpotCandidate: (candidate: Partial<SpotCandidate>) => void;
+  updateSpotCandidate: (id: string, updated: Partial<SpotCandidate>) => void;
+  deleteSpotCandidate: (id: string) => void;
+  clearAllSpotCandidates: () => void;
+  reportSpotCandidate: (candidateId: string, status: 'Reported' | 'Not Reported') => void;
+  runAutomatedMeritSelection: (deptId?: string) => void;
+
+  // System Settings Actions
+  updateSystemSettings: (settings: Partial<SystemSettings>) => void;
+  toggleSpotRound: (enabled: boolean) => void;
+  updateCollegeLogo: (url: string) => void;
+
+  // Utility Actions
   addAuditLog: (actionType: string, description: string) => void;
   restoreSystemFromSnapshot: (snapshotData: any) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const LS_PREFIX = 'SAMS_BARAGADA_V2_';
+const LS_PREFIX = 'SAMS_BARAGADA_V4_';
+
+function safeSaveLocalStorage(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.warn(`LocalStorage quota or write error on key "${key}":`, err);
+    try {
+      sessionStorage.setItem(key, value);
+    } catch {}
+  }
+}
+
+function safeGetLocalStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key) || sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [lang, setLang] = useState<Language>('en');
   const [themeMode, setThemeMode] = useState<ThemeMode>('maroon');
 
+  // Load students from storage or start clean
   const [students, setStudents] = useState<Student[]>(() => {
-    const saved = localStorage.getItem(LS_PREFIX + 'students');
-    return saved ? JSON.parse(saved) : generate1100Students();
+    const saved = safeGetLocalStorage(LS_PREFIX + 'students');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error('Failed to parse saved students:', e);
+      }
+    }
+    return [];
+  });
+
+  const [faculty, setFaculty] = useState<FacultyMember[]>(() => {
+    const saved = safeGetLocalStorage(LS_PREFIX + 'faculty');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    return [];
   });
 
   const [seatMatrix, setSeatMatrix] = useState<SeatMatrixItem[]>(() => {
-    const saved = localStorage.getItem(LS_PREFIX + 'seatMatrix');
-    return saved ? JSON.parse(saved) : DEFAULT_SEAT_MATRIX;
+    const saved = safeGetLocalStorage(LS_PREFIX + 'seatMatrix');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed.some((p: SeatMatrixItem) => p.stream === 'Biological Science' || p.stream === 'Physical Science' || p.stream === 'Arts')
+        ) {
+          return parsed;
+        }
+      } catch {}
+    }
+    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(DEFAULT_SEAT_MATRIX));
+    return DEFAULT_SEAT_MATRIX;
   });
 
   const [spotCandidates, setSpotCandidates] = useState<SpotCandidate[]>(() => {
-    const saved = localStorage.getItem(LS_PREFIX + 'spotCandidates');
+    const saved = safeGetLocalStorage(LS_PREFIX + 'spotCandidates');
     return saved ? JSON.parse(saved) : DEFAULT_SPOT_CANDIDATES;
   });
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
-    const saved = localStorage.getItem(LS_PREFIX + 'auditLogs');
+    const saved = safeGetLocalStorage(LS_PREFIX + 'auditLogs');
     return saved ? JSON.parse(saved) : DEFAULT_AUDIT_LOGS;
   });
 
   const [hodAccounts, setHodAccounts] = useState<HodAccount[]>(() => {
-    const saved = localStorage.getItem(LS_PREFIX + 'hodAccounts');
+    const saved = safeGetLocalStorage(LS_PREFIX + 'hodAccounts');
     return saved ? JSON.parse(saved) : DEFAULT_HOD_ACCOUNTS;
   });
 
   const [systemSettings, setSystemSettings] = useState<SystemSettings>(() => {
-    const saved = localStorage.getItem(LS_PREFIX + 'systemSettings');
+    const saved = safeGetLocalStorage(LS_PREFIX + 'systemSettings');
     return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
 
   const [notices, setNotices] = useState<Notice[]>(() => {
-    const saved = localStorage.getItem(LS_PREFIX + 'notices');
+    const saved = safeGetLocalStorage(LS_PREFIX + 'notices');
     return saved ? JSON.parse(saved) : DEFAULT_NOTICES;
   });
 
-  const [faculty, setFaculty] = useState<FacultyMember[]>(() => {
-    const saved = localStorage.getItem(LS_PREFIX + 'faculty');
-    return saved ? JSON.parse(saved) : DEFAULT_FACULTY;
-  });
-
   const [faqs, setFaqs] = useState<FAQItem[]>(() => {
-    const saved = localStorage.getItem(LS_PREFIX + 'faqs');
+    const saved = safeGetLocalStorage(LS_PREFIX + 'faqs');
     return saved ? JSON.parse(saved) : DEFAULT_FAQS;
   });
 
@@ -120,43 +210,431 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
 
-  // Sync LocalStorage
+  // Safe Sync to LocalStorage
   useEffect(() => {
-    localStorage.setItem(LS_PREFIX + 'students', JSON.stringify(students.slice(0, 1500)));
+    safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(students.slice(0, 5000)));
   }, [students]);
 
   useEffect(() => {
-    localStorage.setItem(LS_PREFIX + 'seatMatrix', JSON.stringify(seatMatrix));
-  }, [seatMatrix]);
-
-  useEffect(() => {
-    localStorage.setItem(LS_PREFIX + 'spotCandidates', JSON.stringify(spotCandidates));
-  }, [spotCandidates]);
-
-  useEffect(() => {
-    localStorage.setItem(LS_PREFIX + 'auditLogs', JSON.stringify(auditLogs));
-  }, [auditLogs]);
-
-  useEffect(() => {
-    localStorage.setItem(LS_PREFIX + 'hodAccounts', JSON.stringify(hodAccounts));
-  }, [hodAccounts]);
-
-  useEffect(() => {
-    localStorage.setItem(LS_PREFIX + 'systemSettings', JSON.stringify(systemSettings));
-  }, [systemSettings]);
-
-  useEffect(() => {
-    localStorage.setItem(LS_PREFIX + 'notices', JSON.stringify(notices));
-  }, [notices]);
-
-  useEffect(() => {
-    localStorage.setItem(LS_PREFIX + 'faculty', JSON.stringify(faculty));
+    safeSaveLocalStorage(LS_PREFIX + 'faculty', JSON.stringify(faculty));
   }, [faculty]);
 
   useEffect(() => {
-    localStorage.setItem(LS_PREFIX + 'faqs', JSON.stringify(faqs));
+    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(seatMatrix));
+  }, [seatMatrix]);
+
+  useEffect(() => {
+    safeSaveLocalStorage(LS_PREFIX + 'spotCandidates', JSON.stringify(spotCandidates));
+  }, [spotCandidates]);
+
+  useEffect(() => {
+    safeSaveLocalStorage(LS_PREFIX + 'auditLogs', JSON.stringify(auditLogs));
+  }, [auditLogs]);
+
+  useEffect(() => {
+    safeSaveLocalStorage(LS_PREFIX + 'hodAccounts', JSON.stringify(hodAccounts));
+  }, [hodAccounts]);
+
+  useEffect(() => {
+    safeSaveLocalStorage(LS_PREFIX + 'systemSettings', JSON.stringify(systemSettings));
+  }, [systemSettings]);
+
+  useEffect(() => {
+    safeSaveLocalStorage(LS_PREFIX + 'notices', JSON.stringify(notices));
+  }, [notices]);
+
+  useEffect(() => {
+    safeSaveLocalStorage(LS_PREFIX + 'faqs', JSON.stringify(faqs));
   }, [faqs]);
 
+  // Firestore optional sync
+  useEffect(() => {
+    const unsubSettings = onSnapshot(
+      collection(db, 'systemSettings'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map((d) => d.data() as SystemSettings);
+          const globalSetting = docs.find((s) => s.id === 'global') || docs[0];
+          if (globalSetting) setSystemSettings(globalSetting);
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'systemSettings')
+    );
+
+    return () => {
+      unsubSettings();
+    };
+  }, []);
+
+  const addAuditLog = (actionType: string, description: string) => {
+    const newLog: AuditLog = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      adminName: 'Super Admin',
+      actionType,
+      description,
+    };
+    setAuditLogs((prev) => [newLog, ...prev.slice(0, 100)]);
+
+    try {
+      setDoc(doc(db, 'auditLogs', newLog.id), newLog).catch(() => {});
+    } catch (e) {}
+  };
+
+  // ==========================================
+  // STUDENT ACTIONS
+  // ==========================================
+  const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt'>) => {
+    const newStudent: Student = {
+      ...studentData,
+      id: `stu_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      updatedAt: new Date().toISOString(),
+    };
+    setStudents((prev) => [newStudent, ...prev]);
+    addAuditLog('STUDENT_ADDED', `New student added: ${newStudent.name} (${newStudent.rollNo || newStudent.samsRegNo})`);
+  };
+
+  const updateStudent = (id: string, updated: Partial<Student>) => {
+    setStudents((prev) =>
+      prev.map((s) => {
+        if (s.id === id) {
+          return {
+            ...s,
+            ...updated,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return s;
+      })
+    );
+    addAuditLog('STUDENT_UPDATED', `Student ${id} record updated.`);
+  };
+
+  const deleteStudent = (id: string) => {
+    const target = students.find((s) => s.id === id);
+    setStudents((prev) => prev.filter((s) => s.id !== id));
+    addAuditLog('STUDENT_DELETED', `Student ${target?.name || id} deleted from database.`);
+  };
+
+  const clearAllStudents = () => {
+    const count = students.length;
+    setStudents([]);
+    localStorage.removeItem(LS_PREFIX + 'students');
+    setSeatMatrix((prev) =>
+      prev.map((item) => ({
+        ...item,
+        admitted: 0,
+        vacant: item.sanctioned,
+        updatedAt: new Date().toISOString(),
+      }))
+    );
+    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(DEFAULT_SEAT_MATRIX));
+    addAuditLog('STUDENTS_CLEARED', `Cleared all ${count} student records from database.`);
+  };
+
+  const bulkImportStudents = (importedStudents: Student[], replace: boolean = false) => {
+    if (!importedStudents || !Array.isArray(importedStudents) || importedStudents.length === 0) return;
+
+    // Sanitize and guarantee valid properties for all records
+    const sanitized: Student[] = importedStudents.map((s, idx) => {
+      const parsedMax =
+        typeof s.maxMarks === 'number' && s.maxMarks > 0
+          ? s.maxMarks
+          : s.maxMarks
+          ? Number(String(s.maxMarks).replace(/[^0-9.]/g, '')) || 600
+          : 600;
+
+      const parsedSec =
+        typeof s.marksSecured === 'number' && s.marksSecured >= 0
+          ? s.marksSecured
+          : s.marksSecured
+          ? Number(String(s.marksSecured).replace(/[^0-9.]/g, '')) || 0
+          : 0;
+
+      let pct =
+        typeof s.marksPercentage === 'number' && s.marksPercentage > 0
+          ? s.marksPercentage
+          : parsedSec > 0 && parsedMax > 0
+          ? parseFloat(((parsedSec / parsedMax) * 100).toFixed(2))
+          : 75.0;
+
+      if (pct > 100 && parsedSec <= parsedMax) {
+        pct = parseFloat(((parsedSec / parsedMax) * 100).toFixed(2));
+      }
+
+      const stream: StreamType = s.stream || 'Arts';
+      const prefix =
+        stream === 'Arts'
+          ? 'BA24'
+          : stream === 'Commerce'
+          ? 'BC24'
+          : stream === 'Self Financing'
+          ? 'CS24'
+          : 'BS24';
+
+      return {
+        ...s,
+        id: s.id || `stu_imp_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+        name: s.name || `Student ${idx + 1}`,
+        rollNo: s.rollNo || `${prefix}-${String(idx + 1).padStart(3, '0')}`,
+        samsRegNo: s.samsRegNo || `24D${15000 + idx}`,
+        barcode: s.barcode || s.samsRegNo || `BAR-${Date.now().toString().slice(-4)}${idx}`,
+        parentName: s.parentName || 'Parent / Guardian',
+        category: s.category || 'GEN',
+        dob: s.dob || '2005-01-01',
+        maxMarks: parsedMax,
+        marksSecured: parsedSec,
+        marksPercentage: pct,
+        department: s.department || 'Economics',
+        stream,
+        isAedp: s.isAedp || (s.department || '').toLowerCase().includes('aedp'),
+        phone: s.phone || '9437123456',
+        gender: s.gender || 'Male',
+        bloodGroup: s.bloodGroup || 'O+',
+        status: s.status || 'Admitted',
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    setStudents((prev) => {
+      const updatedList = replace ? sanitized : [...sanitized, ...prev];
+      safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updatedList.slice(0, 5000)));
+
+      // Also dynamically sync Seat Matrix admitted scholars & remaining vacancies!
+      setSeatMatrix((prevMatrix) => {
+        const synced = prevMatrix.map((item) => {
+          const admittedCount = updatedList.filter((s) => {
+            const sDept = (s.department || '').toLowerCase().trim();
+            const mDept = (item.deptName || '').toLowerCase().trim();
+            if (sDept === mDept) return true;
+            if (item.isAedp && s.isAedp && (sDept.includes(mDept) || mDept.includes(sDept))) return true;
+            if (!item.isAedp && !s.isAedp && sDept.includes(mDept)) return true;
+            return false;
+          }).length;
+          return {
+            ...item,
+            admitted: admittedCount,
+            vacant: Math.max(0, item.sanctioned - admittedCount),
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(synced));
+        return synced;
+      });
+
+      return updatedList;
+    });
+
+    addAuditLog(
+      'BULK_STUDENT_IMPORT',
+      `${replace ? 'Replaced database with' : 'Imported and reflected'} ${sanitized.length} student records from Excel/CSV file.`
+    );
+  };
+
+  const updateStudentRollNo = (studentId: string, newRollNo: string, newStatus?: string) => {
+    setStudents((prev) =>
+      prev.map((s) => {
+        if (s.id === studentId) {
+          return {
+            ...s,
+            rollNo: newRollNo,
+            status: (newStatus as any) || s.status,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return s;
+      })
+    );
+    addAuditLog('STUDENT_ROLL_EDIT', `Updated roll no for student ID ${studentId} to ${newRollNo}`);
+  };
+
+  const loadSampleStudents = () => {
+    const sample = generate1100Students().slice(0, 150);
+    setStudents(sample);
+    addAuditLog('SAMPLE_STUDENTS_LOADED', 'Loaded sample student records for demonstration.');
+  };
+
+  const syncSamsGoogleSheet = async (sheetUrl: string): Promise<number> => {
+    setIsLoading(true);
+    await new Promise((res) => setTimeout(res, 1200));
+
+    const newSyncedCount = 20;
+    const newStudents = generate1100Students().slice(0, newSyncedCount);
+    setStudents((prev) => [...newStudents, ...prev]);
+
+    const updatedSettings = {
+      ...systemSettings,
+      sheetSyncUrl: sheetUrl,
+      lastSheetSync: new Date().toISOString(),
+    };
+    setSystemSettings(updatedSettings);
+
+    addAuditLog('SAMS_GOOGLE_SHEET_SYNC', `Successfully synced live SAMS Google Sheet: ${sheetUrl}`);
+    setIsLoading(false);
+    return newSyncedCount;
+  };
+
+  const correctStudentClassifications = (): number => {
+    let correctedCount = 0;
+    const updated = students.map((s) => {
+      const norm = normalizeDepartmentAndStream(s.department, s.stream);
+      if (s.department !== norm.department || s.stream !== norm.stream || s.isAedp !== norm.isAedp) {
+        correctedCount++;
+        return {
+          ...s,
+          department: norm.department,
+          stream: norm.stream,
+          isAedp: norm.isAedp,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return s;
+    });
+
+    if (correctedCount > 0) {
+      setStudents(updated);
+      safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updated.slice(0, 5000)));
+      addAuditLog('CLASSIFICATION_CORRECTED', `Checked and corrected ${correctedCount} student stream & subject classifications matching Subjects & Seats matrix.`);
+    }
+    return correctedCount;
+  };
+
+  // ==========================================
+  // FACULTY ACTIONS
+  // ==========================================
+  const addFaculty = (facultyMember: Omit<FacultyMember, 'id'>) => {
+    const newFaculty: FacultyMember = {
+      ...facultyMember,
+      id: `fac_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    };
+    setFaculty((prev) => [newFaculty, ...prev]);
+    addAuditLog('FACULTY_ADDED', `Added faculty member: ${newFaculty.name} (${newFaculty.deptName})`);
+  };
+
+  const updateFaculty = (id: string, updated: Partial<FacultyMember>) => {
+    setFaculty((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, ...updated } : f))
+    );
+    addAuditLog('FACULTY_UPDATED', `Updated faculty member ${id}.`);
+  };
+
+  const deleteFaculty = (id: string) => {
+    const target = faculty.find((f) => f.id === id);
+    setFaculty((prev) => prev.filter((f) => f.id !== id));
+    addAuditLog('FACULTY_DELETED', `Deleted faculty member ${target?.name || id}.`);
+  };
+
+  const clearAllFaculty = () => {
+    const count = faculty.length;
+    setFaculty([]);
+    localStorage.removeItem(LS_PREFIX + 'faculty');
+    addAuditLog('FACULTY_CLEARED', `Cleared all ${count} faculty records from directory.`);
+  };
+
+  const loadSampleFaculty = () => {
+    setFaculty(DEFAULT_FACULTY);
+    addAuditLog('SAMPLE_FACULTY_LOADED', 'Restored default faculty members directory.');
+  };
+
+  // ==========================================
+  // SEAT MATRIX ACTIONS
+  // ==========================================
+  const addSeatMatrixItem = (item: Omit<SeatMatrixItem, 'id' | 'updatedAt'>) => {
+    const newItem: SeatMatrixItem = {
+      ...item,
+      id: `dept_${item.deptName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`,
+      vacant: Math.max(0, item.sanctioned - item.admitted),
+      updatedAt: new Date().toISOString(),
+    };
+    setSeatMatrix((prev) => [...prev, newItem]);
+    addAuditLog('SEAT_MATRIX_ADD', `Added department seat matrix for ${newItem.deptName}.`);
+  };
+
+  const updateSeatMatrixItem = (
+    id: string,
+    sanctioned: number,
+    admitted?: number,
+    deptName?: string,
+    stream?: StreamType
+  ) => {
+    setSeatMatrix((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          const newSanctioned = sanctioned;
+          const newAdmitted = admitted !== undefined ? admitted : item.admitted;
+          const newVacant = Math.max(0, newSanctioned - newAdmitted);
+          const updatedItem = {
+            ...item,
+            deptName: deptName || item.deptName,
+            stream: stream || item.stream,
+            sanctioned: newSanctioned,
+            admitted: newAdmitted,
+            vacant: newVacant,
+            updatedAt: new Date().toISOString(),
+          };
+
+          try {
+            setDoc(doc(db, 'seatMatrix', item.id), updatedItem).catch(() => {});
+          } catch (e) {}
+
+          return updatedItem;
+        }
+        return item;
+      })
+    );
+    addAuditLog('SEAT_MATRIX_UPDATE', `Updated intake seat matrix for ${id}.`);
+  };
+
+  const deleteSeatMatrixItem = (id: string) => {
+    setSeatMatrix((prev) => prev.filter((item) => item.id !== id));
+    addAuditLog('SEAT_MATRIX_DELETE', `Deleted department ${id} from seat matrix.`);
+  };
+
+  const resetSeatMatrixToBenchmark = () => {
+    setSeatMatrix(DEFAULT_SEAT_MATRIX);
+    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(DEFAULT_SEAT_MATRIX));
+    addAuditLog('SEAT_MATRIX_RESET', 'Cleared and reset seat intake matrix to official 28 departments.');
+  };
+
+  const clearSeatMatrix = () => {
+    const cleared = DEFAULT_SEAT_MATRIX.map((item) => ({
+      ...item,
+      admitted: 0,
+      vacant: item.sanctioned,
+      updatedAt: new Date().toISOString(),
+    }));
+    setSeatMatrix(cleared);
+    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(cleared));
+    addAuditLog('SEAT_MATRIX_CLEARED', 'Cleared seat matrix and reset intake to official 28 departments.');
+  };
+
+  // ==========================================
+  // NOTICES ACTIONS
+  // ==========================================
+  const addNotice = (notice: Omit<Notice, 'id'>) => {
+    const newNotice: Notice = {
+      ...notice,
+      id: `notice_${Date.now()}`,
+    };
+    setNotices((prev) => [newNotice, ...prev]);
+    addAuditLog('NOTICE_POSTED', `New notice posted: "${notice.title}"`);
+  };
+
+  const updateNotice = (id: string, updated: Partial<Notice>) => {
+    setNotices((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, ...updated } : n))
+    );
+    addAuditLog('NOTICE_UPDATED', `Updated notice ${id}.`);
+  };
+
+  const deleteNotice = (noticeId: string) => {
+    setNotices((prev) => prev.filter((n) => n.id !== noticeId));
+    addAuditLog('NOTICE_DELETED', `Notice ${noticeId} removed.`);
+  };
+
+  // ==========================================
+  // FAQS ACTIONS
+  // ==========================================
   const addFAQ = (question: string, answer: string, category: string) => {
     const newFaq: FAQItem = {
       id: `faq_${Date.now()}`,
@@ -181,114 +659,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addAuditLog('FAQ_DELETED', `FAQ ${id} deleted.`);
   };
 
-  // Firestore Listeners
-  useEffect(() => {
-    const unsubSettings = onSnapshot(
-      collection(db, 'systemSettings'),
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const docs = snapshot.docs.map((d) => d.data() as SystemSettings);
-          const globalSetting = docs.find((s) => s.id === 'global') || docs[0];
-          if (globalSetting) setSystemSettings(globalSetting);
-        }
-      },
-      (error) => handleFirestoreError(error, OperationType.GET, 'systemSettings')
-    );
-
-    const unsubSeat = onSnapshot(
-      collection(db, 'seatMatrix'),
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const items = snapshot.docs.map((d) => d.data() as SeatMatrixItem);
-          setSeatMatrix(items);
-        }
-      },
-      (error) => handleFirestoreError(error, OperationType.GET, 'seatMatrix')
-    );
-
-    const unsubSpot = onSnapshot(
-      collection(db, 'spotCandidates'),
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const candidates = snapshot.docs.map((d) => d.data() as SpotCandidate);
-          setSpotCandidates(candidates);
-        }
-      },
-      (error) => handleFirestoreError(error, OperationType.GET, 'spotCandidates')
-    );
-
-    return () => {
-      unsubSettings();
-      unsubSeat();
-      unsubSpot();
+  // ==========================================
+  // HOD ACCOUNTS ACTIONS
+  // ==========================================
+  const addHodAccount = (acc: Omit<HodAccount, 'id' | 'updatedAt'>) => {
+    const newAcc: HodAccount = {
+      ...acc,
+      id: `dept_${acc.deptName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`,
+      updatedAt: new Date().toISOString(),
     };
-  }, []);
-
-  const addAuditLog = (actionType: string, description: string) => {
-    const newLog: AuditLog = {
-      id: `log_${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      adminName: 'Super Admin',
-      actionType,
-      description,
-    };
-    setAuditLogs((prev) => [newLog, ...prev]);
-
-    try {
-      setDoc(doc(db, 'auditLogs', newLog.id), newLog).catch(() => {});
-    } catch (e) {}
+    setHodAccounts((prev) => [...prev, newAcc]);
+    addAuditLog('HOD_ACCOUNT_ADDED', `Created HOD account for Department of ${newAcc.deptName}`);
   };
 
-  const toggleSpotRound = (enabled: boolean) => {
-    const updated = { ...systemSettings, spotRoundEnabled: enabled, updatedAt: new Date().toISOString() };
-    setSystemSettings(updated);
-    addAuditLog('SPOT_ROUND_TOGGLE', `Spot Round live reporting desk set to ${enabled ? 'ENABLED' : 'DISABLED'}`);
-
-    try {
-      setDoc(doc(db, 'systemSettings', 'global'), updated).catch(() => {});
-    } catch (e) {}
-  };
-
-  const updateCollegeLogo = (url: string) => {
-    const updated = { ...systemSettings, collegeLogoUrl: url, updatedAt: new Date().toISOString() };
-    setSystemSettings(updated);
-    addAuditLog('COLLEGE_LOGO_UPDATE', 'College crest logo updated.');
-
-    try {
-      setDoc(doc(db, 'systemSettings', 'global'), updated).catch(() => {});
-    } catch (e) {}
-  };
-
-  const updateSeatMatrixItem = (id: string, sanctioned: number, admitted?: number) => {
-    setSeatMatrix((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const newSanctioned = sanctioned;
-          const newAdmitted = admitted !== undefined ? admitted : item.admitted;
-          const newVacant = Math.max(0, newSanctioned - newAdmitted);
-          const updatedItem = {
-            ...item,
-            sanctioned: newSanctioned,
-            admitted: newAdmitted,
-            vacant: newVacant,
-            updatedAt: new Date().toISOString(),
-          };
-
-          try {
-            setDoc(doc(db, 'seatMatrix', item.id), updatedItem).catch(() => {});
-          } catch (e) {}
-
-          return updatedItem;
-        }
-        return item;
-      })
+  const updateHodAccount = (id: string, updated: Partial<HodAccount>) => {
+    setHodAccounts((prev) =>
+      prev.map((acc) => (acc.id === id ? { ...acc, ...updated, updatedAt: new Date().toISOString() } : acc))
     );
-    addAuditLog('SEAT_MATRIX_UPDATE', `Updated intake seat matrix for ${id}.`);
+    addAuditLog('HOD_ACCOUNT_UPDATED', `Updated HOD account ${id}.`);
   };
 
-  const resetSeatMatrixToBenchmark = () => {
-    setSeatMatrix(DEFAULT_SEAT_MATRIX);
-    addAuditLog('SEAT_MATRIX_RESET', 'Reset seat intake matrix to Odisha Government benchmark default.');
+  const deleteHodAccount = (id: string) => {
+    setHodAccounts((prev) => prev.filter((acc) => acc.id !== id));
+    addAuditLog('HOD_ACCOUNT_DELETED', `Deleted HOD account ${id}.`);
   };
 
   const updateHodPassword = (deptId: string, newPass: string, hodName?: string) => {
@@ -301,9 +694,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             hodName: hodName || acc.hodName,
             updatedAt: new Date().toISOString(),
           };
-          try {
-            setDoc(doc(db, 'hodAccounts', acc.id), updated).catch(() => {});
-          } catch (e) {}
           return updated;
         }
         return acc;
@@ -312,64 +702,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addAuditLog('HOD_CREDENTIALS_UPDATE', `Updated security password for department ${deptId}.`);
   };
 
-  const updateStudentRollNo = (studentId: string, newRollNo: string, newStatus?: string) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id === studentId) {
-          return {
-            ...s,
-            rollNo: newRollNo,
-            status: (newStatus as any) || s.status,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return s;
-      })
-    );
-    addAuditLog('STUDENT_RECORD_EDIT', `Updated University Roll No for student ID ${studentId} to ${newRollNo}`);
-  };
-
-  const bulkImportStudents = (importedStudents: Student[]) => {
-    setStudents((prev) => [...importedStudents, ...prev]);
-    addAuditLog('BULK_STUDENT_IMPORT', `Imported ${importedStudents.length} student records from CSV/XLSX sheet.`);
-  };
-
-  const syncSamsGoogleSheet = async (sheetUrl: string): Promise<number> => {
-    setIsLoading(true);
-    await new Promise((res) => setTimeout(res, 1200));
-
-    const newSyncedCount = 25;
-    const newStudents = generate1100Students().slice(0, newSyncedCount);
-    setStudents((prev) => [...newStudents, ...prev]);
-
-    const updatedSettings = {
-      ...systemSettings,
-      sheetSyncUrl: sheetUrl,
-      lastSheetSync: new Date().toISOString(),
-    };
-    setSystemSettings(updatedSettings);
-
-    addAuditLog('SAMS_GOOGLE_SHEET_SYNC', `Successfully synced live SAMS Google Sheet URL: ${sheetUrl}`);
-    setIsLoading(false);
-    return newSyncedCount;
-  };
-
-  const reportSpotCandidate = (candidateId: string, status: 'Reported' | 'Not Reported') => {
-    setSpotCandidates((prev) =>
-      prev.map((cand) => {
-        if (cand.id === candidateId) {
-          const updated = { ...cand, reportedStatus: status };
-          try {
-            setDoc(doc(db, 'spotCandidates', cand.id), updated).catch(() => {});
-          } catch (e) {}
-          return updated;
-        }
-        return cand;
-      })
-    );
-    addAuditLog('SPOT_CANDIDATE_REPORTING', `Updated candidate ${candidateId} reported status to ${status}`);
-  };
-
+  // ==========================================
+  // SPOT CANDIDATES ACTIONS
+  // ==========================================
   const registerSpotCandidate = (candidateData: Partial<SpotCandidate>) => {
     const newCand: SpotCandidate = {
       id: `spot_${Date.now()}`,
@@ -389,10 +724,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setSpotCandidates((prev) => [newCand, ...prev]);
     addAuditLog('SPOT_CANDIDATE_REGISTRATION', `New candidate registered for Spot Round: ${newCand.studentName} (${newCand.samsRegNo})`);
+  };
 
-    try {
-      setDoc(doc(db, 'spotCandidates', newCand.id), newCand).catch(() => {});
-    } catch (e) {}
+  const updateSpotCandidate = (id: string, updated: Partial<SpotCandidate>) => {
+    setSpotCandidates((prev) =>
+      prev.map((cand) => (cand.id === id ? { ...cand, ...updated } : cand))
+    );
+    addAuditLog('SPOT_CANDIDATE_UPDATED', `Updated spot candidate ${id}.`);
+  };
+
+  const deleteSpotCandidate = (id: string) => {
+    setSpotCandidates((prev) => prev.filter((cand) => cand.id !== id));
+    addAuditLog('SPOT_CANDIDATE_DELETED', `Deleted spot candidate ${id}.`);
+  };
+
+  const clearAllSpotCandidates = () => {
+    const count = spotCandidates.length;
+    setSpotCandidates([]);
+    addAuditLog('SPOT_CANDIDATES_CLEARED', `Cleared all ${count} spot candidates.`);
+  };
+
+  const reportSpotCandidate = (candidateId: string, status: 'Reported' | 'Not Reported') => {
+    setSpotCandidates((prev) =>
+      prev.map((cand) => (cand.id === candidateId ? { ...cand, reportedStatus: status } : cand))
+    );
+    addAuditLog('SPOT_CANDIDATE_REPORTING', `Updated candidate ${candidateId} reported status to ${status}`);
   };
 
   const runAutomatedMeritSelection = (targetDeptId?: string) => {
@@ -421,43 +777,114 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return updated;
     });
 
-    addAuditLog('AUTOMATED_MERIT_SELECTION', 'Executed automated Spot Round Merit Selection algorithm based on reported candidates and vacant seats.');
+    addAuditLog('AUTOMATED_MERIT_SELECTION', 'Executed automated Spot Round Merit Selection algorithm.');
   };
 
-  const addNotice = (notice: Omit<Notice, 'id'>) => {
-    const newNotice: Notice = {
-      ...notice,
-      id: `notice_${Date.now()}`,
+  // ==========================================
+  // SYSTEM SETTINGS ACTIONS
+  // ==========================================
+  const updateSystemSettings = (newSettings: Partial<SystemSettings>) => {
+    const updated = {
+      ...systemSettings,
+      ...newSettings,
+      updatedAt: new Date().toISOString(),
     };
-    setNotices((prev) => [newNotice, ...prev]);
-    addAuditLog('NOTICE_POSTED', `New notice posted: "${notice.title}"`);
+    setSystemSettings(updated);
+    addAuditLog('SYSTEM_SETTINGS_UPDATE', 'College profile and system configuration updated.');
+
+    try {
+      setDoc(doc(db, 'systemSettings', 'global'), updated).catch(() => {});
+    } catch (e) {}
   };
 
-  const deleteNotice = (noticeId: string) => {
-    setNotices((prev) => prev.filter((n) => n.id !== noticeId));
-    addAuditLog('NOTICE_DELETED', `Notice ${noticeId} removed.`);
+  const toggleSpotRound = (enabled: boolean) => {
+    updateSystemSettings({ spotRoundEnabled: enabled });
   };
 
+  const updateCollegeLogo = (url: string) => {
+    updateSystemSettings({ collegeLogoUrl: url });
+  };
+
+  // ==========================================
+  // SYSTEM RESTORE
+  // ==========================================
   const restoreSystemFromSnapshot = (snapshotData: any) => {
     if (snapshotData && snapshotData.data) {
-      if (snapshotData.data.students) setStudents(snapshotData.data.students);
-      if (snapshotData.data.seatMatrix) setSeatMatrix(snapshotData.data.seatMatrix);
-      if (snapshotData.data.spotCandidates) setSpotCandidates(snapshotData.data.spotCandidates);
-      if (snapshotData.data.auditLogs) setAuditLogs(snapshotData.data.auditLogs);
-      if (snapshotData.data.hodAccounts) setHodAccounts(snapshotData.data.hodAccounts);
+      if (Array.isArray(snapshotData.data.students)) setStudents(snapshotData.data.students);
+      if (Array.isArray(snapshotData.data.seatMatrix)) setSeatMatrix(snapshotData.data.seatMatrix);
+      if (Array.isArray(snapshotData.data.spotCandidates)) setSpotCandidates(snapshotData.data.spotCandidates);
+      if (Array.isArray(snapshotData.data.auditLogs)) setAuditLogs(snapshotData.data.auditLogs);
+      if (Array.isArray(snapshotData.data.hodAccounts)) setHodAccounts(snapshotData.data.hodAccounts);
       if (snapshotData.data.systemSettings) setSystemSettings(snapshotData.data.systemSettings);
-      if (snapshotData.data.notices) setNotices(snapshotData.data.notices);
-      if (snapshotData.data.faculty) setFaculty(snapshotData.data.faculty);
+      if (Array.isArray(snapshotData.data.notices)) setNotices(snapshotData.data.notices);
+      if (Array.isArray(snapshotData.data.faculty)) setFaculty(snapshotData.data.faculty);
+      if (Array.isArray(snapshotData.data.faqs)) setFaqs(snapshotData.data.faqs);
 
       addAuditLog('SYSTEM_RESTORE', `System restored from snapshot created on ${snapshotData.timestamp || 'unknown'}`);
     }
   };
 
+  // Dynamically sync seat matrix admitted counts and vacancies with student database
+  const syncedSeatMatrix = useMemo(() => {
+    return seatMatrix.map((item) => {
+      const admittedCount = students.filter((s) => {
+        if (s.status && s.status !== 'Admitted') return false;
+
+        const sDept = (s.department || '').toLowerCase().trim();
+        const mDept = (item.deptName || '').toLowerCase().trim();
+
+        if (sDept === mDept) return true;
+
+        if (item.isAedp) {
+          if (!s.isAedp && !sDept.includes('aedp')) return false;
+          if (mDept.includes('econ') && sDept.includes('econ')) return true;
+          if (mDept.includes('english') && (sDept.includes('eng') || sDept.includes('translation'))) return true;
+          if (mDept.includes('history') && (sDept.includes('hist') || sDept.includes('tourism'))) return true;
+          if (mDept.includes('botany') && (sDept.includes('botan') || sDept.includes('tissue'))) return true;
+          if (mDept.includes('zoology') && (sDept.includes('zool') || sDept.includes('bioscience'))) return true;
+          if (mDept.includes('commerce') && (sDept.includes('comm') || sDept.includes('bank') || sDept.includes('bfsi'))) return true;
+          if (mDept.includes('chemistry') && (sDept.includes('chem') || sDept.includes('industrial'))) return true;
+          if (mDept.includes('math') && (sDept.includes('math') || sDept.includes('computing'))) return true;
+        } else {
+          if (s.isAedp || sDept.includes('aedp')) return false;
+          if (mDept.includes('econ') && sDept.includes('econ')) return true;
+          if (mDept.includes('education') && sDept.includes('edu')) return true;
+          if (mDept.includes('english') && sDept.includes('eng')) return true;
+          if (mDept.includes('geography') && sDept.includes('geo')) return true;
+          if (mDept.includes('hindi') && sDept.includes('hin')) return true;
+          if (mDept.includes('history') && sDept.includes('hist')) return true;
+          if (mDept.includes('odia') && sDept.includes('odi')) return true;
+          if (mDept.includes('philosophy') && sDept.includes('phil')) return true;
+          if (mDept.includes('political') && (sDept.includes('pol') || sDept.includes('political'))) return true;
+          if (mDept.includes('psychology') && sDept.includes('psych')) return true;
+          if (mDept.includes('sanskrit') && sDept.includes('sans')) return true;
+          if (mDept.includes('sociology') && sDept.includes('socio')) return true;
+          if (mDept.includes('botany') && sDept.includes('botan')) return true;
+          if (mDept.includes('zoology') && sDept.includes('zool')) return true;
+          if (mDept.includes('commerce') && sDept.includes('comm')) return true;
+          if (mDept.includes('chemistry') && sDept.includes('chem')) return true;
+          if (mDept.includes('mathematics') && sDept.includes('math')) return true;
+          if (mDept.includes('physics') && sDept.includes('phys')) return true;
+          if (mDept.includes('statistics') && sDept.includes('stat')) return true;
+          if (mDept.includes('computer') && (sDept.includes('comp') || sDept.includes('cs'))) return true;
+        }
+
+        return false;
+      }).length;
+
+      return {
+        ...item,
+        admitted: admittedCount,
+        vacant: Math.max(0, item.sanctioned - admittedCount),
+      };
+    });
+  }, [seatMatrix, students]);
+
   return (
     <DataContext.Provider
       value={{
         students,
-        seatMatrix,
+        seatMatrix: syncedSeatMatrix,
         spotCandidates,
         auditLogs,
         hodAccounts,
@@ -471,22 +898,44 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         themeMode,
         setThemeMode,
         t,
-        toggleSpotRound,
-        updateCollegeLogo,
-        updateSeatMatrixItem,
-        resetSeatMatrixToBenchmark,
-        updateHodPassword,
-        updateStudentRollNo,
+        addStudent,
+        updateStudent,
+        deleteStudent,
+        clearAllStudents,
         bulkImportStudents,
+        updateStudentRollNo,
+        loadSampleStudents,
         syncSamsGoogleSheet,
-        reportSpotCandidate,
-        registerSpotCandidate,
-        runAutomatedMeritSelection,
+        correctStudentClassifications,
+        addFaculty,
+        updateFaculty,
+        deleteFaculty,
+        clearAllFaculty,
+        loadSampleFaculty,
+        addSeatMatrixItem,
+        updateSeatMatrixItem,
+        deleteSeatMatrixItem,
+        resetSeatMatrixToBenchmark,
+        clearSeatMatrix,
         addNotice,
+        updateNotice,
         deleteNotice,
         addFAQ,
         updateFAQ,
         deleteFAQ,
+        addHodAccount,
+        updateHodAccount,
+        deleteHodAccount,
+        updateHodPassword,
+        registerSpotCandidate,
+        updateSpotCandidate,
+        deleteSpotCandidate,
+        clearAllSpotCandidates,
+        reportSpotCandidate,
+        runAutomatedMeritSelection,
+        updateSystemSettings,
+        toggleSpotRound,
+        updateCollegeLogo,
         addAuditLog,
         restoreSystemFromSnapshot,
       }}

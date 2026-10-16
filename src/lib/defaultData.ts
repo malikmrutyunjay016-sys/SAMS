@@ -7,37 +7,57 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   spotRoundEnabled: true,
   collegeLogoUrl: DEFAULT_COLLEGE_LOGO,
   collegeName: "SAMS Panchayat College, Baragada",
+  collegeCode: "03071302",
   tagline: "Government of Odisha | Department of Higher Education",
   naacGrade: "NAAC Accredited Grade B++ | Govt. Degree College Estd. 1960",
   bannerNotice: "SAMS Degree e-Admission 2026-27: Spot Selection Live Reporting Desk Open. Candidates check merit list below.",
   prospectusUrl: "https://samsodisha.gov.in/Degree/DegreePublicCommonProspectus.pdf",
+  contactPhone: "06646-230234",
+  contactEmail: "principal.baragada@gmail.com",
+  address: "Panchayat College, Baragada, Odisha - 768028",
   sheetSyncUrl: "https://docs.google.com/spreadsheets/d/1_SAMS_Baragada_Live_Admission_2026/edit?usp=sharing",
   lastSheetSync: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
 
 export const DEPARTMENTS_LIST = [
-  { id: 'physics_regular', name: 'Physics (Regular)', stream: 'Science' as const, isAedp: false, sanctioned: 32, admitted: 28, spec: 'Regular Honours' },
-  { id: 'physics_aedp', name: 'Physics (AEDP Renewable Energy)', stream: 'Science' as const, isAedp: true, sanctioned: 16, admitted: 11, spec: 'AEDP Renewable Energy & Electronics' },
-  { id: 'botany_regular', name: 'Botany (Regular)', stream: 'Science' as const, isAedp: false, sanctioned: 32, admitted: 30, spec: 'Regular Honours' },
-  { id: 'botany_aedp', name: 'Botany (AEDP Tissue Culture)', stream: 'Science' as const, isAedp: true, sanctioned: 16, admitted: 12, spec: 'AEDP Tissue Culture & Vertical Gardening' },
-  { id: 'zoology_regular', name: 'Zoology (Regular)', stream: 'Science' as const, isAedp: false, sanctioned: 32, admitted: 29, spec: 'Regular Honours' },
-  { id: 'zoology_aedp', name: 'Zoology (AEDP Bioscience)', stream: 'Science' as const, isAedp: true, sanctioned: 16, admitted: 10, spec: 'AEDP Integrative Bioscience' },
-  { id: 'mathematics_regular', name: 'Mathematics (Regular)', stream: 'Science' as const, isAedp: false, sanctioned: 48, admitted: 42, spec: 'Regular Honours' },
-  { id: 'mathematics_aedp', name: 'Mathematics (AEDP Computing)', stream: 'Science' as const, isAedp: true, sanctioned: 16, admitted: 14, spec: 'AEDP Mathematics & Computing' },
-  { id: 'chemistry_regular', name: 'Chemistry (Regular)', stream: 'Science' as const, isAedp: false, sanctioned: 32, admitted: 27, spec: 'Regular Honours' },
-  { id: 'chemistry_aedp', name: 'Chemistry (AEDP Industrial)', stream: 'Science' as const, isAedp: true, sanctioned: 16, admitted: 13, spec: 'AEDP Industrial Chemistry' },
-  { id: 'odia', name: 'Odia', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 61, spec: 'Language & Literature' },
-  { id: 'political_science', name: 'Political Science', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 62, spec: 'Governance & Public Admin' },
-  { id: 'hindi', name: 'Hindi', stream: 'Arts' as const, isAedp: false, sanctioned: 32, admitted: 28, spec: 'Literature' },
-  { id: 'education', name: 'Education', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 45, spec: 'Pedagogy & Child Psychology' },
-  { id: 'sociology', name: 'Sociology', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 43, spec: 'Social Work & Development' },
-  { id: 'geography', name: 'Geography', stream: 'Arts' as const, isAedp: false, sanctioned: 32, admitted: 30, spec: 'GIS & Cartography' },
-  { id: 'philosophy', name: 'Philosophy', stream: 'Arts' as const, isAedp: false, sanctioned: 32, admitted: 26, spec: 'Ethics & Logic' },
-  { id: 'sanskrit', name: 'Sanskrit', stream: 'Arts' as const, isAedp: false, sanctioned: 32, admitted: 27, spec: 'Classical Language' },
-  { id: 'psychology', name: 'Psychology', stream: 'Arts' as const, isAedp: false, sanctioned: 32, admitted: 29, spec: 'Behavioral Science' },
-  { id: 'history', name: 'History', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 60, spec: 'Odisha & World History' },
-  { id: 'commerce', name: 'Commerce', stream: 'Commerce' as const, isAedp: false, sanctioned: 128, admitted: 120, spec: 'Accounting & Finance' },
+  // Arts Stream (15 courses)
+  { id: 'arts_aedp_econ', name: 'B.A in Economics and data analytics (AEDP)', stream: 'Arts' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP Economics and Data Analytics' },
+  { id: 'arts_aedp_english', name: 'B.A in English and Translation & digital humanities (AEDP)', stream: 'Arts' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP English, Translation & Digital Humanities' },
+  { id: 'arts_aedp_history', name: 'B.A in History with Tourism and Hospitality Operations (AEDP)', stream: 'Arts' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP History with Tourism and Hospitality Operations' },
+  { id: 'arts_economics', name: 'Economics', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_education', name: 'Education', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_english', name: 'English', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_geography', name: 'Geography', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_hindi', name: 'Hindi', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_history', name: 'History', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_odia', name: 'Odia', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_philosophy', name: 'Philosophy', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_political_science', name: 'Political Science', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_psychology', name: 'Psychology', stream: 'Arts' as const, isAedp: false, sanctioned: 32, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_sanskrit', name: 'Sanskrit', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_sociology', name: 'Sociology', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+
+  // Biological Science Stream (4 courses)
+  { id: 'bio_aedp_botany', name: 'B.SC in Botany with Tissue culture and vertical gardening (AEDP)', stream: 'Biological Science' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP Tissue Culture & Vertical Gardening' },
+  { id: 'bio_aedp_zoology', name: 'B.SC in Zoology and integrative bioscience (AEDP)', stream: 'Biological Science' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP Integrative Bioscience' },
+  { id: 'bio_botany', name: 'Botany', stream: 'Biological Science' as const, isAedp: false, sanctioned: 16, admitted: 0, spec: 'Regular Honours' },
+  { id: 'bio_zoology', name: 'Zoology', stream: 'Biological Science' as const, isAedp: false, sanctioned: 16, admitted: 0, spec: 'Regular Honours' },
+
+  // Commerce Stream (2 courses)
+  { id: 'comm_aedp_banking', name: 'B.Com in Banking, Financial Services and Insurance and Commerce (AEDP)', stream: 'Commerce' as const, isAedp: true, sanctioned: 64, admitted: 0, spec: 'AEDP Banking, Financial Services & Insurance (BFSI)' },
+  { id: 'comm_commerce', name: 'Commerce', stream: 'Commerce' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+
+  // Physical Science Stream (6 courses)
+  { id: 'phy_aedp_chemistry', name: 'B.SC in Chemistry and Industrial Chemistry (AEDP)', stream: 'Physical Science' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP Chemistry and Industrial Chemistry' },
+  { id: 'phy_aedp_math', name: 'B.Sc. in Mathematics & Computing (AEDP)', stream: 'Physical Science' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP Mathematics & Computing' },
+  { id: 'phy_chemistry', name: 'Chemistry', stream: 'Physical Science' as const, isAedp: false, sanctioned: 16, admitted: 0, spec: 'Regular Honours' },
+  { id: 'phy_mathematics', name: 'Mathematics', stream: 'Physical Science' as const, isAedp: false, sanctioned: 32, admitted: 0, spec: 'Regular Honours' },
+  { id: 'phy_physics', name: 'Physics', stream: 'Physical Science' as const, isAedp: false, sanctioned: 32, admitted: 0, spec: 'Regular Honours' },
+  { id: 'phy_statistics', name: 'Statistics', stream: 'Physical Science' as const, isAedp: false, sanctioned: 32, admitted: 0, spec: 'Regular Honours' },
+
+  // Self Financing Stream (1 course)
+  { id: 'sf_computer_science', name: 'Computer Science', stream: 'Self Financing' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Self Financing Honours' },
 ];
 
 export const DEFAULT_SEAT_MATRIX: SeatMatrixItem[] = DEPARTMENTS_LIST.map(dept => ({
@@ -53,22 +73,26 @@ export const DEFAULT_SEAT_MATRIX: SeatMatrixItem[] = DEPARTMENTS_LIST.map(dept =
 }));
 
 export const DEFAULT_HOD_ACCOUNTS: HodAccount[] = [
-  { id: 'physics_regular', deptName: 'Physics', username: 'hod_physics', password: 'Physics@baragada2026', hodName: 'Dr. Ramesh Chandra Sahoo', phone: '9437123401', email: 'hod.physics@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'botany_regular', deptName: 'Botany', username: 'hod_botany', password: 'Botany@baragada2026', hodName: 'Dr. Sunita Mohapatra', phone: '9437123402', email: 'hod.botany@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'zoology_regular', deptName: 'Zoology', username: 'hod_zoology', password: 'Zoology@baragada2026', hodName: 'Dr. Bipin Bihari Behera', phone: '9437123403', email: 'hod.zoology@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'mathematics_regular', deptName: 'Mathematics', username: 'hod_math', password: 'Math@baragada2026', hodName: 'Prof. Amarendra Panda', phone: '9437123404', email: 'hod.math@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'chemistry_regular', deptName: 'Chemistry', username: 'hod_chemistry', password: 'Chem@baragada2026', hodName: 'Dr. Priyambada Dash', phone: '9437123405', email: 'hod.chemistry@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'odia', deptName: 'Odia', username: 'hod_odia', password: 'Odia@baragada2026', hodName: 'Prof. Manas Ranjan Tripathy', phone: '9437123406', email: 'hod.odia@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'political_science', deptName: 'Political Science', username: 'hod_polsc', password: 'Polsc@baragada2026', hodName: 'Dr. Lopamudra Nayak', phone: '9437123407', email: 'hod.polsc@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'history', deptName: 'History', username: 'hod_history', password: 'History@baragada2026', hodName: 'Dr. Asit Kumar Pradhan', phone: '9437123408', email: 'hod.history@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'commerce', deptName: 'Commerce', username: 'hod_commerce', password: 'Commerce@baragada2026', hodName: 'Prof. Debabrata Singh', phone: '9437123409', email: 'hod.commerce@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'education', deptName: 'Education', username: 'hod_education', password: 'Edu@baragada2026', hodName: 'Dr. Sarojini Jena', phone: '9437123410', email: 'hod.edu@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'sociology', deptName: 'Sociology', username: 'hod_sociology', password: 'Socio@baragada2026', hodName: 'Prof. Nirmal Chandra Bhoi', phone: '9437123411', email: 'hod.socio@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'geography', deptName: 'Geography', username: 'hod_geography', password: 'Geo@baragada2026', hodName: 'Dr. Mamata Mohanty', phone: '9437123412', email: 'hod.geo@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'philosophy', deptName: 'Philosophy', username: 'hod_philosophy', password: 'Philo@baragada2026', hodName: 'Prof. Subash Chandra Rout', phone: '9437123413', email: 'hod.philo@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'sanskrit', deptName: 'Sanskrit', username: 'hod_sanskrit', password: 'Sans@baragada2026', hodName: 'Dr. Banita Padhi', phone: '9437123414', email: 'hod.sans@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'psychology', deptName: 'Psychology', username: 'hod_psychology', password: 'Psych@baragada2026', hodName: 'Dr. Rashmi Rekha Kar', phone: '9437123415', email: 'hod.psych@baragada.edu.in', updatedAt: new Date().toISOString() },
-  { id: 'hindi', deptName: 'Hindi', username: 'hod_hindi', password: 'Hindi@baragada2026', hodName: 'Prof. Vijay Prasad Sharma', phone: '9437123416', email: 'hod.hindi@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'phy_physics', deptName: 'Physics', username: 'hod_physics', password: 'Physics@baragada2026', hodName: 'Dr. Ramesh Chandra Sahoo', phone: '9437123401', email: 'hod.physics@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'bio_botany', deptName: 'Botany', username: 'hod_botany', password: 'Botany@baragada2026', hodName: 'Dr. Sunita Mohapatra', phone: '9437123402', email: 'hod.botany@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'bio_zoology', deptName: 'Zoology', username: 'hod_zoology', password: 'Zoology@baragada2026', hodName: 'Dr. Bipin Bihari Behera', phone: '9437123403', email: 'hod.zoology@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'phy_mathematics', deptName: 'Mathematics', username: 'hod_math', password: 'Math@baragada2026', hodName: 'Prof. Amarendra Panda', phone: '9437123404', email: 'hod.math@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'phy_chemistry', deptName: 'Chemistry', username: 'hod_chemistry', password: 'Chem@baragada2026', hodName: 'Dr. Priyambada Dash', phone: '9437123405', email: 'hod.chemistry@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'phy_statistics', deptName: 'Statistics', username: 'hod_stats', password: 'Stats@baragada2026', hodName: 'Dr. Bikash Ranjan Patel', phone: '9437123417', email: 'hod.stats@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'sf_computer_science', deptName: 'Computer Science', username: 'hod_cs', password: 'CS@baragada2026', hodName: 'Prof. Deepak Kumar Sahu', phone: '9437123418', email: 'hod.cs@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_economics', deptName: 'Economics', username: 'hod_economics', password: 'Econ@baragada2026', hodName: 'Dr. Prasanta Kumar Hota', phone: '9437123419', email: 'hod.econ@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_english', deptName: 'English', username: 'hod_english', password: 'English@baragada2026', hodName: 'Dr. Madhusmita Mishra', phone: '9437123420', email: 'hod.eng@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_odia', deptName: 'Odia', username: 'hod_odia', password: 'Odia@baragada2026', hodName: 'Prof. Manas Ranjan Tripathy', phone: '9437123406', email: 'hod.odia@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_political_science', deptName: 'Political Science', username: 'hod_polsc', password: 'Polsc@baragada2026', hodName: 'Dr. Lopamudra Nayak', phone: '9437123407', email: 'hod.polsc@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_history', deptName: 'History', username: 'hod_history', password: 'History@baragada2026', hodName: 'Dr. Asit Kumar Pradhan', phone: '9437123408', email: 'hod.history@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'comm_commerce', deptName: 'Commerce', username: 'hod_commerce', password: 'Commerce@baragada2026', hodName: 'Prof. Debabrata Singh', phone: '9437123409', email: 'hod.commerce@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_education', deptName: 'Education', username: 'hod_education', password: 'Edu@baragada2026', hodName: 'Dr. Sarojini Jena', phone: '9437123410', email: 'hod.edu@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_sociology', deptName: 'Sociology', username: 'hod_sociology', password: 'Socio@baragada2026', hodName: 'Prof. Nirmal Chandra Bhoi', phone: '9437123411', email: 'hod.socio@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_geography', deptName: 'Geography', username: 'hod_geography', password: 'Geo@baragada2026', hodName: 'Dr. Mamata Mohanty', phone: '9437123412', email: 'hod.geo@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_philosophy', deptName: 'Philosophy', username: 'hod_philosophy', password: 'Philo@baragada2026', hodName: 'Prof. Subash Chandra Rout', phone: '9437123413', email: 'hod.philo@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_sanskrit', deptName: 'Sanskrit', username: 'hod_sanskrit', password: 'Sans@baragada2026', hodName: 'Dr. Banita Padhi', phone: '9437123414', email: 'hod.sans@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_psychology', deptName: 'Psychology', username: 'hod_psychology', password: 'Psych@baragada2026', hodName: 'Dr. Rashmi Rekha Kar', phone: '9437123415', email: 'hod.psych@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'arts_hindi', deptName: 'Hindi', username: 'hod_hindi', password: 'Hindi@baragada2026', hodName: 'Prof. Vijay Prasad Sharma', phone: '9437123416', email: 'hod.hindi@baragada.edu.in', updatedAt: new Date().toISOString() },
 ];
 
 export const DEFAULT_FACULTY: FacultyMember[] = [
@@ -193,12 +217,21 @@ export function generate1100Students(): Student[] {
       const name = `${fName} ${lName}`;
       
       const samsRegNo = `24D${10800 + studentCounter}`;
-      const prefix = dept.stream === 'Science' ? 'BS24' : dept.stream === 'Arts' ? 'BA24' : 'BC24';
+      const prefix =
+        dept.stream === 'Arts'
+          ? 'BA24'
+          : dept.stream === 'Commerce'
+          ? 'BC24'
+          : dept.stream === 'Self Financing'
+          ? 'CS24'
+          : 'BS24';
       const rollNo = `${prefix}-${String(studentCounter).padStart(3, '0')}`;
       
       const category = categories[Math.floor(Math.random() * categories.length)];
       const bloodGroup = bloodGroups[Math.floor(Math.random() * bloodGroups.length)];
       const marksPercentage = parseFloat((55 + Math.random() * 41).toFixed(1)); // 55.0% to 96.0%
+      const maxMarks = 600;
+      const marksSecured = Math.round(maxMarks * (marksPercentage / 100));
       const phone = `9437${Math.floor(100000 + Math.random() * 900000)}`;
 
       students.push({
@@ -210,6 +243,8 @@ export function generate1100Students(): Student[] {
         stream: dept.stream,
         isAedp: dept.isAedp,
         category,
+        maxMarks,
+        marksSecured,
         marksPercentage,
         bloodGroup,
         phone,
@@ -232,9 +267,19 @@ export function generate1100Students(): Student[] {
     const name = `${fName} ${lName}`;
     const dept = DEPARTMENTS_LIST[Math.floor(Math.random() * DEPARTMENTS_LIST.length)];
     const samsRegNo = `24D${10800 + studentCounter}`;
-    const prefix = dept.stream === 'Science' ? 'BS24' : dept.stream === 'Arts' ? 'BA24' : 'BC24';
+    const prefix =
+      dept.stream === 'Arts'
+        ? 'BA24'
+        : dept.stream === 'Commerce'
+        ? 'BC24'
+        : dept.stream === 'Self Financing'
+        ? 'CS24'
+        : 'BS24';
     const rollNo = `${prefix}-${String(studentCounter).padStart(3, '0')}`;
     const category = categories[Math.floor(Math.random() * categories.length)];
+    const marksPercentage = parseFloat((50 + Math.random() * 45).toFixed(1));
+    const maxMarks = 600;
+    const marksSecured = Math.round(maxMarks * (marksPercentage / 100));
 
     students.push({
       id: `stu_${studentCounter}_${Math.random().toString(36).substr(2, 5)}`,
@@ -245,11 +290,13 @@ export function generate1100Students(): Student[] {
       stream: dept.stream,
       isAedp: dept.isAedp,
       category,
-      marksPercentage: parseFloat((52 + Math.random() * 42).toFixed(1)),
-      bloodGroup: bloodGroups[Math.floor(Math.random() * bloodGroups.length)],
-      phone: `9861${Math.floor(100000 + Math.random() * 900000)}`,
+      maxMarks,
+      marksSecured,
+      marksPercentage,
+      bloodGroup: 'O+',
+      phone: `9437${Math.floor(100000 + Math.random() * 900000)}`,
       gender: isFemale ? 'Female' : 'Male',
-      status: Math.random() > 0.5 ? 'Spot Applied' : 'Selected',
+      status: 'Spot Applied',
       updatedAt: new Date().toISOString()
     });
 

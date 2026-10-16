@@ -8,7 +8,7 @@ export const StatsView: React.FC = () => {
   const totalStudents = students.length;
   const femaleCount = students.filter((s) => s.gender === 'Female').length;
   const maleCount = students.filter((s) => s.gender === 'Male').length;
-  const femalePercent = ((femaleCount / totalStudents) * 100).toFixed(1);
+  const femalePercent = totalStudents > 0 ? ((femaleCount / totalStudents) * 100).toFixed(1) : '0.0';
 
   const genCount = students.filter((s) => s.category === 'GEN').length;
   const scCount = students.filter((s) => s.category === 'SC').length;
@@ -82,30 +82,45 @@ export const StatsView: React.FC = () => {
             <div>
               <div className="flex justify-between font-semibold mb-1">
                 <span className="text-blue-300">Science Stream (+3 B.Sc)</span>
-                <span className="text-slate-200">{scienceCount} ({((scienceCount / totalStudents) * 100).toFixed(1)}%)</span>
+                <span className="text-slate-200">
+                  {scienceCount} ({totalStudents > 0 ? ((scienceCount / totalStudents) * 100).toFixed(1) : '0.0'}%)
+                </span>
               </div>
               <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
-                <div className="bg-blue-500 h-full rounded-full" style={{ width: `${(scienceCount / totalStudents) * 100}%` }}></div>
+                <div
+                  className="bg-blue-500 h-full rounded-full"
+                  style={{ width: `${totalStudents > 0 ? (scienceCount / totalStudents) * 100 : 0}%` }}
+                ></div>
               </div>
             </div>
 
             <div>
               <div className="flex justify-between font-semibold mb-1">
                 <span className="text-amber-300">Arts Stream (+3 B.A)</span>
-                <span className="text-slate-200">{artsCount} ({((artsCount / totalStudents) * 100).toFixed(1)}%)</span>
+                <span className="text-slate-200">
+                  {artsCount} ({totalStudents > 0 ? ((artsCount / totalStudents) * 100).toFixed(1) : '0.0'}%)
+                </span>
               </div>
               <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
-                <div className="bg-amber-500 h-full rounded-full" style={{ width: `${(artsCount / totalStudents) * 100}%` }}></div>
+                <div
+                  className="bg-amber-500 h-full rounded-full"
+                  style={{ width: `${totalStudents > 0 ? (artsCount / totalStudents) * 100 : 0}%` }}
+                ></div>
               </div>
             </div>
 
             <div>
               <div className="flex justify-between font-semibold mb-1">
                 <span className="text-emerald-300">Commerce Stream (+3 B.Com)</span>
-                <span className="text-slate-200">{commerceCount} ({((commerceCount / totalStudents) * 100).toFixed(1)}%)</span>
+                <span className="text-slate-200">
+                  {commerceCount} ({totalStudents > 0 ? ((commerceCount / totalStudents) * 100).toFixed(1) : '0.0'}%)
+                </span>
               </div>
               <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
-                <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${(commerceCount / totalStudents) * 100}%` }}></div>
+                <div
+                  className="bg-emerald-500 h-full rounded-full"
+                  style={{ width: `${totalStudents > 0 ? (commerceCount / totalStudents) * 100 : 0}%` }}
+                ></div>
               </div>
             </div>
           </div>
@@ -122,7 +137,7 @@ export const StatsView: React.FC = () => {
               <span className="text-slate-400 text-[10px] block font-mono">GENERAL CATEGORY</span>
               <span className="text-xl font-bold text-white">{genCount}</span>
               <span className="text-[10px] text-slate-500 block">
-                {((genCount / totalStudents) * 100).toFixed(1)}% of total
+                {totalStudents > 0 ? ((genCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
               </span>
             </div>
 
@@ -130,7 +145,7 @@ export const StatsView: React.FC = () => {
               <span className="text-slate-400 text-[10px] block font-mono">SCHEDULED CASTE (SC)</span>
               <span className="text-xl font-bold text-amber-400">{scCount}</span>
               <span className="text-[10px] text-slate-500 block">
-                {((scCount / totalStudents) * 100).toFixed(1)}% of total
+                {totalStudents > 0 ? ((scCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
               </span>
             </div>
 
@@ -138,7 +153,7 @@ export const StatsView: React.FC = () => {
               <span className="text-slate-400 text-[10px] block font-mono">SCHEDULED TRIBE (ST)</span>
               <span className="text-xl font-bold text-emerald-400">{stCount}</span>
               <span className="text-[10px] text-slate-500 block">
-                {((stCount / totalStudents) * 100).toFixed(1)}% of total
+                {totalStudents > 0 ? ((stCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
               </span>
             </div>
 
@@ -146,7 +161,7 @@ export const StatsView: React.FC = () => {
               <span className="text-slate-400 text-[10px] block font-mono">SEBC / OBC</span>
               <span className="text-xl font-bold text-blue-400">{sebcCount}</span>
               <span className="text-[10px] text-slate-500 block">
-                {((sebcCount / totalStudents) * 100).toFixed(1)}% of total
+                {totalStudents > 0 ? ((sebcCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
               </span>
             </div>
           </div>

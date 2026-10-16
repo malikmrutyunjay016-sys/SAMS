@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { createDriveBackupSnapshot, parseSnapshotFile } from '../lib/driveService';
+import {
+  parseExcelOrCsvFile,
+  downloadStudentTemplateExcel,
+  downloadStudentTemplateCSV,
+  normalizeCategory,
+  ParseResult
+} from '../lib/excelParser';
+import { Student, FacultyMember, Notice, FAQItem, SeatMatrixItem, HodAccount, StreamType, CategoryType, StudentStatus } from '../types';
 import * as XLSX from 'xlsx';
 import {
   ShieldCheck,
@@ -22,7 +30,19 @@ import {
   Building2,
   FileSpreadsheet,
   RotateCcw,
-  Plus
+  Plus,
+  Trash2,
+  X,
+  Users,
+  Bell,
+  HelpCircle,
+  Settings,
+  AlertTriangle,
+  UserPlus,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 
 export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ onOpenAdminModal }) => {
@@ -35,13 +55,52 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     systemSettings,
     notices,
     faculty,
-    toggleSpotRound,
-    updateSeatMatrixItem,
-    resetSeatMatrixToBenchmark,
-    updateHodPassword,
-    updateStudentRollNo,
+    faqs,
+    // Student Actions
+    addStudent,
+    updateStudent,
+    deleteStudent,
+    clearAllStudents,
     bulkImportStudents,
+    loadSampleStudents,
     syncSamsGoogleSheet,
+    correctStudentClassifications,
+    // Faculty Actions
+    addFaculty,
+    updateFaculty,
+    deleteFaculty,
+    clearAllFaculty,
+    loadSampleFaculty,
+    // Seat Matrix Actions
+    addSeatMatrixItem,
+    updateSeatMatrixItem,
+    deleteSeatMatrixItem,
+    resetSeatMatrixToBenchmark,
+    clearSeatMatrix,
+    // Notices Actions
+    addNotice,
+    updateNotice,
+    deleteNotice,
+    // FAQs Actions
+    addFAQ,
+    updateFAQ,
+    deleteFAQ,
+    // HOD Accounts
+    addHodAccount,
+    updateHodAccount,
+    deleteHodAccount,
+    updateHodPassword,
+    // Spot Candidates
+    registerSpotCandidate,
+    updateSpotCandidate,
+    deleteSpotCandidate,
+    clearAllSpotCandidates,
+    reportSpotCandidate,
+    runAutomatedMeritSelection,
+    // System Settings
+    updateSystemSettings,
+    toggleSpotRound,
+    updateCollegeLogo,
     restoreSystemFromSnapshot,
     addAuditLog
   } = useData();
@@ -49,29 +108,154 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   const { isAdmin, logout } = useAuth();
 
   const [activeAdminTab, setActiveAdminTab] = useState<
-    'control' | 'students' | 'add-students' | 'seats' | 'hods' | 'drive' | 'audit'
-  >('control');
+    'students' | 'add-students' | 'faculty' | 'seats' | 'notices' | 'faqs' | 'hods' | 'spot' | 'settings' | 'drive' | 'audit'
+  >('students');
 
-  // Student Manager State
+  // ==========================================
+  // STUDENT MANAGER STATE
+  // ==========================================
   const [studentSearch, setStudentSearch] = useState('');
   const [streamFilter, setStreamFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
-  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
-  const [editingRollNo, setEditingRollNo] = useState('');
+
+  // Student Add / Edit Modal
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [studentForm, setStudentForm] = useState({
+    name: '',
+    rollNo: '',
+    samsRegNo: '',
+    barcode: '',
+    parentName: '',
+    dob: '2005-01-01',
+    category: 'GEN' as CategoryType,
+    maxMarks: 600,
+    marksSecured: 480,
+    marksPercentage: 84.0,
+    stream: 'Science' as StreamType,
+    department: 'Physics',
+    phone: '9437123456',
+    gender: 'Male' as 'Male' | 'Female' | 'Other',
+    bloodGroup: 'O+',
+    status: 'Admitted' as StudentStatus,
+  });
+
+  // ==========================================
+  // EXCEL IMPORT STATE & PREVIEW
+  // ==========================================
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ParseResult | null>(null);
+  const [importReplaceMode, setImportReplaceMode] = useState(false);
+  const [autoCommitImport, setAutoCommitImport] = useState(true);
+  const [importStatusMessage, setImportStatusMessage] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
   const [sheetUrlInput, setSheetUrlInput] = useState(systemSettings.sheetSyncUrl || '');
   const [isSyncingSheet, setIsSyncingSheet] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
 
-  // HOD Manager State
-  const [editingHodDeptId, setEditingHodDeptId] = useState<string | null>(null);
-  const [newHodPassword, setNewHodPassword] = useState('');
-  const [newHodName, setNewHodName] = useState('');
+  // Toast notification state & helper (replaces browser alerts)
+  const [adminToast, setAdminToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
+    setAdminToast({ type, message });
+    setTimeout(() => {
+      setAdminToast((prev) => (prev?.message === message ? null : prev));
+    }, 7000);
+  };
 
-  // Seat Matrix Editor State
-  const [editingSeatId, setEditingSeatId] = useState<string | null>(null);
-  const [newSanctioned, setNewSanctioned] = useState<number>(32);
+  // Pagination for Students DB Table
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
 
-  // Google Drive Cloud Backup State
+  // ==========================================
+  // FACULTY MANAGER STATE
+  // ==========================================
+  const [facultySearch, setFacultySearch] = useState('');
+  const [isFacultyModalOpen, setIsFacultyModalOpen] = useState(false);
+  const [editingFaculty, setEditingFaculty] = useState<FacultyMember | null>(null);
+  const [facultyForm, setFacultyForm] = useState({
+    name: '',
+    deptName: 'Physics',
+    designation: 'Assistant Professor',
+    qualification: 'M.Sc., Ph.D.',
+    email: '',
+    phone: '',
+    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    isHod: false,
+  });
+
+  // ==========================================
+  // SEAT MATRIX STATE
+  // ==========================================
+  const [isSeatModalOpen, setIsSeatModalOpen] = useState(false);
+  const [editingSeatItem, setEditingSeatItem] = useState<SeatMatrixItem | null>(null);
+  const [seatForm, setSeatForm] = useState({
+    deptName: '',
+    stream: 'Science' as StreamType,
+    isAedp: false,
+    specialization: 'Regular Honours',
+    sanctioned: 32,
+    admitted: 0,
+  });
+
+  // ==========================================
+  // NOTICES STATE
+  // ==========================================
+  const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
+  const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
+  const [noticeForm, setNoticeForm] = useState({
+    title: '',
+    category: 'General' as 'General' | 'Admission' | 'Examination' | 'Departmental' | 'Spot Round',
+    date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    isImportant: false,
+    content: '',
+    downloadUrl: '#',
+  });
+
+  // ==========================================
+  // FAQS STATE
+  // ==========================================
+  const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
+  const [editingFaq, setEditingFaq] = useState<FAQItem | null>(null);
+  const [faqForm, setFaqForm] = useState({
+    question: '',
+    answer: '',
+    category: 'Admission',
+  });
+
+  // ==========================================
+  // HOD ACCOUNTS STATE
+  // ==========================================
+  const [isHodModalOpen, setIsHodModalOpen] = useState(false);
+  const [editingHod, setEditingHod] = useState<HodAccount | null>(null);
+  const [hodForm, setHodForm] = useState({
+    deptName: '',
+    username: '',
+    password: '',
+    hodName: '',
+    phone: '',
+    email: '',
+  });
+
+  // ==========================================
+  // SETTINGS STATE
+  // ==========================================
+  const [settingsForm, setSettingsForm] = useState({
+    collegeName: systemSettings.collegeName,
+    collegeCode: systemSettings.collegeCode || '03071302',
+    tagline: systemSettings.tagline,
+    naacGrade: systemSettings.naacGrade,
+    bannerNotice: systemSettings.bannerNotice,
+    prospectusUrl: systemSettings.prospectusUrl,
+    collegeLogoUrl: systemSettings.collegeLogoUrl,
+    contactPhone: systemSettings.contactPhone || '06646-230234',
+    contactEmail: systemSettings.contactEmail || 'principal.baragada@gmail.com',
+    address: systemSettings.address || 'Panchayat College, Baragada, Odisha - 768028',
+  });
+  const [settingsSavedMsg, setSettingsSavedMsg] = useState('');
+
+  // ==========================================
+  // CLOUD BACKUP STATE
+  // ==========================================
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [backupStatusMsg, setBackupStatusMsg] = useState('');
 
@@ -85,7 +269,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
           Super Admin Restricted Access
         </h2>
         <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-          Super Admin authentication required to access live Spot Round controls, 1,100+ student database manager, seat matrix editor, HOD password manager, and Google Drive cloud backups.
+          Super Admin authentication required to access student database manager, excel import, faculty directory, seat matrix editor, and college settings.
         </p>
         <button
           onClick={onOpenAdminModal}
@@ -97,122 +281,477 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     );
   }
 
-  // Filtered Students
+  // Helper function to resolve effective stream from student stream or department
+  const getEffectiveStream = (s: Student): StreamType => {
+    if (s.stream === 'Arts') return 'Arts';
+    if (s.stream === 'Biological Science') return 'Biological Science';
+    if (s.stream === 'Commerce') return 'Commerce';
+    if (s.stream === 'Physical Science') return 'Physical Science';
+    if (s.stream === 'Self Financing') return 'Self Financing';
+
+    const st = (s.stream || '').toLowerCase().trim();
+    const dept = (s.department || '').toLowerCase().trim();
+
+    if (st.includes('bio') || st.includes('botan') || st.includes('zool')) return 'Biological Science';
+    if (st.includes('phys') || st.includes('chem') || st.includes('math') || st.includes('stat')) return 'Physical Science';
+    if (st.includes('self') || st.includes('comp') || st.includes('csa') || st.includes('it')) return 'Self Financing';
+    if (st.includes('comm') || st.includes('b.com') || st.includes('bcom')) return 'Commerce';
+    if (st.includes('art') || st.includes('b.a') || st.includes('ba')) return 'Arts';
+
+    if (dept.includes('comp') || dept.includes('csa') || dept.includes('it') || dept.includes('self')) return 'Self Financing';
+    if (dept.includes('botan') || dept.includes('zool') || dept.includes('bio') || dept.includes('tissue') || dept.includes('integrative')) return 'Biological Science';
+    if (dept.includes('phys') || dept.includes('chem') || dept.includes('math') || dept.includes('stat') || dept.includes('industr') || dept.includes('computing')) return 'Physical Science';
+    if (dept.includes('comm') || dept.includes('bank') || dept.includes('bfsi')) return 'Commerce';
+
+    return 'Arts';
+  };
+
+  // Filtered Students (Crash-proof with case-insensitive and deep multi-field matching)
   const filteredStudents = students.filter((s) => {
-    const matchesSearch =
-      s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-      s.rollNo.toLowerCase().includes(studentSearch.toLowerCase()) ||
-      s.samsRegNo.toLowerCase().includes(studentSearch.toLowerCase()) ||
-      (s.barcode && s.barcode.toLowerCase().includes(studentSearch.toLowerCase()));
-    const matchesStream = streamFilter === 'ALL' || s.stream === streamFilter;
-    const matchesCat = categoryFilter === 'ALL' || s.category === categoryFilter;
+    const q = (studentSearch || '').trim().toLowerCase();
+    const nameMatch = (s.name || '').toLowerCase().includes(q);
+    const rollMatch = (s.rollNo || '').toLowerCase().includes(q);
+    const samsMatch = (s.samsRegNo || '').toLowerCase().includes(q);
+    const barcodeMatch = (s.barcode || '').toLowerCase().includes(q);
+    const parentMatch = (s.parentName || '').toLowerCase().includes(q);
+    const deptMatch = (s.department || '').toLowerCase().includes(q);
+    const matchesSearch = !q || nameMatch || rollMatch || samsMatch || barcodeMatch || parentMatch || deptMatch;
+
+    const effStream = getEffectiveStream(s);
+    const fStream = streamFilter.toLowerCase();
+    const matchesStream =
+      streamFilter === 'ALL' ||
+      effStream.toLowerCase() === fStream ||
+      (fStream === 'science' && (effStream === 'Physical Science' || effStream === 'Biological Science'));
+
+    const normCat = normalizeCategory(s.category);
+    const matchesCat = categoryFilter === 'ALL' || normCat.toUpperCase() === categoryFilter.toUpperCase();
     return matchesSearch && matchesStream && matchesCat;
   });
 
-  // Download Sample Excel Template
-  const handleDownloadExcelTemplate = () => {
-    const templateData = [
-      {
-        'Name': 'Rajesh Kumar Sahoo',
-        'Barcode': 'BAR-982314',
-        'Father Name/Mother Name': 'Bikash Sahoo / Sunita Sahoo',
-        'Category': 'GEN',
-        'Date of Birth': '2005-06-15',
-        'Maximum Marks': 500,
-        'Marks Secured': 430,
-        'Percentage': 86.0,
-        'Stream': 'Science',
-        'Department': 'Physics',
-        'SAMS Reg No': '24D18901',
-        'Roll No': 'BS24-101',
-      }
-    ];
+  // Filtered Faculty
+  const filteredFaculty = faculty.filter((f) => {
+    const q = (facultySearch || '').trim().toLowerCase();
+    return (
+      !q ||
+      (f.name || '').toLowerCase().includes(q) ||
+      (f.deptName || '').toLowerCase().includes(q) ||
+      (f.designation || '').toLowerCase().includes(q)
+    );
+  });
 
-    const ws = XLSX.utils.json_to_sheet(templateData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Student Import Template');
-    XLSX.writeFile(wb, 'SAMS_Student_Import_Template.xlsx');
+  // ==========================================
+  // EXCEL / CSV FILE IMPORT HANDLER
+  // ==========================================
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadedFileName(file.name);
+    setIsImporting(true);
+    setImportStatusMessage('');
+
+    try {
+      const res = await parseExcelOrCsvFile(file);
+      setIsImporting(false);
+      setImportResult(res);
+
+      if (res.success && res.students.length > 0) {
+        // Direct commit to database so students are reflected in DB immediately!
+        bulkImportStudents(res.students, importReplaceMode);
+        showToast(
+          'success',
+          `Successfully imported and reflected ${res.students.length} student records into SAMS Database from "${file.name}"!`
+        );
+        setImportStatusMessage(`Imported ${res.students.length} student records into SAMS Database.`);
+        setImportResult(null);
+
+        // Reset all search and stream filters so imported students are immediately visible in the table
+        setStudentSearch('');
+        setStreamFilter('ALL');
+        setCategoryFilter('ALL');
+        setActiveAdminTab('students');
+        setCurrentPage(1);
+      } else {
+        const errMsg = res.message || 'Could not parse student records from file.';
+        setImportStatusMessage(`Import error: ${errMsg}`);
+        showToast('error', errMsg);
+      }
+    } catch (err: any) {
+      setIsImporting(false);
+      const errMsg = err?.message || 'Error parsing spreadsheet file.';
+      setImportStatusMessage(`Import error: ${errMsg}`);
+      showToast('error', errMsg);
+    }
+
+    // Reset file input so same file can be re-selected if needed
+    e.target.value = '';
+  };
+
+  const handleConfirmImport = () => {
+    if (!importResult || !importResult.students.length) return;
+
+    bulkImportStudents(importResult.students, importReplaceMode);
+    showToast(
+      'success',
+      `Successfully ${importReplaceMode ? 'replaced database with' : 'added'} ${importResult.students.length} student records into SAMS Database!`
+    );
+    setImportResult(null);
+    setImportStatusMessage('');
+    setStudentSearch('');
+    setStreamFilter('ALL');
+    setCategoryFilter('ALL');
+    setActiveAdminTab('students');
+    setCurrentPage(1);
   };
 
   // Export Students to Excel
   const handleExportStudentsExcel = () => {
-    const wsData = filteredStudents.map((s) => ({
-      'SAMS Reg No': s.samsRegNo,
+    const dataToExport = filteredStudents.length > 0 ? filteredStudents : students;
+    if (dataToExport.length === 0) {
+      showToast('info', 'No student records to export.');
+      return;
+    }
+
+    const wsData = dataToExport.map((s) => ({
       'University Roll No': s.rollNo,
-      'Student Name': s.name,
+      'SAMS Reg No': s.samsRegNo,
       'Barcode': s.barcode || '',
-      'Father Name/Mother Name': s.parentName || '',
+      'Student Name': s.name,
+      'Father Name / Mother Name': s.parentName || '',
       'Category': s.category,
       'Date of Birth': s.dob || '',
-      'Maximum Marks': s.maxMarks || 500,
-      'Marks Secured': s.marksSecured || 400,
+      'Maximum Marks': s.maxMarks || 600,
+      'Marks Secured': s.marksSecured || 0,
       'Percentage (%)': s.marksPercentage,
       'Department': s.department,
       'Stream': s.stream,
       'Gender': s.gender,
       'Phone': s.phone,
+      'Blood Group': s.bloodGroup,
       'Status': s.status,
     }));
 
     const ws = XLSX.utils.json_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'SAMS Students Database');
-    XLSX.writeFile(wb, `SAMS_Baragada_Students_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'SAMS Students');
+    XLSX.writeFile(wb, `SAMS_Students_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  // Upload Excel / CSV file with Name, Barcode, Father/Mother name, Category, DOB, Max Marks, Marks Secured, Percentage
-  const handleFileUploadXLSX = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // ==========================================
+  // STUDENT MODAL HANDLERS
+  // ==========================================
+  const handleOpenAddStudent = () => {
+    setEditingStudent(null);
+    setStudentForm({
+      name: '',
+      rollNo: `BS24-${String(students.length + 1).padStart(3, '0')}`,
+      samsRegNo: `24D${15000 + students.length + 1}`,
+      barcode: `BAR-${Date.now().toString().slice(-6)}`,
+      parentName: '',
+      dob: '2005-01-01',
+      category: 'GEN',
+      maxMarks: 600,
+      marksSecured: 480,
+      marksPercentage: 80.0,
+      stream: 'Science',
+      department: 'Physics',
+      phone: '9437123456',
+      gender: 'Male',
+      bloodGroup: 'O+',
+      status: 'Admitted',
+    });
+    setIsStudentModalOpen(true);
+  };
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const rawData = XLSX.utils.sheet_to_json<any>(ws);
+  const handleOpenEditStudent = (s: Student) => {
+    setEditingStudent(s);
+    setStudentForm({
+      name: s.name,
+      rollNo: s.rollNo,
+      samsRegNo: s.samsRegNo,
+      barcode: s.barcode || '',
+      parentName: s.parentName || '',
+      dob: s.dob || '2005-01-01',
+      category: s.category,
+      maxMarks: s.maxMarks || 600,
+      marksSecured: s.marksSecured || 400,
+      marksPercentage: s.marksPercentage,
+      stream: s.stream,
+      department: s.department,
+      phone: s.phone || '9437123456',
+      gender: s.gender,
+      bloodGroup: s.bloodGroup || 'O+',
+      status: s.status,
+    });
+    setIsStudentModalOpen(true);
+  };
 
-        const imported: any[] = rawData.map((row, idx) => {
-          const maxMarksVal = parseFloat(row['Maximum Marks'] || row['Max Marks'] || row['maxMarks']) || 500;
-          const securedVal = parseFloat(row['Marks Secured'] || row['Secured Marks'] || row['marksSecured']) || 400;
-          const pctVal = parseFloat(row['Percentage'] || row['Marks %'] || row['%'] || row['percentage']) || parseFloat(((securedVal / maxMarksVal) * 100).toFixed(1));
+  const handleStudentFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentForm.name.trim()) return;
 
-          return {
-            id: `imp_${Date.now()}_${idx}`,
-            name: row['Student Name'] || row['Name'] || row['name'] || 'Student',
-            barcode: row['Barcode'] || row['barcode'] || `BAR-${Math.floor(100000 + Math.random() * 900000)}`,
-            parentName: row['Father Name/Mother Name'] || row['Parent Name'] || row['Father Name'] || row['Mother Name'] || row['parentName'] || 'Parent',
-            category: row['Category'] || row['category'] || 'GEN',
-            dob: row['Date of Birth'] || row['DOB'] || row['dob'] || '2005-01-01',
-            maxMarks: maxMarksVal,
-            marksSecured: securedVal,
-            marksPercentage: pctVal,
-            rollNo: row['University Roll No'] || row['Roll No'] || row['rollNo'] || `BS24-${idx + 500}`,
-            samsRegNo: row['SAMS Reg No'] || row['Reg No'] || row['samsRegNo'] || `24D${15000 + idx}`,
-            department: row['Department'] || row['department'] || 'Physics',
-            stream: row['Stream'] || row['stream'] || 'Science',
-            isAedp: false,
-            bloodGroup: row['Blood Group'] || 'O+',
-            phone: row['Phone'] || row['phone'] || '9437000000',
-            gender: row['Gender'] || 'Male',
-            status: row['Status'] || 'Admitted',
-            updatedAt: new Date().toISOString(),
-          };
-        });
+    const pct = studentForm.maxMarks > 0
+      ? parseFloat(((studentForm.marksSecured / studentForm.maxMarks) * 100).toFixed(1))
+      : studentForm.marksPercentage;
 
-        bulkImportStudents(imported);
-        alert(`Successfully imported ${imported.length} student records into database with Name, Barcode, Parent Name, Category, DOB, and Marks.`);
-        setActiveAdminTab('students');
-      } catch (err) {
-        alert('Error parsing Excel file. Please ensure valid columns (Name, Barcode, Father Name/Mother Name, Category, DOB, Maximum Marks, Marks Secured, Percentage).');
-      }
+    const payload = {
+      ...studentForm,
+      marksPercentage: pct,
+      isAedp: studentForm.department.toLowerCase().includes('aedp'),
     };
-    reader.readAsBinaryString(file);
+
+    if (editingStudent) {
+      updateStudent(editingStudent.id, payload);
+    } else {
+      addStudent(payload);
+    }
+
+    setIsStudentModalOpen(false);
   };
 
-  // Sync Google Sheet
+  // ==========================================
+  // FACULTY MODAL HANDLERS
+  // ==========================================
+  const handleOpenAddFaculty = () => {
+    setEditingFaculty(null);
+    setFacultyForm({
+      name: '',
+      deptName: 'Physics',
+      designation: 'Assistant Professor',
+      qualification: 'Ph.D., M.Sc.',
+      email: '',
+      phone: '',
+      photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      isHod: false,
+    });
+    setIsFacultyModalOpen(true);
+  };
+
+  const handleOpenEditFaculty = (f: FacultyMember) => {
+    setEditingFaculty(f);
+    setFacultyForm({
+      name: f.name,
+      deptName: f.deptName,
+      designation: f.designation,
+      qualification: f.qualification,
+      email: f.email,
+      phone: f.phone,
+      photoUrl: f.photoUrl,
+      isHod: f.isHod,
+    });
+    setIsFacultyModalOpen(true);
+  };
+
+  const handleFacultyFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!facultyForm.name.trim()) return;
+
+    const payload = {
+      name: facultyForm.name.trim(),
+      deptId: facultyForm.deptName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      deptName: facultyForm.deptName.trim(),
+      designation: facultyForm.designation.trim(),
+      qualification: facultyForm.qualification.trim(),
+      email: facultyForm.email.trim() || `${facultyForm.name.toLowerCase().replace(/\s+/g, '.')}@baragada.edu.in`,
+      phone: facultyForm.phone.trim() || '9437123456',
+      photoUrl: facultyForm.photoUrl.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      isHod: facultyForm.isHod,
+    };
+
+    if (editingFaculty) {
+      updateFaculty(editingFaculty.id, payload);
+    } else {
+      addFaculty(payload);
+    }
+
+    setIsFacultyModalOpen(false);
+  };
+
+  // ==========================================
+  // SEAT MATRIX MODAL HANDLERS
+  // ==========================================
+  const handleOpenAddSeat = () => {
+    setEditingSeatItem(null);
+    setSeatForm({
+      deptName: '',
+      stream: 'Science',
+      isAedp: false,
+      specialization: 'Regular Honours',
+      sanctioned: 32,
+      admitted: 0,
+    });
+    setIsSeatModalOpen(true);
+  };
+
+  const handleOpenEditSeat = (s: SeatMatrixItem) => {
+    setEditingSeatItem(s);
+    setSeatForm({
+      deptName: s.deptName,
+      stream: s.stream,
+      isAedp: s.isAedp,
+      specialization: s.specialization || 'Regular Honours',
+      sanctioned: s.sanctioned,
+      admitted: s.admitted,
+    });
+    setIsSeatModalOpen(true);
+  };
+
+  const handleSeatFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!seatForm.deptName.trim()) return;
+
+    if (editingSeatItem) {
+      updateSeatMatrixItem(
+        editingSeatItem.id,
+        seatForm.sanctioned,
+        seatForm.admitted,
+        seatForm.deptName,
+        seatForm.stream
+      );
+    } else {
+      addSeatMatrixItem({
+        deptName: seatForm.deptName,
+        stream: seatForm.stream,
+        isAedp: seatForm.isAedp,
+        specialization: seatForm.specialization,
+        sanctioned: seatForm.sanctioned,
+        admitted: seatForm.admitted,
+        vacant: Math.max(0, seatForm.sanctioned - seatForm.admitted),
+      });
+    }
+
+    setIsSeatModalOpen(false);
+  };
+
+  // ==========================================
+  // NOTICES MODAL HANDLERS
+  // ==========================================
+  const handleOpenAddNotice = () => {
+    setEditingNotice(null);
+    setNoticeForm({
+      title: '',
+      category: 'General',
+      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      isImportant: false,
+      content: '',
+      downloadUrl: '#',
+    });
+    setIsNoticeModalOpen(true);
+  };
+
+  const handleOpenEditNotice = (n: Notice) => {
+    setEditingNotice(n);
+    setNoticeForm({
+      title: n.title,
+      category: n.category,
+      date: n.date,
+      isImportant: n.isImportant,
+      content: n.content || '',
+      downloadUrl: n.downloadUrl || '#',
+    });
+    setIsNoticeModalOpen(true);
+  };
+
+  const handleNoticeFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!noticeForm.title.trim()) return;
+
+    if (editingNotice) {
+      updateNotice(editingNotice.id, noticeForm);
+    } else {
+      addNotice(noticeForm);
+    }
+    setIsNoticeModalOpen(false);
+  };
+
+  // ==========================================
+  // FAQS MODAL HANDLERS
+  // ==========================================
+  const handleOpenAddFaq = () => {
+    setEditingFaq(null);
+    setFaqForm({
+      question: '',
+      answer: '',
+      category: 'Admission',
+    });
+    setIsFaqModalOpen(true);
+  };
+
+  const handleOpenEditFaq = (f: FAQItem) => {
+    setEditingFaq(f);
+    setFaqForm({
+      question: f.question,
+      answer: f.answer,
+      category: f.category,
+    });
+    setIsFaqModalOpen(true);
+  };
+
+  const handleFaqFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!faqForm.question.trim() || !faqForm.answer.trim()) return;
+
+    if (editingFaq) {
+      updateFAQ(editingFaq.id, faqForm.question, faqForm.answer, faqForm.category);
+    } else {
+      addFAQ(faqForm.question, faqForm.answer, faqForm.category);
+    }
+    setIsFaqModalOpen(false);
+  };
+
+  // ==========================================
+  // HOD MODAL HANDLERS
+  // ==========================================
+  const handleOpenAddHod = () => {
+    setEditingHod(null);
+    setHodForm({
+      deptName: '',
+      username: '',
+      password: '',
+      hodName: '',
+      phone: '',
+      email: '',
+    });
+    setIsHodModalOpen(true);
+  };
+
+  const handleOpenEditHod = (h: HodAccount) => {
+    setEditingHod(h);
+    setHodForm({
+      deptName: h.deptName,
+      username: h.username,
+      password: h.password,
+      hodName: h.hodName,
+      phone: h.phone,
+      email: h.email,
+    });
+    setIsHodModalOpen(true);
+  };
+
+  const handleHodFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hodForm.deptName.trim() || !hodForm.username.trim() || !hodForm.password.trim()) return;
+
+    if (editingHod) {
+      updateHodAccount(editingHod.id, hodForm);
+    } else {
+      addHodAccount(hodForm);
+    }
+    setIsHodModalOpen(false);
+  };
+
+  // ==========================================
+  // SETTINGS HANDLER
+  // ==========================================
+  const handleSaveSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSystemSettings(settingsForm);
+    setSettingsSavedMsg('College details and system configuration saved successfully!');
+    setTimeout(() => setSettingsSavedMsg(''), 4000);
+  };
+
+  // Google Sheet live sync
   const handleGoogleSheetSync = async () => {
     setIsSyncingSheet(true);
     setSyncMessage('');
@@ -221,13 +760,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     setSyncMessage(`Successfully synced ${syncedCount} records from live SAMS Google Sheet!`);
   };
 
-  // Trigger Google Drive Snapshot Backup
+  // Google Drive cloud backup
   const handleTriggerDriveBackup = async () => {
     setIsCreatingBackup(true);
     setBackupStatusMsg('');
 
     const snapshot = {
-      version: '2.0.0',
+      version: '3.0.0',
       timestamp: new Date().toISOString(),
       college: systemSettings.collegeName,
       data: {
@@ -239,6 +778,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         systemSettings,
         notices,
         faculty,
+        faqs,
       },
     };
 
@@ -248,7 +788,6 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     addAuditLog('CLOUD_BACKUP', 'Generated system snapshot backup to Google Drive.');
   };
 
-  // Restore Cloud Snapshot File
   const handleRestoreSnapshotFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -259,9 +798,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       const parsed = parseSnapshotFile(content);
       if (parsed) {
         restoreSystemFromSnapshot(parsed);
-        alert('System successfully restored from snapshot backup!');
+        showToast('success', 'System successfully restored from snapshot backup!');
       } else {
-        alert('Invalid snapshot file format.');
+        showToast('error', 'Invalid snapshot file format.');
       }
     };
     reader.readAsText(file);
@@ -269,7 +808,6 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
 
   return (
     <div className="space-y-8 pb-12">
-      
       {/* Admin Title Header */}
       <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -281,7 +819,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
             SAMS e-Admission & Administration Master Suite
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Logged in as <strong>Super Administrator</strong> &bull; SAMS Panchayat College, Baragada
+            Logged in as <strong>Super Administrator</strong> &bull; SAMS Code: <strong>{systemSettings.collegeCode || '03071302'}</strong> &bull; {systemSettings.collegeName}
           </p>
         </div>
 
@@ -296,13 +834,17 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       {/* Navigation Sub-Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
         {[
-          { id: 'control', label: 'Spot Round Live Switch', icon: Radio },
-          { id: 'add-students', label: 'Add Students (Excel)', icon: FileSpreadsheet },
-          { id: 'students', label: 'Student DB Records', icon: Database },
-          { id: 'seats', label: 'Seat Matrix Editor', icon: Edit2 },
-          { id: 'hods', label: 'HOD Credentials Manager', icon: Lock },
-          { id: 'drive', label: 'Google Drive Backup', icon: Cloud },
-          { id: 'audit', label: 'System Audit Logs', icon: History },
+          { id: 'students', label: `Students DB (${students.length})`, icon: Database },
+          { id: 'add-students', label: 'Import Excel / CSV', icon: FileSpreadsheet },
+          { id: 'faculty', label: `Faculty (${faculty.length})`, icon: Users },
+          { id: 'seats', label: `Seat Matrix (${seatMatrix.length})`, icon: Edit2 },
+          { id: 'notices', label: `Notices (${notices.length})`, icon: Bell },
+          { id: 'faqs', label: `FAQs (${faqs.length})`, icon: HelpCircle },
+          { id: 'hods', label: `HOD Accounts (${hodAccounts.length})`, icon: Lock },
+          { id: 'spot', label: `Spot Round Desk (${spotCandidates.length})`, icon: Radio },
+          { id: 'settings', label: 'College Settings', icon: Settings },
+          { id: 'drive', label: 'Cloud Backup', icon: Cloud },
+          { id: 'audit', label: 'Audit Trail', icon: History },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeAdminTab === tab.id;
@@ -310,7 +852,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
             <button
               key={tab.id}
               onClick={() => setActiveAdminTab(tab.id as any)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center transition ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center transition ${
                 isActive
                   ? 'bg-amber-500 text-slate-950 shadow-lg'
                   : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'
@@ -323,17 +865,1169 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         })}
       </div>
 
-      {/* TAB: SPOT ROUND LIVE CONTROL */}
-      {activeAdminTab === 'control' && (
+      {/* Global Admin Toast Notification Banner */}
+      {adminToast && (
+        <div
+          className={`p-4 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-xl transition-all ${
+            adminToast.type === 'success'
+              ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/50'
+              : adminToast.type === 'error'
+              ? 'bg-red-500/15 text-red-200 border-red-500/50'
+              : 'bg-amber-500/15 text-amber-200 border-amber-500/50'
+          }`}
+        >
+          <div className="flex items-center space-x-2.5">
+            {adminToast.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : adminToast.type === 'error' ? (
+              <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            )}
+            <span>{adminToast.message}</span>
+          </div>
+          <button
+            onClick={() => setAdminToast(null)}
+            className="text-slate-400 hover:text-white p-1 rounded transition ml-2"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 1: STUDENT DATABASE RECORDS (FULL CRUD & ACTIONS)     */}
+      {/* ========================================================= */}
+      {activeAdminTab === 'students' && (() => {
+        const totalFiltered = filteredStudents.length;
+        const effectivePageSize = pageSize === 'ALL' ? totalFiltered || 1 : pageSize;
+        const totalPages = Math.max(1, Math.ceil(totalFiltered / effectivePageSize));
+        const safePage = Math.min(Math.max(1, currentPage), totalPages);
+        const pagedStudents = pageSize === 'ALL'
+          ? filteredStudents
+          : filteredStudents.slice((safePage - 1) * effectivePageSize, safePage * effectivePageSize);
+
+        const artsCount = students.filter((s) => getEffectiveStream(s) === 'Arts').length;
+        const bioCount = students.filter((s) => getEffectiveStream(s) === 'Biological Science').length;
+        const commCount = students.filter((s) => getEffectiveStream(s) === 'Commerce').length;
+        const phyCount = students.filter((s) => getEffectiveStream(s) === 'Physical Science').length;
+        const sfCount = students.filter((s) => getEffectiveStream(s) === 'Self Financing').length;
+
+        const genCount = students.filter((s) => normalizeCategory(s.category) === 'GEN').length;
+        const scCount = students.filter((s) => normalizeCategory(s.category) === 'SC').length;
+        const stCount = students.filter((s) => normalizeCategory(s.category) === 'ST').length;
+        const sebcCount = students.filter((s) => normalizeCategory(s.category) === 'SEBC').length;
+
+        return (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <h2 className="text-lg font-bold text-white font-serif flex items-center">
+                  <Database className="w-5 h-5 mr-2 text-amber-400" />
+                  SAMS Student Database Records ({students.length} Total in DB)
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Institutional student roster for Panchayat College Baragada. First column displays University Roll & SAMS Reg. No.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleOpenAddStudent}
+                  className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center shadow"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Add Student
+                </button>
+
+                <label className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold flex items-center shadow cursor-pointer transition">
+                  <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />
+                  {isImporting ? 'Importing Sheet...' : 'Quick Import Excel / CSV'}
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls, .csv, .tsv"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    disabled={isImporting}
+                  />
+                </label>
+
+                <button
+                  onClick={handleExportStudentsExcel}
+                  className="px-3.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-xs font-bold flex items-center"
+                >
+                  <Download className="w-3.5 h-3.5 mr-1" /> Export Excel
+                </button>
+
+                {students.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const count = correctStudentClassifications();
+                      if (count > 0) {
+                        showToast('success', `Checked & corrected ${count} student stream & subject classifications with Subjects & Seats!`);
+                      } else {
+                        showToast('info', 'All student records in database are already 100% synchronized with Subjects & Seats.');
+                      }
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center shadow transition"
+                    title="Synchronize student stream and subject classifications with official Subjects & Seats matrix"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-1 text-purple-400" /> Correct Stream & Subject Classifications
+                  </button>
+                )}
+
+                {students.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to clear all student records?')) {
+                        clearAllStudents();
+                        showToast('info', 'All student database records cleared.');
+                      }
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold flex items-center"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Clear All Students
+                  </button>
+                )}
+
+                {students.length === 0 && (
+                  <button
+                    onClick={() => {
+                      loadSampleStudents();
+                      showToast('success', 'Loaded sample student roster.');
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 mr-1" /> Load Sample Students
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Stream & Category Roster Breakdown Bar */}
+            <div className="space-y-2.5 pt-1 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-amber-400 font-mono text-[11px] font-bold mr-1">Stream Breakdown:</span>
+                <button
+                  onClick={() => { setStreamFilter('ALL'); setCurrentPage(1); }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    streamFilter === 'ALL'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  All Streams ({students.length})
+                </button>
+                <button
+                  onClick={() => { setStreamFilter('Arts'); setCurrentPage(1); }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    streamFilter === 'Arts'
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  Arts ({artsCount})
+                </button>
+                <button
+                  onClick={() => { setStreamFilter('Biological Science'); setCurrentPage(1); }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    streamFilter === 'Biological Science'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  Biological Science ({bioCount})
+                </button>
+                <button
+                  onClick={() => { setStreamFilter('Commerce'); setCurrentPage(1); }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    streamFilter === 'Commerce'
+                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  Commerce ({commCount})
+                </button>
+                <button
+                  onClick={() => { setStreamFilter('Physical Science'); setCurrentPage(1); }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    streamFilter === 'Physical Science'
+                      ? 'bg-teal-500/20 text-teal-300 border-teal-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  Physical Science ({phyCount})
+                </button>
+                <button
+                  onClick={() => { setStreamFilter('Self Financing'); setCurrentPage(1); }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    streamFilter === 'Self Financing'
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  Self Financing ({sfCount})
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-slate-400 font-mono text-[11px] font-semibold mr-1">Category Breakdown:</span>
+                <button
+                  onClick={() => { setCategoryFilter('ALL'); setCurrentPage(1); }}
+                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
+                    categoryFilter === 'ALL'
+                      ? 'bg-slate-800 text-amber-300 border-amber-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  All Categories ({students.length})
+                </button>
+                <button
+                  onClick={() => { setCategoryFilter('GEN'); setCurrentPage(1); }}
+                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
+                    categoryFilter === 'GEN'
+                      ? 'bg-slate-800 text-amber-300 border-amber-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  GEN ({genCount})
+                </button>
+                <button
+                  onClick={() => { setCategoryFilter('SC'); setCurrentPage(1); }}
+                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
+                    categoryFilter === 'SC'
+                      ? 'bg-slate-800 text-amber-300 border-amber-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  SC ({scCount})
+                </button>
+                <button
+                  onClick={() => { setCategoryFilter('ST'); setCurrentPage(1); }}
+                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
+                    categoryFilter === 'ST'
+                      ? 'bg-slate-800 text-amber-300 border-amber-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  ST ({stCount})
+                </button>
+                <button
+                  onClick={() => { setCategoryFilter('SEBC'); setCurrentPage(1); }}
+                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
+                    categoryFilter === 'SEBC'
+                      ? 'bg-slate-800 text-amber-300 border-amber-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  SEBC ({sebcCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Search & Filter Bar */}
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search name, roll, barcode, parent, dept..."
+                  value={studentSearch}
+                  onChange={(e) => { setStudentSearch(e.target.value); setCurrentPage(1); }}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <select
+                value={streamFilter}
+                onChange={(e) => { setStreamFilter(e.target.value); setCurrentPage(1); }}
+                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500"
+              >
+                <option value="ALL">All Streams</option>
+                <option value="Arts">Arts</option>
+                <option value="Biological Science">Biological Science</option>
+                <option value="Commerce">Commerce</option>
+                <option value="Physical Science">Physical Science</option>
+                <option value="Self Financing">Self Financing</option>
+                <option value="Science">All Science (Physical + Biological)</option>
+              </select>
+
+              <select
+                value={categoryFilter}
+                onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
+                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500"
+              >
+                <option value="ALL">All Categories</option>
+                <option value="GEN">GEN</option>
+                <option value="SC">SC</option>
+                <option value="ST">ST</option>
+                <option value="SEBC">SEBC</option>
+              </select>
+
+              <span className="text-slate-400 font-mono text-[11px] ml-auto">
+                Showing <strong>{pagedStudents.length}</strong> of <strong>{totalFiltered}</strong> matching (<strong>{students.length}</strong> total)
+              </span>
+            </div>
+
+            {/* Students Table */}
+            {students.length === 0 ? (
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-12 text-center max-w-md mx-auto space-y-3">
+                <Database className="w-12 h-12 text-slate-600 mx-auto" />
+                <h3 className="font-bold text-white text-base">Students Database is Currently Clean</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  No student records loaded. Upload your college Excel/CSV sheet or add records manually.
+                </p>
+                <div className="flex justify-center gap-2 pt-2">
+                  <button
+                    onClick={handleOpenAddStudent}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow"
+                  >
+                    <Plus className="w-3.5 h-3.5 inline mr-1" /> Add Student
+                  </button>
+                  <button
+                    onClick={() => setActiveAdminTab('add-students')}
+                    className="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs shadow"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 inline mr-1" /> Upload Excel Sheet
+                  </button>
+                </div>
+              </div>
+            ) : totalFiltered === 0 ? (
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-8 text-center space-y-2">
+                <p className="text-slate-300 text-xs">No records matched your search query or filter.</p>
+                <button
+                  onClick={() => { setStudentSearch(''); setStreamFilter('ALL'); setCategoryFilter('ALL'); }}
+                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold rounded-lg"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="overflow-x-auto rounded-xl border border-slate-800">
+                  <table className="w-full text-left text-xs text-slate-200">
+                    <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                      <tr>
+                        <th className="py-3 px-3">Roll / SAMS</th>
+                        <th className="py-3 px-3">Student Name</th>
+                        <th className="py-3 px-3">Barcode</th>
+                        <th className="py-3 px-3">Father / Mother Name</th>
+                        <th className="py-3 px-3">Category</th>
+                        <th className="py-3 px-3">DOB</th>
+                        <th className="py-3 px-3">Department</th>
+                        <th className="py-3 px-3 text-center">Marks</th>
+                        <th className="py-3 px-3 text-center">%</th>
+                        <th className="py-3 px-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {pagedStudents.map((stu) => (
+                        <tr key={stu.id} className="hover:bg-slate-800/40 transition">
+                          <td className="py-2.5 px-3 font-mono text-[11px] whitespace-nowrap">
+                            <span className="text-amber-300 font-bold block">{stu.rollNo}</span>
+                            <span className="text-slate-500 block text-[10px]">{stu.samsRegNo}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-white whitespace-nowrap">{stu.name}</td>
+                          <td className="py-2.5 px-3 font-mono text-amber-300 text-[11px] whitespace-nowrap">{stu.barcode || stu.samsRegNo}</td>
+                          <td className="py-2.5 px-3 text-slate-300">{stu.parentName || 'N/A'}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-400">{stu.category}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-400">{stu.dob || 'N/A'}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="text-slate-200">{stu.department}</span>
+                            <span className="text-[10px] text-slate-500 block">{stu.stream}</span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono whitespace-nowrap">
+                            <span className="text-emerald-400 font-semibold">{stu.marksSecured !== undefined ? stu.marksSecured : 0}</span> / {stu.maxMarks || 600}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-bold text-amber-400">{stu.marksPercentage}%</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <div className="flex items-center justify-center space-x-1">
+                              <button
+                                onClick={() => handleOpenEditStudent(stu)}
+                                className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs transition"
+                                title="Edit Student"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Delete student ${stu.name} (${stu.rollNo || stu.samsRegNo})?`)) {
+                                    deleteStudent(stu.id);
+                                    showToast('success', `Removed ${stu.name} from database.`);
+                                  }
+                                }}
+                                className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400 text-xs transition"
+                                title="Delete Student"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Table Pagination Controls */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs">
+                  <div className="flex items-center space-x-2 text-slate-400 font-mono text-[11px]">
+                    <span>Rows per page:</span>
+                    <select
+                      value={String(pageSize)}
+                      onChange={(e) => {
+                        const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
+                        setPageSize(val as any);
+                        setCurrentPage(1);
+                      }}
+                      className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200"
+                    >
+                      <option value="25">25</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                      <option value="250">250</option>
+                      <option value="ALL">All ({totalFiltered})</option>
+                    </select>
+                    <span>
+                      Page {safePage} of {totalPages} ({totalFiltered} total matching)
+                    </span>
+                  </div>
+
+                  {pageSize !== 'ALL' && totalPages > 1 && (
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={safePage <= 1}
+                        className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 flex items-center font-bold"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5 mr-0.5" /> Prev
+                      </button>
+                      <span className="px-3 py-1 font-mono text-amber-400 font-bold bg-slate-950 border border-slate-800 rounded">
+                        {safePage} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={safePage >= totalPages}
+                        className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 flex items-center font-bold"
+                      >
+                        Next <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ========================================================= */}
+      {/* TAB 2: IMPORT STUDENTS EXCEL / CSV (FIXED & ENHANCED)    */}
+      {/* ========================================================= */}
+      {activeAdminTab === 'add-students' && (
+        <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 shadow-2xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div>
+              <h2 className="text-lg font-bold text-white font-serif flex items-center">
+                <FileSpreadsheet className="w-5 h-5 mr-2 text-amber-400" />
+                Enhanced Excel & CSV Student Importer
+              </h2>
+              <p className="text-xs text-slate-400">
+                Upload any college Excel (.xlsx, .xls) or CSV sheet. Features smart header discovery (handles titles in row 1-3), date normalization, and preview before saving.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={downloadStudentTemplateExcel}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center shadow"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5" /> Download Excel Template
+              </button>
+              <button
+                onClick={downloadStudentTemplateCSV}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center shadow"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5" /> Download CSV Template
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Upload Box */}
+            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4 text-xs">
+              <h3 className="font-bold text-white text-sm flex items-center">
+                <Upload className="w-4 h-4 mr-2 text-emerald-400" /> Select Spreadsheet File
+              </h3>
+              <p className="text-slate-400 leading-relaxed">
+                Supports standard SAMS Odisha admission lists, College office sheets, and custom formats. Columns like <strong className="text-amber-400">Student Name</strong>, <strong className="text-amber-400">Barcode</strong>, <strong className="text-amber-400">Father/Mother Name</strong>, <strong className="text-amber-400">Category</strong>, <strong className="text-amber-400">DOB</strong>, <strong className="text-amber-400">Marks</strong>, and <strong className="text-amber-400">Department</strong> are mapped automatically.
+              </p>
+
+              <label className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold shadow-lg flex items-center justify-center cursor-pointer transition">
+                <FileSpreadsheet className="w-5 h-5 mr-2" />
+                {isImporting ? 'Reading & Parsing Spreadsheet...' : 'Browse & Select Excel / CSV File'}
+                <input
+                  type="file"
+                  accept=".xlsx, .xls, .csv, .tsv"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  disabled={isImporting}
+                />
+              </label>
+
+              {uploadedFileName && (
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-300 font-mono text-[11px] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span className="truncate">Selected File: <strong>{uploadedFileName}</strong></span>
+                  {importResult?.success && (
+                    <span className="text-emerald-400 font-bold flex items-center shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> {importResult.students.length} Records Parsed
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {importResult?.success && importResult.students.length > 0 && (
+                <div className="pt-2">
+                  <button
+                    onClick={handleConfirmImport}
+                    className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs shadow-lg flex items-center justify-center transition"
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Commit & Save {importResult.students.length} Records into SAMS Database Now &rarr;
+                  </button>
+                </div>
+              )}
+
+              {importStatusMessage && (
+                <div
+                  className={`p-3 rounded-xl text-xs font-medium ${
+                    importResult?.success
+                      ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-red-500/10 text-red-300 border border-red-500/30'
+                  }`}
+                >
+                  {importStatusMessage}
+                </div>
+              )}
+            </div>
+
+            {/* Import Mode & Specifications */}
+            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4 text-xs text-slate-300">
+              <h3 className="font-bold text-amber-400 uppercase tracking-wider font-mono">
+                Import Settings & Workflow
+              </h3>
+
+              <div className="space-y-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                <label className="text-xs font-bold text-slate-200 block mb-1">Import Destination Mode:</label>
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="importMode"
+                      checked={!importReplaceMode}
+                      onChange={() => setImportReplaceMode(false)}
+                      className="text-amber-500 focus:ring-0"
+                    />
+                    <span className="text-slate-300">Append to Existing Records</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="importMode"
+                      checked={importReplaceMode}
+                      onChange={() => setImportReplaceMode(true)}
+                      className="text-amber-500 focus:ring-0"
+                    />
+                    <span className="text-red-400 font-semibold">Replace Entire Database</span>
+                  </label>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="autoCommitCheck"
+                    checked={autoCommitImport}
+                    onChange={(e) => setAutoCommitImport(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-500 focus:ring-0 bg-slate-950 border-slate-700"
+                  />
+                  <label htmlFor="autoCommitCheck" className="text-xs text-amber-300 font-semibold cursor-pointer">
+                    Direct Auto-Import into Student DB immediately upon selecting file
+                  </label>
+                </div>
+              </div>
+
+              <ul className="list-disc list-inside space-y-1.5 text-slate-400 text-[11px]">
+                <li><strong>Header Rows:</strong> Automatically detects headers on row 1, 2, 3 or below even if title rows exist.</li>
+                <li><strong>Dates:</strong> Converts Excel serial numbers, DD/MM/YYYY, and YYYY-MM-DD reliably.</li>
+                <li><strong>Aliases:</strong> Understands "Student Name", "Applicant Name", "Candidate Name", "Name".</li>
+                <li><strong>Streams:</strong> Automatically assigns Science/Arts/Commerce based on Honours department if missing.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* PREVIEW MODAL / TABLE IF PARSED SUCCESSFULLY */}
+          {importResult && importResult.success && importResult.students.length > 0 && (
+            <div className="bg-slate-950 p-6 rounded-2xl border border-amber-500/40 space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div>
+                  <h3 className="font-bold text-white text-sm flex items-center">
+                    <Eye className="w-4 h-4 mr-2 text-amber-400" />
+                    Preview Data ({importResult.students.length} Records Extracted)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Review sample extracted columns below. Click "Confirm & Import Records" to commit to the database.
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setImportResult(null)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmImport}
+                    className="px-6 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold shadow-lg flex items-center"
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-1.5" /> Confirm & Import {importResult.students.length} Records
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-800 max-h-72">
+                <table className="w-full text-left text-xs text-slate-200">
+                  <thead className="bg-slate-900 text-slate-400 uppercase font-mono text-[10px] sticky top-0">
+                    <tr>
+                      <th className="py-2.5 px-3">Roll / SAMS</th>
+                      <th className="py-2.5 px-3">Student Name</th>
+                      <th className="py-2.5 px-3">Barcode</th>
+                      <th className="py-2.5 px-3">Father / Mother Name</th>
+                      <th className="py-2.5 px-3">Category</th>
+                      <th className="py-2.5 px-3">DOB</th>
+                      <th className="py-2.5 px-3">Department</th>
+                      <th className="py-2.5 px-3">Stream</th>
+                      <th className="py-2.5 px-3 text-center">Marks</th>
+                      <th className="py-2.5 px-3 text-center">%</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {importResult.students.slice(0, 10).map((stu, i) => (
+                      <tr key={i} className="hover:bg-slate-800/30">
+                        <td className="py-2 px-3 font-mono text-[11px] whitespace-nowrap">
+                          <span className="text-amber-300 font-bold block">{stu.rollNo}</span>
+                          <span className="text-slate-500 block text-[10px]">{stu.samsRegNo}</span>
+                        </td>
+                        <td className="py-2 px-3 font-bold text-white whitespace-nowrap">{stu.name}</td>
+                        <td className="py-2 px-3 font-mono text-amber-300 text-[11px] whitespace-nowrap">{stu.barcode}</td>
+                        <td className="py-2 px-3 text-slate-300">{stu.parentName}</td>
+                        <td className="py-2 px-3 font-mono text-slate-400">{stu.category}</td>
+                        <td className="py-2 px-3 font-mono text-slate-400">{stu.dob}</td>
+                        <td className="py-2 px-3">{stu.department}</td>
+                        <td className="py-2 px-3">{stu.stream}</td>
+                        <td className="py-2 px-3 text-center font-mono whitespace-nowrap">
+                          <span className="text-emerald-400 font-semibold">{stu.marksSecured}</span> / {stu.maxMarks}
+                        </td>
+                        <td className="py-2 px-3 text-center font-bold text-amber-400">{stu.marksPercentage}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {importResult.students.length > 10 && (
+                <p className="text-[11px] text-slate-500 font-mono text-right">
+                  ...and {importResult.students.length - 10} more rows
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* SAMS Live Google Sheet Sync Box */}
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-amber-400 font-mono">Live Google Sheet Sync URL</span>
+              <span className="text-slate-500 font-mono text-[10px]">
+                Last Sync: {systemSettings.lastSheetSync ? new Date(systemSettings.lastSheetSync).toLocaleString('en-IN') : 'Never'}
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="url"
+                value={sheetUrlInput}
+                onChange={(e) => setSheetUrlInput(e.target.value)}
+                placeholder="https://docs.google.com/spreadsheets/d/..."
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+              />
+              <button
+                onClick={handleGoogleSheetSync}
+                disabled={isSyncingSheet}
+                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center shrink-0 shadow"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isSyncingSheet ? 'animate-spin' : ''}`} />
+                {isSyncingSheet ? 'Syncing...' : 'Sync Sheet'}
+              </button>
+            </div>
+
+            {syncMessage && <p className="text-xs text-emerald-400 font-medium">{syncMessage}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 3: FACULTY DIRECTORY MANAGER                         */}
+      {/* ========================================================= */}
+      {activeAdminTab === 'faculty' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div>
+              <h2 className="text-lg font-bold text-white font-serif flex items-center">
+                <Users className="w-5 h-5 mr-2 text-amber-400" />
+                Academic Faculty Directory Manager ({faculty.length} Members)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Add, edit, or remove teaching professors, readers, and Department Heads (HODs).
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleOpenAddFaculty}
+                className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center shadow"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Faculty Member
+              </button>
+
+              {faculty.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to clear ALL faculty records?')) {
+                      clearAllFaculty();
+                    }
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold flex items-center"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Clear All Faculty
+                </button>
+              )}
+
+              {faculty.length === 0 && (
+                <button
+                  onClick={loadSampleFaculty}
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" /> Load Benchmark Faculty
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="relative w-full sm:w-72">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="Search faculty name, department..."
+              value={facultySearch}
+              onChange={(e) => setFacultySearch(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          {faculty.length === 0 ? (
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-12 text-center max-w-md mx-auto space-y-3">
+              <Users className="w-12 h-12 text-slate-600 mx-auto" />
+              <h3 className="font-bold text-white text-base">Faculty Directory is Clean</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Faculty data has been cleared. Administrators can add teaching faculty members using the button below.
+              </p>
+              <button
+                onClick={handleOpenAddFaculty}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs"
+              >
+                <Plus className="w-3.5 h-3.5 inline mr-1" /> Add Faculty Member
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredFaculty.map((member) => (
+                <div
+                  key={member.id}
+                  className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-3 hover:border-amber-500/30 transition"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <img
+                        src={member.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
+                        alt={member.name}
+                        className="w-12 h-12 rounded-full object-cover border border-amber-500/40"
+                      />
+                      <div>
+                        <h4 className="font-bold text-white text-sm">{member.name}</h4>
+                        <p className="text-amber-400 text-xs">{member.designation}</p>
+                        <p className="text-slate-400 text-[11px]">Dept of {member.deptName}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => handleOpenEditFaculty(member)}
+                        className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
+                        title="Edit Faculty"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete faculty record for ${member.name}?`)) {
+                            deleteFaculty(member.id);
+                            showToast('success', `Deleted faculty record for ${member.name}.`);
+                          }
+                        }}
+                        className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400"
+                        title="Delete Faculty"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-900 space-y-1 text-slate-400 text-[11px]">
+                    <p className="text-slate-300">{member.qualification}</p>
+                    <p className="truncate">Email: {member.email}</p>
+                    <p>Phone: +91 {member.phone}</p>
+                    {member.isHod && (
+                      <span className="inline-block mt-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded text-[10px] font-bold">
+                        HOD Head
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 4: SEAT MATRIX EDITOR (ADD / EDIT / DELETE)           */}
+      {/* ========================================================= */}
+      {activeAdminTab === 'seats' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div>
+              <h2 className="text-lg font-bold text-white font-serif flex items-center">
+                <Edit2 className="w-5 h-5 mr-2 text-amber-400" />
+                Department Intake & Seat Matrix Editor ({seatMatrix.length} Departments)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Adjust sanctioned seats, admitted scholars, or add new subjects and streams.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleOpenAddSeat}
+                className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center shadow"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Department / Subject
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm('Clear all enrolled counts and re-initialize seat matrix with official 28 departments and intake strengths?')) {
+                    clearSeatMatrix();
+                    showToast('success', 'Cleared seat matrix and reset to official 28 departments.');
+                  }
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold flex items-center"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Clear Seat Matrix (28 Depts)
+              </button>
+              <button
+                onClick={() => {
+                  resetSeatMatrixToBenchmark();
+                  showToast('success', 'Reset seat matrix to Govt benchmark.');
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center"
+              >
+                <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Reset to Govt Benchmark
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-800">
+            <table className="w-full text-left text-xs text-slate-200">
+              <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="py-3 px-4">Department / Subject</th>
+                  <th className="py-3 px-4">Stream</th>
+                  <th className="py-3 px-4">Specialization</th>
+                  <th className="py-3 px-4 text-center">Sanctioned</th>
+                  <th className="py-3 px-4 text-center">Admitted</th>
+                  <th className="py-3 px-4 text-center">Vacant</th>
+                  <th className="py-3 px-4 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {seatMatrix.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-800/40">
+                    <td className="py-3 px-4 font-bold text-white">{item.deptName}</td>
+                    <td className="py-3 px-4 text-slate-400">{item.stream}</td>
+                    <td className="py-3 px-4 text-slate-400 text-[11px]">{item.specialization || 'Regular'}</td>
+                    <td className="py-3 px-4 text-center font-bold text-slate-100">{item.sanctioned}</td>
+                    <td className="py-3 px-4 text-center font-bold text-emerald-400">{item.admitted}</td>
+                    <td className="py-3 px-4 text-center font-bold text-amber-400">{item.vacant}</td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center space-x-1">
+                        <button
+                          onClick={() => handleOpenEditSeat(item)}
+                          className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs"
+                          title="Edit Seat Matrix"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete seat matrix for ${item.deptName}?`)) {
+                              deleteSeatMatrixItem(item.id);
+                              showToast('success', `Deleted department ${item.deptName}.`);
+                            }
+                          }}
+                          className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400 text-xs"
+                          title="Delete Department"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 5: NOTICES & ANNOUNCEMENTS MANAGER                    */}
+      {/* ========================================================= */}
+      {activeAdminTab === 'notices' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div>
+              <h2 className="text-lg font-bold text-white font-serif flex items-center">
+                <Bell className="w-5 h-5 mr-2 text-amber-400" />
+                Notices & Official Announcements ({notices.length} Notices)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Post new college notices, circulars, exam dates, or edit existing notices.
+              </p>
+            </div>
+
+            <button
+              onClick={handleOpenAddNotice}
+              className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center shadow"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" /> Post New Notice
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {notices.map((n) => (
+              <div
+                key={n.id}
+                className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-2 hover:border-amber-500/30 transition"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[10px] font-bold">
+                        {n.category}
+                      </span>
+                      <span className="text-slate-500 text-[10px] font-mono">{n.date}</span>
+                      {n.isImportant && (
+                        <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-bold">
+                          URGENT
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="font-bold text-white text-sm">{n.title}</h3>
+                    {n.content && <p className="text-slate-400 mt-1 leading-relaxed">{n.content}</p>}
+                  </div>
+
+                  <div className="flex items-center space-x-1 shrink-0">
+                    <button
+                      onClick={() => handleOpenEditNotice(n)}
+                      className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
+                      title="Edit Notice"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Delete this notice?')) {
+                          deleteNotice(n.id);
+                          showToast('success', 'Notice deleted successfully.');
+                        }
+                      }}
+                      className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400"
+                      title="Delete Notice"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 6: FAQS MANAGER (FULL CRUD & PRESERVES NEWLINES)      */}
+      {/* ========================================================= */}
+      {activeAdminTab === 'faqs' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div>
+              <h2 className="text-lg font-bold text-white font-serif flex items-center">
+                <HelpCircle className="w-5 h-5 mr-2 text-amber-400" />
+                Frequently Asked Questions (FAQs) Manager ({faqs.length} FAQs)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Add questions and edit multiline answers. Formatting and new lines are strictly preserved on the public site.
+              </p>
+            </div>
+
+            <button
+              onClick={handleOpenAddFaq}
+              className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center shadow"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add New FAQ
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {faqs.map((faq) => (
+              <div
+                key={faq.id}
+                className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-2 hover:border-amber-500/30 transition"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[10px] font-bold">
+                      {faq.category}
+                    </span>
+                    <h3 className="font-bold text-white text-sm">{faq.question}</h3>
+                    <div className="text-slate-300 text-xs whitespace-pre-line leading-relaxed pt-1">
+                      {faq.answer}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-1 shrink-0">
+                    <button
+                      onClick={() => handleOpenEditFaq(faq)}
+                      className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
+                      title="Edit FAQ"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Delete this FAQ?')) {
+                          deleteFAQ(faq.id);
+                          showToast('success', 'FAQ deleted successfully.');
+                        }
+                      }}
+                      className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400"
+                      title="Delete FAQ"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 7: HOD CREDENTIALS & ACCOUNTS MANAGER                 */}
+      {/* ========================================================= */}
+      {activeAdminTab === 'hods' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div>
+              <h2 className="text-lg font-bold text-white font-serif flex items-center">
+                <Lock className="w-5 h-5 mr-2 text-amber-400" />
+                HOD Security Credentials & Department Accounts ({hodAccounts.length} Departments)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Manage department logins, reset passwords, update HOD head contacts, or add new department logins.
+              </p>
+            </div>
+
+            <button
+              onClick={handleOpenAddHod}
+              className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center shadow"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add HOD Account
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {hodAccounts.map((hod) => (
+              <div key={hod.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-3">
+                <div className="flex justify-between items-center border-b border-slate-800/80 pb-2">
+                  <span className="font-bold text-white text-sm">Department of {hod.deptName}</span>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => handleOpenEditHod(hod)}
+                      className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
+                      title="Edit Account"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Delete HOD account for ${hod.deptName}?`)) {
+                          deleteHodAccount(hod.id);
+                          showToast('success', `Deleted HOD account for ${hod.deptName}.`);
+                        }
+                      }}
+                      className="p-1 rounded bg-slate-800 hover:bg-red-950/40 text-red-400"
+                      title="Delete Account"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-slate-300 text-[11px]">
+                  <p>HOD Head: <strong>{hod.hodName}</strong></p>
+                  <p className="font-mono text-slate-400">Username: <span className="text-amber-400 font-bold">{hod.username}</span></p>
+                  <p className="font-mono text-slate-400">Password: <span className="text-emerald-400">{hod.password}</span></p>
+                  <p className="font-mono text-slate-400">Phone: +91 {hod.phone}</p>
+                  <p className="font-mono text-slate-400">Email: {hod.email}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 8: SPOT ROUND MASTER DESK & CANDIDATES                */}
+      {/* ========================================================= */}
+      {activeAdminTab === 'spot' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-800">
             <div className="space-y-1">
               <h2 className="text-lg font-bold text-white font-serif flex items-center">
                 <Radio className="w-5 h-5 mr-2 text-amber-400" />
-                Spot Round Live Master Control Switch
+                Spot Round Live Master Control Desk & Candidate Roster
               </h2>
               <p className="text-xs text-slate-400">
-                Master toggle to ENABLE or DISABLE the public Spot Round Seats reporting desk and merit list publication.
+                Master toggle for Spot Round public reporting, automated merit selection runner, and candidate manager.
               </p>
             </div>
 
@@ -366,421 +2060,251 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </button>
               </div>
 
-              <p className="text-xs text-slate-400 leading-relaxed">
-                When enabled, students and visitors can view vacant seat matrix, candidate reported status, and download provisional merit selection lists.
-              </p>
+              <div className="flex items-center space-x-2 pt-2">
+                <button
+                  onClick={() => runAutomatedMeritSelection()}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow flex items-center"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Run Automated Merit Selection
+                </button>
+                {spotCandidates.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Clear all spot candidates?')) {
+                        clearAllSpotCandidates();
+                        showToast('info', 'All spot candidates cleared.');
+                      }
+                    }}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-red-950 text-red-400 text-xs font-bold"
+                  >
+                    Clear Candidates
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="bg-amber-500/10 border border-amber-500/30 p-5 rounded-2xl space-y-2 text-xs text-amber-200">
               <span className="font-bold block text-amber-300 uppercase tracking-wider font-mono">
-                SAMS Admission Rule Notice
+                Spot Selection Rule Notice
               </span>
               <p>
-                Ensure candidate document verification is completed at SAMS Room No. 12 before locking final selection lists.
+                Candidates must report with CAF printout and original matric/higher secondary certificates. Run automated merit selection after locking physical reporting.
               </p>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* TAB: ADD STUDENTS (EXCEL UPLOAD FOR SUPER ADMIN) */}
-      {activeAdminTab === 'add-students' && (
-        <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 shadow-2xl space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-            <div>
-              <h2 className="text-lg font-bold text-white font-serif flex items-center">
-                <FileSpreadsheet className="w-5 h-5 mr-2 text-amber-400" />
-                Add Students via Excel Spreadsheet (Super Admin Exclusive)
-              </h2>
-              <p className="text-xs text-slate-400">
-                Upload an Excel sheet (.xlsx, .xls) or CSV to instantly import students with Barcode, Parent Name, DOB, and Marks into the database.
-              </p>
-            </div>
+          {/* Spot Candidates Table */}
+          <div className="space-y-4 pt-4 border-t border-slate-800">
+            <h3 className="text-sm font-bold text-white font-serif flex items-center">
+              <Users className="w-4 h-4 mr-2 text-amber-400" />
+              Registered Spot Candidates ({spotCandidates.length})
+            </h3>
 
-            <button
-              onClick={handleDownloadExcelTemplate}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center shadow"
-            >
-              <Download className="w-4 h-4 mr-1.5" /> Download Excel Template
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Upload Card */}
-            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4 text-xs">
-              <h3 className="font-bold text-white text-sm flex items-center">
-                <Upload className="w-4 h-4 mr-2 text-emerald-400" /> Upload Student Excel File (.xlsx, .csv)
-              </h3>
-              <p className="text-slate-400 leading-relaxed">
-                Required Excel Columns: <strong className="text-amber-400">Name</strong>, <strong className="text-amber-400">Barcode</strong>, <strong className="text-amber-400">Father Name/Mother Name</strong>, <strong className="text-amber-400">Category</strong>, <strong className="text-amber-400">Date of Birth</strong>, <strong className="text-amber-400">Maximum Marks</strong>, <strong className="text-amber-400">Marks Secured</strong>, <strong className="text-amber-400">Percentage</strong>.
-              </p>
-
-              <label className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold shadow-lg flex items-center justify-center cursor-pointer">
-                <FileSpreadsheet className="w-4 h-4 mr-2" /> Browse & Import Excel Sheet
-                <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUploadXLSX} className="hidden" />
-              </label>
-            </div>
-
-            {/* Schema Guide */}
-            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3 text-xs text-slate-300">
-              <h3 className="font-bold text-amber-400 uppercase tracking-wider font-mono">Excel Schema Specification</h3>
-              <ul className="list-disc list-inside space-y-1.5 text-slate-300">
-                <li><strong>Name</strong>: Student Full Name</li>
-                <li><strong>Barcode</strong>: Unique barcode string or id</li>
-                <li><strong>Father Name/Mother Name</strong>: Parent guardian name</li>
-                <li><strong>Category</strong>: GEN, SC, ST, or SEBC</li>
-                <li><strong>Date of Birth</strong>: Format YYYY-MM-DD or DD/MM/YYYY</li>
-                <li><strong>Maximum Marks</strong>: Total possible marks (e.g., 500)</li>
-                <li><strong>Marks Secured</strong>: Marks obtained by student</li>
-                <li><strong>Percentage</strong>: Calculated percentage (%)</li>
-              </ul>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* TAB: STUDENT DATABASE MANAGER */}
-      {activeAdminTab === 'students' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-            <div>
-              <h2 className="text-lg font-bold text-white font-serif flex items-center">
-                <Database className="w-5 h-5 mr-2 text-amber-400" />
-                SAMS Student Database Manager ({students.length} Total Records)
-              </h2>
-              <p className="text-xs text-slate-400">
-                Includes Name, Barcode, Parent Name, Category, DOB, Maximum Marks, Marks Secured, and Percentage.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setActiveAdminTab('add-students')}
-                className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center shadow"
-              >
-                <Plus className="w-3.5 h-3.5 mr-1" /> Add Students (Excel)
-              </button>
-
-              <button
-                onClick={handleExportStudentsExcel}
-                className="px-3.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-xs font-bold flex items-center"
-              >
-                <Download className="w-3.5 h-3.5 mr-1.5" /> Export Excel
-              </button>
-            </div>
-          </div>
-
-          {/* SAMS Google Sheet Live Sync Box */}
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-bold text-amber-400 font-mono">Sync Live SAMS Google Sheet URL</span>
-              <span className="text-slate-500 font-mono text-[10px]">
-                Last Sync: {systemSettings.lastSheetSync ? new Date(systemSettings.lastSheetSync).toLocaleString('en-IN') : 'Never'}
-              </span>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="url"
-                value={sheetUrlInput}
-                onChange={(e) => setSheetUrlInput(e.target.value)}
-                placeholder="https://docs.google.com/spreadsheets/d/..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-              />
-              <button
-                onClick={handleGoogleSheetSync}
-                disabled={isSyncingSheet}
-                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center shrink-0 shadow"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isSyncingSheet ? 'animate-spin' : ''}`} />
-                {isSyncingSheet ? 'Syncing...' : 'Sync Sheet'}
-              </button>
-            </div>
-
-            {syncMessage && <p className="text-xs text-emerald-400 font-medium">{syncMessage}</p>}
-          </div>
-
-          {/* Filter Bar */}
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Search name, barcode, roll..."
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-
-            <select
-              value={streamFilter}
-              onChange={(e) => setStreamFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500"
-            >
-              <option value="ALL">All Streams</option>
-              <option value="Science">Science</option>
-              <option value="Arts">Arts</option>
-              <option value="Commerce">Commerce</option>
-            </select>
-
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500"
-            >
-              <option value="ALL">All Categories</option>
-              <option value="GEN">GEN</option>
-              <option value="SC">SC</option>
-              <option value="ST">ST</option>
-              <option value="SEBC">SEBC</option>
-            </select>
-
-            <span className="text-slate-400 font-mono text-[11px] ml-auto">
-              Showing <strong>{filteredStudents.length}</strong> records
-            </span>
-          </div>
-
-          {/* Table with Barcode, Parent Name, DOB, Marks */}
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
-            <table className="w-full text-left text-xs text-slate-200">
-              <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
-                <tr>
-                  <th className="py-3 px-3">Student Name</th>
-                  <th className="py-3 px-3">Barcode</th>
-                  <th className="py-3 px-3">Father / Mother Name</th>
-                  <th className="py-3 px-3">Category</th>
-                  <th className="py-3 px-3">DOB</th>
-                  <th className="py-3 px-3 text-center">Max Marks</th>
-                  <th className="py-3 px-3 text-center">Secured</th>
-                  <th className="py-3 px-3 text-center">Percentage</th>
-                  <th className="py-3 px-3">SAMS Reg / Roll</th>
-                  <th className="py-3 px-3 text-center">Edit Roll</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {filteredStudents.slice(0, 150).map((stu, idx) => (
-                  <tr key={`${stu.id}_${idx}`} className="hover:bg-slate-800/40">
-                    <td className="py-3 px-3 font-bold text-white">{stu.name}</td>
-                    <td className="py-3 px-3 font-mono text-amber-300">{stu.barcode || `BAR-${stu.samsRegNo}`}</td>
-                    <td className="py-3 px-3 text-slate-300">{stu.parentName || 'N/A'}</td>
-                    <td className="py-3 px-3 font-mono text-slate-400">{stu.category}</td>
-                    <td className="py-3 px-3 font-mono text-slate-400">{stu.dob || '2005-01-01'}</td>
-                    <td className="py-3 px-3 text-center font-mono text-slate-300">{stu.maxMarks || 500}</td>
-                    <td className="py-3 px-3 text-center font-mono text-emerald-400">{stu.marksSecured || 400}</td>
-                    <td className="py-3 px-3 text-center font-bold text-amber-400">{stu.marksPercentage}%</td>
-                    <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">
-                      {stu.samsRegNo} <br />
-                      <span className="text-amber-300">{stu.rollNo}</span>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      {editingStudentId === stu.id ? (
-                        <div className="flex items-center space-x-1">
-                          <input
-                            type="text"
-                            value={editingRollNo}
-                            onChange={(e) => setEditingRollNo(e.target.value)}
-                            className="bg-slate-950 border border-amber-500 rounded px-1.5 py-0.5 text-xs text-amber-300 focus:outline-none w-20"
-                          />
+            {spotCandidates.length === 0 ? (
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-8 text-center text-slate-400 text-xs">
+                No spot candidates registered yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-800">
+                <table className="w-full text-left text-xs text-slate-200">
+                  <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                    <tr>
+                      <th className="py-3 px-4">SAMS Reg. No.</th>
+                      <th className="py-3 px-4">Candidate Name</th>
+                      <th className="py-3 px-4">Department / Stream</th>
+                      <th className="py-3 px-4">Category</th>
+                      <th className="py-3 px-4 text-center">Marks %</th>
+                      <th className="py-3 px-4 text-center">Report Status</th>
+                      <th className="py-3 px-4 text-center">Selection Status</th>
+                      <th className="py-3 px-4 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {spotCandidates.map((cand) => (
+                      <tr key={cand.id} className="hover:bg-slate-800/40">
+                        <td className="py-3 px-4 font-mono text-amber-300 font-bold">{cand.samsRegNo}</td>
+                        <td className="py-3 px-4 font-bold text-white">{cand.studentName}</td>
+                        <td className="py-3 px-4">
+                          <span className="text-slate-200">{cand.deptName}</span>
+                          <span className="text-[10px] text-slate-500 block">{cand.stream}</span>
+                        </td>
+                        <td className="py-3 px-4 font-mono text-slate-300">{cand.category}</td>
+                        <td className="py-3 px-4 text-center font-mono font-bold text-emerald-400">{cand.marksPercentage}%</td>
+                        <td className="py-3 px-4 text-center font-mono text-[11px]">
+                          <span className={`px-2 py-0.5 rounded font-bold ${cand.reportedStatus === 'Reported' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+                            {cand.reportedStatus}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center font-mono text-[11px]">
+                          <span className={`px-2 py-0.5 rounded font-bold ${cand.selectionStatus === 'Selected' ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-800 text-slate-400'}`}>
+                            {cand.selectionStatus}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
                           <button
                             onClick={() => {
-                              updateStudentRollNo(stu.id, editingRollNo);
-                              setEditingStudentId(null);
+                              if (window.confirm(`Delete spot candidate ${cand.studentName} (${cand.samsRegNo})?`)) {
+                                deleteSpotCandidate(cand.id);
+                                showToast('success', `Deleted spot candidate ${cand.studentName}.`);
+                              }
                             }}
-                            className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-bold text-[10px]"
+                            className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400 text-xs transition"
+                            title="Delete Spot Candidate"
                           >
-                            Save
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setEditingStudentId(stu.id);
-                            setEditingRollNo(stu.rollNo);
-                          }}
-                          className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* TAB: SANCTIONED SEAT MATRIX EDITOR */}
-      {activeAdminTab === 'seats' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-            <div>
-              <h2 className="text-lg font-bold text-white font-serif flex items-center">
-                <Edit2 className="w-5 h-5 mr-2 text-amber-400" />
-                Sanctioned Seat Matrix Editor
-              </h2>
-              <p className="text-xs text-slate-400">
-                Adjust intake capacity per subject or reset to Odisha Government benchmark default.
-              </p>
-            </div>
-
-            <button
-              onClick={resetSeatMatrixToBenchmark}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center"
-            >
-              <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Reset to Govt Benchmark
-            </button>
-          </div>
-
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
-            <table className="w-full text-left text-xs text-slate-200">
-              <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
-                <tr>
-                  <th className="py-3 px-4">Subject</th>
-                  <th className="py-3 px-4">Stream</th>
-                  <th className="py-3 px-4 text-center">Sanctioned Intake</th>
-                  <th className="py-3 px-4 text-center">Admitted Count</th>
-                  <th className="py-3 px-4 text-center">Vacant Seats</th>
-                  <th className="py-3 px-4 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {seatMatrix.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-bold text-white">{item.deptName}</td>
-                    <td className="py-3 px-4 text-slate-400">{item.stream}</td>
-                    <td className="py-3 px-4 text-center font-bold text-slate-100">
-                      {editingSeatId === item.id ? (
-                        <input
-                          type="number"
-                          value={newSanctioned}
-                          onChange={(e) => setNewSanctioned(parseInt(e.target.value) || 0)}
-                          className="w-20 bg-slate-950 border border-amber-500 rounded px-2 py-0.5 text-xs text-center text-amber-300 focus:outline-none"
-                        />
-                      ) : (
-                        item.sanctioned
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-center font-bold text-emerald-400">{item.admitted}</td>
-                    <td className="py-3 px-4 text-center font-bold text-amber-400">{item.vacant}</td>
-                    <td className="py-3 px-4 text-center">
-                      {editingSeatId === item.id ? (
-                        <button
-                          onClick={() => {
-                            updateSeatMatrixItem(item.id, newSanctioned);
-                            setEditingSeatId(null);
-                          }}
-                          className="px-2.5 py-1 rounded bg-amber-500 text-slate-950 font-bold text-[10px]"
-                        >
-                          Save
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setEditingSeatId(item.id);
-                            setNewSanctioned(item.sanctioned);
-                          }}
-                          className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
-                        >
-                          Edit Intake
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB: HOD CREDENTIALS MANAGER */}
-      {activeAdminTab === 'hods' && (
+      {/* ========================================================= */}
+      {/* TAB 9: COLLEGE SETTINGS & BRANDING                        */}
+      {/* ========================================================= */}
+      {activeAdminTab === 'settings' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
           <div className="pb-4 border-b border-slate-800">
             <h2 className="text-lg font-bold text-white font-serif flex items-center">
-              <Lock className="w-5 h-5 mr-2 text-amber-400" />
-              HOD Security Credentials Manager
+              <Settings className="w-5 h-5 mr-2 text-amber-400" />
+              College Information & Global System Settings
             </h2>
             <p className="text-xs text-slate-400">
-              Manage department login passwords and HOD head contact details across all departments.
+              Configure official college name, SAMS code, tagline, NAAC accreditation, header marquee notice, and logo crest.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {hodAccounts.map((hod) => (
-              <div key={hod.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-3">
-                <div className="flex justify-between items-center border-b border-slate-800/80 pb-2">
-                  <span className="font-bold text-white text-sm">Department of {hod.deptName}</span>
-                  <span className="font-mono text-amber-400 text-[11px]">User: {hod.username}</span>
-                </div>
-
-                <div className="space-y-1 text-slate-300">
-                  <p>HOD Head: <strong>{hod.hodName}</strong></p>
-                  <p className="font-mono text-slate-400">Phone: +91 {hod.phone}</p>
-                  <p className="font-mono text-slate-400">Email: {hod.email}</p>
-                </div>
-
-                {editingHodDeptId === hod.id ? (
-                  <div className="space-y-2 pt-2 border-t border-slate-800">
-                    <input
-                      type="text"
-                      placeholder="New HOD Name"
-                      value={newHodName}
-                      onChange={(e) => setNewHodName(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200"
-                    />
-                    <input
-                      type="text"
-                      placeholder="New Security Password"
-                      value={newHodPassword}
-                      onChange={(e) => setNewHodPassword(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-amber-300 font-mono"
-                    />
-                    <div className="flex justify-end space-x-2 pt-1">
-                      <button
-                        onClick={() => setEditingHodDeptId(null)}
-                        className="px-2 py-1 rounded bg-slate-800 text-slate-400 text-[10px]"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => {
-                          updateHodPassword(hod.id, newHodPassword, newHodName);
-                          setEditingHodDeptId(null);
-                        }}
-                        className="px-3 py-1 rounded bg-amber-500 text-slate-950 font-bold text-[10px]"
-                      >
-                        Save Password
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex justify-between items-center pt-2 border-t border-slate-800/80">
-                    <span className="font-mono text-slate-500 text-[10px]">Pass: {hod.password}</span>
-                    <button
-                      onClick={() => {
-                        setEditingHodDeptId(hod.id);
-                        setNewHodPassword(hod.password);
-                        setNewHodName(hod.hodName);
-                      }}
-                      className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-[10px]"
-                    >
-                      Update Credentials
-                    </button>
-                  </div>
-                )}
+          <form onSubmit={handleSaveSettings} className="space-y-4 max-w-2xl text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Official College Name</label>
+                <input
+                  type="text"
+                  value={settingsForm.collegeName}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, collegeName: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
               </div>
-            ))}
-          </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Official SAMS College Code</label>
+                <input
+                  type="text"
+                  value={settingsForm.collegeCode}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, collegeCode: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-400 font-mono font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-slate-300 block mb-1 font-semibold">Government / Affiliation Tagline</label>
+              <input
+                type="text"
+                value={settingsForm.tagline}
+                onChange={(e) => setSettingsForm({ ...settingsForm, tagline: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-300 block mb-1 font-semibold">NAAC Accreditation & Estd Details</label>
+              <input
+                type="text"
+                value={settingsForm.naacGrade}
+                onChange={(e) => setSettingsForm({ ...settingsForm, naacGrade: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-300 block mb-1 font-semibold">Top Marquee Notice Banner</label>
+              <textarea
+                rows={2}
+                value={settingsForm.bannerNotice}
+                onChange={(e) => setSettingsForm({ ...settingsForm, bannerNotice: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">College Crest Logo Image URL</label>
+                <input
+                  type="url"
+                  value={settingsForm.collegeLogoUrl}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, collegeLogoUrl: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Common Prospectus (CP) PDF URL</label>
+                <input
+                  type="url"
+                  value={settingsForm.prospectusUrl}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, prospectusUrl: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Contact Phone</label>
+                <input
+                  type="text"
+                  value={settingsForm.contactPhone}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, contactPhone: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Contact Email</label>
+                <input
+                  type="email"
+                  value={settingsForm.contactEmail}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, contactEmail: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Postal Address</label>
+                <input
+                  type="text"
+                  value={settingsForm.address}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, address: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            {settingsSavedMsg && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-xl font-bold">
+                {settingsSavedMsg}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-lg flex items-center"
+            >
+              <Save className="w-4 h-4 mr-1.5" /> Save College Settings
+            </button>
+          </form>
         </div>
       )}
 
-      {/* TAB: GOOGLE DRIVE CLOUD BACKUP & RESTORE */}
+      {/* ========================================================= */}
+      {/* TAB 10: GOOGLE DRIVE CLOUD BACKUP & RESTORE               */}
+      {/* ========================================================= */}
       {activeAdminTab === 'drive' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
           <div className="pb-4 border-b border-slate-800">
@@ -831,7 +2355,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         </div>
       )}
 
-      {/* TAB: SYSTEM AUDIT LOGS */}
+      {/* ========================================================= */}
+      {/* TAB 11: SYSTEM AUDIT LOGS                                 */}
+      {/* ========================================================= */}
       {activeAdminTab === 'audit' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="pb-4 border-b border-slate-800">
@@ -859,6 +2385,737 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         </div>
       )}
 
+      {/* ========================================================= */}
+      {/* MODAL 1: ADD / EDIT STUDENT MODAL                         */}
+      {/* ========================================================= */}
+      {isStudentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 w-full max-w-xl shadow-2xl space-y-4 text-xs my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-white text-base font-serif flex items-center">
+                <UserPlus className="w-4 h-4 mr-2 text-amber-400" />
+                {editingStudent ? 'Edit Student Record' : 'Add New Student Record'}
+              </h3>
+              <button onClick={() => setIsStudentModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleStudentFormSubmit} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Student Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={studentForm.name}
+                    onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Barcode Number</label>
+                  <input
+                    type="text"
+                    value={studentForm.barcode}
+                    onChange={(e) => setStudentForm({ ...studentForm, barcode: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-300 font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Father / Mother / Parent Name</label>
+                  <input
+                    type="text"
+                    value={studentForm.parentName}
+                    onChange={(e) => setStudentForm({ ...studentForm, parentName: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Date of Birth (DOB)</label>
+                  <input
+                    type="date"
+                    value={studentForm.dob}
+                    onChange={(e) => setStudentForm({ ...studentForm, dob: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Category</label>
+                  <select
+                    value={studentForm.category}
+                    onChange={(e) => setStudentForm({ ...studentForm, category: e.target.value as CategoryType })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="GEN">GEN</option>
+                    <option value="SC">SC</option>
+                    <option value="ST">ST</option>
+                    <option value="SEBC">SEBC</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Max Marks</label>
+                  <input
+                    type="number"
+                    value={studentForm.maxMarks}
+                    onChange={(e) => setStudentForm({ ...studentForm, maxMarks: parseFloat(e.target.value) || 600 })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Secured Marks</label>
+                  <input
+                    type="number"
+                    value={studentForm.marksSecured}
+                    onChange={(e) => setStudentForm({ ...studentForm, marksSecured: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-emerald-400 font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Department / Honours</label>
+                  <input
+                    type="text"
+                    required
+                    value={studentForm.department}
+                    onChange={(e) => setStudentForm({ ...studentForm, department: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Stream</label>
+                  <select
+                    value={studentForm.stream}
+                    onChange={(e) => setStudentForm({ ...studentForm, stream: e.target.value as StreamType })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Science">Science</option>
+                    <option value="Arts">Arts</option>
+                    <option value="Commerce">Commerce</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">University Roll No</label>
+                  <input
+                    type="text"
+                    value={studentForm.rollNo}
+                    onChange={(e) => setStudentForm({ ...studentForm, rollNo: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-300 font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">SAMS Reg No</label>
+                  <input
+                    type="text"
+                    value={studentForm.samsRegNo}
+                    onChange={(e) => setStudentForm({ ...studentForm, samsRegNo: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Phone</label>
+                  <input
+                    type="tel"
+                    value={studentForm.phone}
+                    onChange={(e) => setStudentForm({ ...studentForm, phone: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Gender</label>
+                  <select
+                    value={studentForm.gender}
+                    onChange={(e) => setStudentForm({ ...studentForm, gender: e.target.value as any })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Status</label>
+                  <select
+                    value={studentForm.status}
+                    onChange={(e) => setStudentForm({ ...studentForm, status: e.target.value as any })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Admitted">Admitted</option>
+                    <option value="Spot Applied">Spot Applied</option>
+                    <option value="Selected">Selected</option>
+                    <option value="Verified">Verified</option>
+                    <option value="Pending">Pending</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsStudentModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-lg"
+                >
+                  {editingStudent ? 'Save Changes' : 'Create Student Record'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 2: ADD / EDIT FACULTY MODAL                         */}
+      {/* ========================================================= */}
+      {isFacultyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-white text-base font-serif flex items-center">
+                <Users className="w-4 h-4 mr-2 text-amber-400" />
+                {editingFaculty ? 'Edit Faculty Member' : 'Add New Faculty Member'}
+              </h3>
+              <button onClick={() => setIsFacultyModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleFacultyFormSubmit} className="space-y-3">
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Faculty Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={facultyForm.name}
+                  onChange={(e) => setFacultyForm({ ...facultyForm, name: e.target.value })}
+                  placeholder="e.g. Dr. Ramesh Chandra Sahoo"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Department *</label>
+                  <input
+                    type="text"
+                    required
+                    value={facultyForm.deptName}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, deptName: e.target.value })}
+                    placeholder="e.g. Physics"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Designation *</label>
+                  <input
+                    type="text"
+                    required
+                    value={facultyForm.designation}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, designation: e.target.value })}
+                    placeholder="e.g. Associate Professor"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Qualification *</label>
+                <input
+                  type="text"
+                  required
+                  value={facultyForm.qualification}
+                  onChange={(e) => setFacultyForm({ ...facultyForm, qualification: e.target.value })}
+                  placeholder="e.g. Ph.D. (IIT Kharagpur), M.Sc."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Email</label>
+                  <input
+                    type="email"
+                    value={facultyForm.email}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, email: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Phone</label>
+                  <input
+                    type="tel"
+                    value={facultyForm.phone}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, phone: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Photo URL</label>
+                <input
+                  type="url"
+                  value={facultyForm.photoUrl}
+                  onChange={(e) => setFacultyForm({ ...facultyForm, photoUrl: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="facultyIsHodCheck"
+                  checked={facultyForm.isHod}
+                  onChange={(e) => setFacultyForm({ ...facultyForm, isHod: e.target.checked })}
+                  className="rounded border-slate-700 text-amber-500 focus:ring-0 w-4 h-4"
+                />
+                <label htmlFor="facultyIsHodCheck" className="text-slate-200 font-semibold cursor-pointer">
+                  Department Head (HOD)
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsFacultyModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-lg"
+                >
+                  {editingFaculty ? 'Save Changes' : 'Create Faculty'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 3: ADD / EDIT SEAT MATRIX MODAL                     */}
+      {/* ========================================================= */}
+      {isSeatModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-white text-base font-serif flex items-center">
+                <Edit2 className="w-4 h-4 mr-2 text-amber-400" />
+                {editingSeatItem ? 'Edit Department Intake' : 'Add Department to Seat Matrix'}
+              </h3>
+              <button onClick={() => setIsSeatModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSeatFormSubmit} className="space-y-3">
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Department / Subject Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Computer Science"
+                  value={seatForm.deptName}
+                  onChange={(e) => setSeatForm({ ...seatForm, deptName: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Stream</label>
+                  <select
+                    value={seatForm.stream}
+                    onChange={(e) => setSeatForm({ ...seatForm, stream: e.target.value as StreamType })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Science">Science</option>
+                    <option value="Arts">Arts</option>
+                    <option value="Commerce">Commerce</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Specialization</label>
+                  <input
+                    type="text"
+                    value={seatForm.specialization}
+                    onChange={(e) => setSeatForm({ ...seatForm, specialization: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Sanctioned Intake Capacity *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={seatForm.sanctioned}
+                    onChange={(e) => setSeatForm({ ...seatForm, sanctioned: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Admitted Count</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={seatForm.admitted}
+                    onChange={(e) => setSeatForm({ ...seatForm, admitted: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="seatIsAedpCheck"
+                  checked={seatForm.isAedp}
+                  onChange={(e) => setSeatForm({ ...seatForm, isAedp: e.target.checked })}
+                  className="rounded border-slate-700 text-amber-500 focus:ring-0 w-4 h-4"
+                />
+                <label htmlFor="seatIsAedpCheck" className="text-slate-200 font-semibold cursor-pointer">
+                  AEDP Skill Development Course
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsSeatModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-lg"
+                >
+                  {editingSeatItem ? 'Save Seat Intake' : 'Add Department'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 4: ADD / EDIT NOTICE MODAL                          */}
+      {/* ========================================================= */}
+      {isNoticeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-white text-base font-serif flex items-center">
+                <Bell className="w-4 h-4 mr-2 text-amber-400" />
+                {editingNotice ? 'Edit Notice' : 'Post New Notice'}
+              </h3>
+              <button onClick={() => setIsNoticeModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleNoticeFormSubmit} className="space-y-3">
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Notice Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={noticeForm.title}
+                  onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
+                  placeholder="e.g. Schedule for Spot Selection Document Verification"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Category</label>
+                  <select
+                    value={noticeForm.category}
+                    onChange={(e) => setNoticeForm({ ...noticeForm, category: e.target.value as any })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="General">General</option>
+                    <option value="Admission">Admission</option>
+                    <option value="Spot Round">Spot Round</option>
+                    <option value="Examination">Examination</option>
+                    <option value="Departmental">Departmental</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Date</label>
+                  <input
+                    type="text"
+                    value={noticeForm.date}
+                    onChange={(e) => setNoticeForm({ ...noticeForm, date: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Notice Content / Instructions</label>
+                <textarea
+                  rows={3}
+                  value={noticeForm.content}
+                  onChange={(e) => setNoticeForm({ ...noticeForm, content: e.target.value })}
+                  placeholder="Detailed instructions for students and applicants..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="noticeIsImportantCheck"
+                  checked={noticeForm.isImportant}
+                  onChange={(e) => setNoticeForm({ ...noticeForm, isImportant: e.target.checked })}
+                  className="rounded border-slate-700 text-red-500 focus:ring-0 w-4 h-4"
+                />
+                <label htmlFor="noticeIsImportantCheck" className="text-red-400 font-semibold cursor-pointer">
+                  Mark as URGENT / Important
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsNoticeModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-lg"
+                >
+                  {editingNotice ? 'Save Changes' : 'Publish Notice'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 5: ADD / EDIT FAQ MODAL                             */}
+      {/* ========================================================= */}
+      {isFaqModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-white text-base font-serif flex items-center">
+                <HelpCircle className="w-4 h-4 mr-2 text-amber-400" />
+                {editingFaq ? 'Edit FAQ Item' : 'Add New FAQ Item'}
+              </h3>
+              <button onClick={() => setIsFaqModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleFaqFormSubmit} className="space-y-3">
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Question *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. What documents are required for Spot Round reporting?"
+                  value={faqForm.question}
+                  onChange={(e) => setFaqForm({ ...faqForm, question: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Category</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Admission, Spot Round, Academics"
+                  value={faqForm.category}
+                  onChange={(e) => setFaqForm({ ...faqForm, category: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">
+                  Answer * <span className="text-slate-500 font-normal">(New lines entered here will be displayed exactly as typed)</span>
+                </label>
+                <textarea
+                  rows={6}
+                  required
+                  placeholder="Enter detailed answer here. Press Enter for line breaks..."
+                  value={faqForm.answer}
+                  onChange={(e) => setFaqForm({ ...faqForm, answer: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 whitespace-pre-wrap font-sans"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsFaqModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-lg"
+                >
+                  {editingFaq ? 'Save FAQ' : 'Create FAQ'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 6: ADD / EDIT HOD MODAL                             */}
+      {/* ========================================================= */}
+      {isHodModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-white text-base font-serif flex items-center">
+                <Lock className="w-4 h-4 mr-2 text-amber-400" />
+                {editingHod ? 'Edit HOD Credentials' : 'Add New Department HOD Account'}
+              </h3>
+              <button onClick={() => setIsHodModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleHodFormSubmit} className="space-y-3">
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Department Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Philosophy"
+                  value={hodForm.deptName}
+                  onChange={(e) => setHodForm({ ...hodForm, deptName: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">HOD Head Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dr. Ramesh Chandra Sahoo"
+                  value={hodForm.hodName}
+                  onChange={(e) => setHodForm({ ...hodForm, hodName: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Username *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="hod_physics"
+                    value={hodForm.username}
+                    onChange={(e) => setHodForm({ ...hodForm, username: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-400 font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Password *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Secret@2026"
+                    value={hodForm.password}
+                    onChange={(e) => setHodForm({ ...hodForm, password: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-emerald-400 font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Phone</label>
+                  <input
+                    type="tel"
+                    value={hodForm.phone}
+                    onChange={(e) => setHodForm({ ...hodForm, phone: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Email</label>
+                  <input
+                    type="email"
+                    value={hodForm.email}
+                    onChange={(e) => setHodForm({ ...hodForm, email: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsHodModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-lg"
+                >
+                  {editingHod ? 'Save Credentials' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

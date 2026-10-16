@@ -113,7 +113,7 @@ export const Header: React.FC<{ onOpenAdminModal: () => void; onOpenHodModal: ()
           </div>
 
           <span className="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30 text-[10px] font-bold tracking-wider hidden md:inline">
-            SAMS: 03071302
+            SAMS: {systemSettings.collegeCode || '03071302'}
           </span>
         </div>
 

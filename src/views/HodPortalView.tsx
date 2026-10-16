@@ -39,13 +39,13 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
 
   // Filter students belonging to this department
   const deptStudents = students.filter((s) =>
-    s.department.toLowerCase().includes((hodDeptName || '').toLowerCase())
+    (s.department || '').toLowerCase().includes((hodDeptName || '').toLowerCase())
   );
 
   const filteredDeptStudents = deptStudents.filter((s) =>
-    s.name.toLowerCase().includes(searchStudent.toLowerCase()) ||
-    s.rollNo.toLowerCase().includes(searchStudent.toLowerCase()) ||
-    s.samsRegNo.toLowerCase().includes(searchStudent.toLowerCase())
+    (s.name || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
+    (s.rollNo || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
+    (s.samsRegNo || '').toLowerCase().includes((searchStudent || '').toLowerCase())
   );
 
   const deptSeats = seatMatrix.filter((s) =>
@@ -211,11 +211,11 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
           <table className="w-full text-left text-xs text-slate-200">
             <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
               <tr>
-                <th className="py-3 px-4">Univ Roll No</th>
+                <th className="py-3 px-4">Roll / SAMS</th>
                 <th className="py-3 px-4">Student Name</th>
-                <th className="py-3 px-4">SAMS Reg No</th>
                 <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4 text-center">Marks %</th>
+                <th className="py-3 px-4 text-center">Marks</th>
+                <th className="py-3 px-4 text-center">%</th>
                 <th className="py-3 px-4">Blood Group</th>
                 <th className="py-3 px-4">Phone</th>
               </tr>
@@ -223,11 +223,16 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
             <tbody className="divide-y divide-slate-800/60">
               {filteredDeptStudents.slice(0, 100).map((stu, idx) => (
                 <tr key={`${stu.id}_${idx}`} className="hover:bg-slate-800/40">
-                  <td className="py-3 px-4 font-mono font-bold text-amber-400">{stu.rollNo}</td>
-                  <td className="py-3 px-4 font-bold text-slate-100">{stu.name}</td>
-                  <td className="py-3 px-4 font-mono text-slate-400">{stu.samsRegNo}</td>
+                  <td className="py-3 px-4 font-mono whitespace-nowrap">
+                    <span className="font-bold text-amber-400 block">{stu.rollNo}</span>
+                    <span className="text-slate-500 text-[10px] block">{stu.samsRegNo}</span>
+                  </td>
+                  <td className="py-3 px-4 font-bold text-slate-100 whitespace-nowrap">{stu.name}</td>
                   <td className="py-3 px-4 font-mono text-slate-300">{stu.category}</td>
-                  <td className="py-3 px-4 text-center font-bold text-emerald-400">{stu.marksPercentage}%</td>
+                  <td className="py-3 px-4 text-center font-mono whitespace-nowrap">
+                    <span className="text-emerald-400 font-semibold">{stu.marksSecured !== undefined ? stu.marksSecured : 0}</span> / {stu.maxMarks || 600}
+                  </td>
+                  <td className="py-3 px-4 text-center font-bold text-amber-400">{stu.marksPercentage}%</td>
                   <td className="py-3 px-4 text-slate-400">{stu.bloodGroup}</td>
                   <td className="py-3 px-4 font-mono text-slate-400">{stu.phone}</td>
                 </tr>

@@ -3,12 +3,15 @@ import { useData } from '../context/DataContext';
 import { BookOpen, CheckCircle, Sparkles, AlertCircle, Filter, ArrowRight } from 'lucide-react';
 
 export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNavigateSpot }) => {
-  const { seatMatrix } = useData();
+  const { seatMatrix, students } = useData();
   const [selectedStream, setSelectedStream] = useState<string>('ALL');
   const [selectedType, setSelectedType] = useState<string>('ALL');
 
   const filteredMatrix = seatMatrix.filter((item) => {
-    const matchesStream = selectedStream === 'ALL' || item.stream === selectedStream;
+    const matchesStream =
+      selectedStream === 'ALL' ||
+      item.stream === selectedStream ||
+      (selectedStream === 'Science' && (item.stream === 'Physical Science' || item.stream === 'Biological Science'));
     const matchesType =
       selectedType === 'ALL' ||
       (selectedType === 'AEDP' && item.isAedp) ||
@@ -29,12 +32,15 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
           <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono mb-1">
             <BookOpen className="w-4 h-4" />
             <span>SAMS PANCHAYAT COLLEGE, BARAGADA &bull; INTAKE MATRIX</span>
+            <span className="ml-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded font-mono inline-flex items-center">
+              <CheckCircle className="w-3 h-3 mr-1 text-emerald-400" /> Live Synced with Student DB ({students.length} Records)
+            </span>
           </div>
           <h1 className="text-2xl font-extrabold text-white font-serif">
-            Sanctioned Seat Matrix & AEDP Specialization Comparison
+            Sanctioned Seat Matrix & AEDP Specialization Courses
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Compare Regular Honours vs. AEDP (Skill Enhancement & Specialization) courses across Science, Arts & Commerce.
+            Official 28 Honours & AEDP intake matrix across Arts, Biological Science, Commerce, Physical Science & Self Financing.
           </p>
         </div>
 
@@ -55,26 +61,26 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
           <span className="text-slate-400 font-mono">DHE Odisha AEDP Scheme</span>
         </div>
         <h3 className="text-sm font-bold text-white">
-          What is AEDP (Academic Excellence & Skill Development Program)?
+          AEDP (Academic Excellence & Skill Development Program) Specializations
         </h3>
         <p className="text-slate-300 leading-relaxed">
-          In addition to standard Regular Honours, Panchayat College Baragada offers AEDP specialized seats. Students enrolled in AEDP receive industry-aligned practical training in <strong>Renewable Energy & Solar Electronics (Physics)</strong>, <strong>Tissue Culture & Vertical Gardening (Botany)</strong>, <strong>Integrative Bioscience (Zoology)</strong>, <strong>Mathematics & Computing (Maths)</strong>, and <strong>Industrial Chemistry (Chemistry)</strong> with specialized certificates.
+          Panchayat College Baragada offers specialized AEDP seats across faculties: <strong>B.A in Economics and data analytics</strong>, <strong>B.A in English and Translation & digital humanities</strong>, <strong>B.A in History with Tourism and Hospitality Operations</strong>, <strong>B.SC in Botany with Tissue culture and vertical gardening</strong>, <strong>B.SC in Zoology and integrative bioscience</strong>, <strong>B.Com in Banking, Financial Services and Insurance</strong>, <strong>B.SC in Chemistry and Industrial Chemistry</strong>, and <strong>B.Sc. in Mathematics & Computing</strong>.
         </p>
       </div>
 
       {/* Filters & Summary Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
         
-        <div className="md:col-span-7 flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 p-1.5 rounded-xl text-xs">
+        <div className="md:col-span-8 flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-900 border border-slate-800 p-1.5 rounded-xl text-xs">
             <span className="text-slate-400 px-2 font-semibold">Stream:</span>
-            {['ALL', 'Science', 'Arts', 'Commerce'].map((s) => (
+            {['ALL', 'Arts', 'Biological Science', 'Commerce', 'Physical Science', 'Self Financing'].map((s) => (
               <button
                 key={s}
                 onClick={() => setSelectedStream(s)}
-                className={`px-3 py-1 rounded-lg font-medium transition ${
+                className={`px-2.5 py-1 rounded-lg font-medium transition ${
                   selectedStream === s
-                    ? 'bg-amber-500 text-slate-950 font-bold'
+                    ? 'bg-amber-500 text-slate-950 font-bold shadow'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
@@ -105,7 +111,7 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
           </div>
         </div>
 
-        <div className="md:col-span-5 grid grid-cols-3 gap-3 text-center">
+        <div className="md:col-span-4 grid grid-cols-3 gap-3 text-center">
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
             <span className="text-[10px] text-slate-400 uppercase font-mono block">Sanctioned</span>
             <span className="text-lg font-bold text-white">{totalSanctioned}</span>

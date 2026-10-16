@@ -1,7 +1,9 @@
 import React from 'react';
 import { Building2, Phone, Mail, MapPin, ExternalLink, Shield } from 'lucide-react';
+import { useData } from '../context/DataContext';
 
 export const Footer: React.FC = () => {
+  const { systemSettings } = useData();
   return (
     <footer className="bg-slate-950 text-slate-400 border-t border-slate-800 text-xs mt-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -10,13 +12,13 @@ export const Footer: React.FC = () => {
           {/* College Overview */}
           <div className="space-y-3">
             <h3 className="text-slate-100 font-bold text-sm font-serif">
-              SAMS Panchayat College, Baragada
+              {systemSettings.collegeName}
             </h3>
             <p className="text-slate-400 leading-relaxed text-[11px]">
-              A premier Odisha Government Higher Education Institution established in 1960. NAAC Grade B++ accredited. Dedicated to academic excellence and e-Admission transparency under SAMS Govt. of Odisha.
+              A premier Odisha Government Higher Education Institution established in 1960. {systemSettings.naacGrade}. Dedicated to academic excellence and e-Admission transparency under SAMS Govt. of Odisha.
             </p>
             <div className="text-[10px] text-amber-400 font-mono">
-              SAMS College Code: 03071302 | ESTD: 1960
+              SAMS College Code: {systemSettings.collegeCode || '03071302'} | ESTD: 1960
             </div>
           </div>
 

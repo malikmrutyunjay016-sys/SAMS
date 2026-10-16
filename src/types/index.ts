@@ -1,4 +1,4 @@
-export type StreamType = 'Arts' | 'Science' | 'Commerce';
+export type StreamType = 'Arts' | 'Biological Science' | 'Commerce' | 'Physical Science' | 'Self Financing' | 'Science';
 
 export type CategoryType = 'GEN' | 'SC' | 'ST' | 'SEBC';
 
@@ -78,10 +78,14 @@ export interface SystemSettings {
   spotRoundEnabled: boolean;
   collegeLogoUrl: string;
   collegeName: string;
+  collegeCode?: string;
   tagline: string;
   naacGrade: string;
   bannerNotice: string;
   prospectusUrl: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  address?: string;
   sheetSyncUrl?: string;
   lastSheetSync?: string;
   updatedAt: string;

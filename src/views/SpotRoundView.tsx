@@ -193,9 +193,9 @@ export const SpotRoundView: React.FC = () => {
           <table className="w-full text-left text-xs text-slate-200">
             <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
               <tr>
+                <th className="py-3.5 px-4 font-mono">Roll / SAMS Reg. No.</th>
                 <th className="py-3.5 px-4">Merit Rank</th>
                 <th className="py-3.5 px-4">Candidate Name</th>
-                <th className="py-3.5 px-4">SAMS Reg. No.</th>
                 <th className="py-3.5 px-4">Department</th>
                 <th className="py-3.5 px-4">Category</th>
                 <th className="py-3.5 px-4 text-center">+2 Marks %</th>
@@ -207,11 +207,11 @@ export const SpotRoundView: React.FC = () => {
             <tbody className="divide-y divide-slate-800/60">
               {filteredCandidates.map((cand, idx) => (
                 <tr key={cand.id} className="hover:bg-slate-800/40 transition">
-                  <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
+                  <td className="py-3.5 px-4 font-mono font-bold text-amber-400">{cand.samsRegNo}</td>
+                  <td className="py-3.5 px-4 font-mono text-slate-300">
                     #{cand.waitlistRank || idx + 1}
                   </td>
                   <td className="py-3.5 px-4 font-bold text-slate-100">{cand.studentName}</td>
-                  <td className="py-3.5 px-4 font-mono text-slate-300">{cand.samsRegNo}</td>
                   <td className="py-3.5 px-4 text-slate-300">{cand.deptName}</td>
                   <td className="py-3.5 px-4 font-mono text-slate-400">{cand.category}</td>
                   <td className="py-3.5 px-4 text-center font-bold text-slate-100">

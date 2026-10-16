@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
-import { Award, Bell, BookOpen, ChevronRight, FileText, Globe, GraduationCap, Search, ShieldCheck, Sparkles, UserCheck, Users, HelpCircle } from 'lucide-react';
+import { Award, Bell, BookOpen, ChevronRight, FileText, Globe, GraduationCap, Search, ShieldCheck, UserCheck, Users, HelpCircle } from 'lucide-react';
 
 export const HomeView: React.FC<{
   onNavigateTab: (tab: any) => void;
@@ -10,39 +10,6 @@ export const HomeView: React.FC<{
   const { notices, systemSettings, seatMatrix, t, lang } = useData();
   const [searchNotice, setSearchNotice] = useState('');
   const [selectedNoticeCategory, setSelectedNoticeCategory] = useState<string>('ALL');
-
-  // Interactive Probability Predictor Calculator
-  const [calcMarks, setCalcMarks] = useState<string>('82');
-  const [calcDept, setCalcDept] = useState<string>('physics_regular');
-  const [calcCategory, setCalcCategory] = useState<string>('GEN');
-  const [calcResult, setCalcResult] = useState<{ chance: string; color: string; desc: string } | null>(null);
-
-  const handlePredictSeat = (e: React.FormEvent) => {
-    e.preventDefault();
-    const marks = parseFloat(calcMarks) || 0;
-    const deptObj = seatMatrix.find((s) => s.id === calcDept);
-    const vacant = deptObj ? deptObj.vacant : 2;
-
-    if (marks >= 85) {
-      setCalcResult({
-        chance: 'HIGH PROBABILITY OF SELECTION',
-        color: 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10',
-        desc: `High chance of securing admission in ${deptObj?.deptName} (${vacant} vacant seats) based on current cut-offs.`,
-      });
-    } else if (marks >= 70) {
-      setCalcResult({
-        chance: 'MODERATE / SPOT ROUND SELECTION',
-        color: 'text-amber-400 border-amber-500/40 bg-amber-500/10',
-        desc: `Eligible for Spot Selection in ${deptObj?.deptName}. Submit physical reporting at Room 12.`,
-      });
-    } else {
-      setCalcResult({
-        chance: 'WAITING LIST / AEDP SPECIALIZATION RECOMMENDED',
-        color: 'text-blue-400 border-blue-500/40 bg-blue-500/10',
-        desc: `Consider applying for AEDP Specializations or alternative Arts/Commerce combinations with higher vacancy.`,
-      });
-    }
-  };
 
   const filteredNotices = notices.filter((n) => {
     const matchesSearch = n.title.toLowerCase().includes(searchNotice.toLowerCase()) || (n.content && n.content.toLowerCase().includes(searchNotice.toLowerCase()));
@@ -168,83 +135,12 @@ export const HomeView: React.FC<{
         </div>
       </div>
 
-      {/* Interactive Probability Predictor Calculator */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-          <div className="flex items-center space-x-2">
-            <Sparkles className="w-5 h-5 text-amber-400" />
-            <h2 className="text-sm font-bold text-white font-serif">
-              Spot Round Seat Selection Probability Calculator
-            </h2>
-          </div>
-          <span className="text-xs text-slate-400 font-mono">SAMS Odisha Cut-Off Algorithm</span>
-        </div>
 
-        <form onSubmit={handlePredictSeat} className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">+2 Marks Percentage</label>
-            <input
-              type="number"
-              step="0.1"
-              required
-              value={calcMarks}
-              onChange={(e) => setCalcMarks(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Target Department</label>
-            <select
-              value={calcDept}
-              onChange={(e) => setCalcDept(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-            >
-              {seatMatrix.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.deptName} ({s.vacant} vacant)
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Reservation Category</label>
-            <select
-              value={calcCategory}
-              onChange={(e) => setCalcCategory(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-            >
-              <option value="GEN">GENERAL</option>
-              <option value="SC">SC (16.25%)</option>
-              <option value="ST">ST (22.5%)</option>
-              <option value="SEBC">SEBC (11.25%)</option>
-            </select>
-          </div>
-
-          <div className="flex items-end">
-            <button
-              type="submit"
-              className="w-full py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow"
-            >
-              Calculate Selection Chance
-            </button>
-          </div>
-        </form>
-
-        {calcResult && (
-          <div className={`p-4 rounded-xl border text-xs space-y-1 ${calcResult.color}`}>
-            <span className="font-extrabold uppercase font-mono block text-sm">{calcResult.chance}</span>
-            <p>{calcResult.desc}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Main Section: Official Notice Board & Quick Desk */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* Main Section: Official Notice Board */}
+      <div className="grid grid-cols-1 gap-8">
         
         {/* Notice Board */}
-        <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
           
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
             <div className="flex items-center space-x-3">
@@ -300,29 +196,6 @@ export const HomeView: React.FC<{
             ))}
           </div>
 
-        </div>
-
-        {/* Quick Help Desk & Rules */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-3">
-            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center">
-              <ShieldCheck className="w-4 h-4 mr-1.5" /> SAMS e-Admission Helpdesk
-            </h3>
-            <div className="text-xs space-y-2 text-slate-300">
-              <div className="flex justify-between border-b border-slate-800 pb-1.5">
-                <span className="text-slate-400">Admission In-Charge:</span>
-                <span className="font-semibold text-slate-200">Dr. R.C. Sahoo</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800 pb-1.5">
-                <span className="text-slate-400">e-Admission Counter:</span>
-                <span className="font-semibold text-slate-200">Room No. 12</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800 pb-1.5">
-                <span className="text-slate-400">Helpline Phone:</span>
-                <span className="font-semibold text-amber-400">06646-220142</span>
-              </div>
-            </div>
-          </div>
         </div>
 
       </div>

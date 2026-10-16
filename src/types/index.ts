@@ -78,14 +78,18 @@ export interface SystemSettings {
   spotRoundEnabled: boolean;
   collegeLogoUrl: string;
   collegeName: string;
+  collegeNameOdia?: string;
   collegeCode?: string;
   tagline: string;
+  taglineOdia?: string;
   naacGrade: string;
   bannerNotice: string;
+  bannerNoticeOdia?: string;
   prospectusUrl: string;
   contactPhone?: string;
   contactEmail?: string;
   address?: string;
+  addressOdia?: string;
   sheetSyncUrl?: string;
   lastSheetSync?: string;
   updatedAt: string;

@@ -3,23 +3,34 @@ import { Building2, Phone, Mail, MapPin, ExternalLink, Shield } from 'lucide-rea
 import { useData } from '../context/DataContext';
 
 export const Footer: React.FC = () => {
-  const { systemSettings, t, lang } = useData();
+  const { systemSettings, t, lang, themeMode } = useData();
+
+  const footerBgClass =
+    themeMode === 'maroon'
+      ? 'bg-[#100307] text-pink-200/70 border-t border-red-950/80 text-xs mt-12'
+      : themeMode === 'navy'
+      ? 'bg-[#030712] text-blue-200/70 border-t border-blue-950/80 text-xs mt-12'
+      : 'bg-slate-100 text-slate-600 border-t border-slate-300 text-xs mt-12';
 
   return (
-    <footer className="bg-slate-950 text-slate-400 border-t border-slate-800 text-xs mt-12">
+    <footer className={`${footerBgClass} transition-colors duration-300`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           
           {/* College Overview */}
           <div className="space-y-3">
-            <h3 className="text-slate-100 font-bold text-sm font-serif">
-              {t.collegeName}
+            <h3 className={`font-bold text-sm font-serif ${themeMode === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
+              {lang === 'or'
+                ? (systemSettings.collegeNameOdia || 'ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼')
+                : systemSettings.collegeName}
             </h3>
-            <p className="text-slate-400 leading-relaxed text-[11px]">
-              {t.footerEstablished}
+            <p className={`leading-relaxed text-[11px] ${themeMode === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
+              {systemSettings.naacGrade || t.footerEstablished}
             </p>
-            <div className="text-[10px] text-amber-400 font-mono">
-              {lang === 'or' ? 'ସାମ୍ସ କଲେଜ କୋଡ୍: ୦୩୦୭୧୩୦୨ | ସ୍ଥାପିତ: ୧୯୬୦' : `SAMS College Code: ${systemSettings.collegeCode || '03071302'} | ESTD: 1960`}
+            <div className={`text-[10px] font-mono ${themeMode === 'navy' ? 'text-cyan-400' : 'text-amber-500'}`}>
+              {lang === 'or'
+                ? `ସାମ୍ସ କଲେଜ କୋଡ୍: ${systemSettings.collegeCode || '୦୩୦୭୧୩୦୨'} | ସ୍ଥାପିତ: ୧୯୬୦`
+                : `SAMS College Code: ${systemSettings.collegeCode || '03071302'} | ESTD: 1960`}
             </div>
           </div>
 
@@ -56,15 +67,23 @@ export const Footer: React.FC = () => {
             <ul className="space-y-2 text-[11px]">
               <li className="flex items-start">
                 <MapPin className="w-3.5 h-3.5 mr-2 text-amber-400 shrink-0 mt-0.5" />
-                <span>{t.address}</span>
+                <span>
+                  {lang === 'or'
+                    ? (systemSettings.addressOdia || systemSettings.address || t.address)
+                    : (systemSettings.address || t.address)}
+                </span>
               </li>
               <li className="flex items-center">
                 <Phone className="w-3.5 h-3.5 mr-2 text-amber-400 shrink-0" />
-                <span>{lang === 'or' ? 'ନାମଲେଖା ହେଲ୍ପଲାଇନ୍: ୦୬୬୪୬-୨୨୦୧୪୨ / ୯୪୩୭୧୨୩୪୦୧' : 'Admission Helpline: 06646-220142 / 9437123401'}</span>
+                <span>
+                  {lang === 'or'
+                    ? `ନାମଲେଖା ହେଲ୍ପଲାଇନ୍: ${systemSettings.contactPhone || '୦୬୬୪୬-୨୩୦୨୩୪'}`
+                    : `Admission Helpline: ${systemSettings.contactPhone || '06646-230234'}`}
+                </span>
               </li>
               <li className="flex items-center">
                 <Mail className="w-3.5 h-3.5 mr-2 text-amber-400 shrink-0" />
-                <span>principal.baragada@odisha.gov.in</span>
+                <span>{systemSettings.contactEmail || 'principal.baragada@gmail.com'}</span>
               </li>
             </ul>
           </div>

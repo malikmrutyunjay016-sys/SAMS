@@ -12,7 +12,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenProspectus }) => {
-  const { systemSettings, t } = useData();
+  const { systemSettings, t, themeMode } = useData();
   const { isHod, isAdmin } = useAuth();
 
   const navItems = [
@@ -39,8 +39,15 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenP
     { id: 'contact' as TabType, label: t.contactUs, icon: PhoneCall },
   ];
 
+  const navBgClass =
+    themeMode === 'maroon'
+      ? 'bg-[#18050e] border-b border-red-950/80 text-pink-100 shadow-xl'
+      : themeMode === 'navy'
+      ? 'bg-[#061226] border-b border-blue-950/80 text-cyan-100 shadow-xl'
+      : 'bg-slate-900 border-b border-slate-800 text-slate-200 shadow-lg';
+
   return (
-    <nav className="bg-slate-900 border-b border-slate-800 text-slate-200 sticky top-0 z-20 shadow-xl">
+    <nav className={`${navBgClass} sticky top-0 z-20 transition-colors duration-300`}>
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-12 overflow-x-auto scrollbar-none">
           
@@ -54,11 +61,23 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenP
                   onClick={() => setActiveTab(item.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center whitespace-nowrap transition-all ${
                     isActive
-                      ? 'bg-amber-500 text-slate-950 shadow-md font-bold'
+                      ? themeMode === 'navy'
+                        ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-[0_0_12px_rgba(56,189,248,0.4)] font-bold'
+                        : 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.4)] font-bold'
+                      : themeMode === 'maroon'
+                      ? 'hover:bg-red-950/60 text-pink-200/80 hover:text-white'
+                      : themeMode === 'navy'
+                      ? 'hover:bg-blue-950/60 text-blue-200/80 hover:text-white'
                       : 'hover:bg-slate-800 text-slate-300 hover:text-white'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 mr-1.5 ${isActive ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 mr-1.5 ${
+                    isActive
+                      ? 'text-slate-950'
+                      : themeMode === 'navy'
+                      ? 'text-cyan-400'
+                      : 'text-amber-400'
+                  }`} />
                   {item.label}
                   {item.badge}
                 </button>

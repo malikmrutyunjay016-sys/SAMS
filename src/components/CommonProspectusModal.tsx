@@ -6,7 +6,7 @@ export const CommonProspectusModal: React.FC<{ isOpen: boolean; onClose: () => v
   isOpen,
   onClose,
 }) => {
-  const { lang, t } = useData();
+  const { systemSettings, lang, t } = useData();
 
   if (!isOpen) return null;
 
@@ -32,7 +32,7 @@ export const CommonProspectusModal: React.FC<{ isOpen: boolean; onClose: () => v
                 : 'Common Prospectus (CP) - SAMS Degree Admissions 2026-27'}
             </h2>
             <p className="text-xs text-amber-400 font-mono">
-              {t.collegeName} - {t.govtOdisha}
+              {lang === 'or' ? (systemSettings.collegeNameOdia || 'ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼') : systemSettings.collegeName} - {t.govtOdisha}
             </p>
           </div>
         </div>
@@ -139,7 +139,7 @@ export const CommonProspectusModal: React.FC<{ isOpen: boolean; onClose: () => v
 
         <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
           <a
-            href="https://samsodisha.gov.in/Degree/DegreePublicCommonProspectus.pdf"
+            href={systemSettings.prospectusUrl || "https://samsodisha.gov.in/Degree/DegreePublicCommonProspectus.pdf"}
             target="_blank"
             rel="noreferrer"
             className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs flex items-center shadow-lg"

@@ -130,8 +130,29 @@ function safeGetLocalStorage(key: string): string | null {
 }
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [lang, setLang] = useState<Language>('en');
-  const [themeMode, setThemeMode] = useState<ThemeMode>('maroon');
+  const [lang, setLang] = useState<Language>(() => {
+    const saved = safeGetLocalStorage(LS_PREFIX + 'lang') as Language;
+    return saved === 'or' || saved === 'en' ? saved : 'en';
+  });
+
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
+    const saved = safeGetLocalStorage(LS_PREFIX + 'themeMode') as ThemeMode;
+    return saved === 'maroon' || saved === 'navy' || saved === 'light' ? saved : 'maroon';
+  });
+
+  const setThemeMode = (mode: ThemeMode) => {
+    setThemeModeState(mode);
+    try {
+      localStorage.setItem(LS_PREFIX + 'themeMode', mode);
+      document.documentElement.setAttribute('data-theme', mode);
+      document.body.setAttribute('data-theme', mode);
+    } catch {}
+  };
+
+  React.useEffect(() => {
+    document.documentElement.setAttribute('data-theme', themeMode);
+    document.body.setAttribute('data-theme', themeMode);
+  }, [themeMode]);
 
   // Load students from storage or start clean
   const [students, setStudents] = useState<Student[]>(() => {

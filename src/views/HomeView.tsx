@@ -37,18 +37,22 @@ export const HomeView: React.FC<{
             <div className="flex flex-wrap items-center gap-2">
               <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold px-3 py-1 rounded-full flex items-center shadow-inner">
                 <Award className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
-                {t.naacBadge}
+                {systemSettings.naacGrade || t.naacBadge}
               </span>
               <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1 rounded-full flex items-center">
                 <Globe className="w-3.5 h-3.5 mr-1.5" />
-                {t.deptDhe}
+                {lang === 'or'
+                  ? (systemSettings.taglineOdia || 'ଓଡ଼ିଶା ସରକାର | ଉଚ୍ଚଶିକ୍ଷା ବିଭାଗ')
+                  : (systemSettings.tagline || t.deptDhe)}
               </span>
             </div>
 
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight font-serif">
               {t.welcomeTitle} <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500">
-                {t.collegeName}
+                {lang === 'or'
+                  ? (systemSettings.collegeNameOdia || 'ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼')
+                  : systemSettings.collegeName}
               </span>
             </h1>
 
@@ -99,7 +103,9 @@ export const HomeView: React.FC<{
               <div className="text-xs">
                 <div className="font-bold text-slate-100">{lang === 'or' ? 'ପ୍ରଫେସର ଅମରେନ୍ଦ୍ର ପଣ୍ଡା' : 'Prof. Amarendra Panda'}</div>
                 <div className="text-[10px] text-amber-400">{t.principalInCharge}</div>
-                <div className="text-[10px] text-slate-400 font-mono">{t.panchayatCollege}</div>
+                <div className="text-[10px] text-slate-400 font-mono">
+                  {lang === 'or' ? (systemSettings.collegeNameOdia || 'ପଞ୍ଚାୟତ ଡିଗ୍ରୀ କଲେଜ') : systemSettings.collegeName}
+                </div>
               </div>
             </div>
 

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Phone, Mail, MapPin, Building2, Send, CheckCircle2, Clock } from 'lucide-react';
+import { Phone, Mail, MapPin, Building2, Send, CheckCircle2, Clock, Shield, Award } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
 export const ContactView: React.FC = () => {
-  const { t, lang } = useData();
+  const { systemSettings, t, lang } = useData();
   const [inquirySubmitted, setInquirySubmitted] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -21,8 +21,8 @@ export const ContactView: React.FC = () => {
     {
       name: lang === 'or' ? 'ପ୍ରଫେସର ଅମରେନ୍ଦ୍ର ପଣ୍ଡା' : 'Prof. Amarendra Panda',
       role: t.principalInCharge,
-      phone: '06646-220142',
-      email: 'principal.baragada@odisha.gov.in',
+      phone: systemSettings.contactPhone || '06646-230234',
+      email: systemSettings.contactEmail || 'principal.baragada@gmail.com',
     },
     {
       name: lang === 'or' ? 'ଡଃ ରମେଶ ଚନ୍ଦ୍ର ସାହୁ' : 'Dr. Ramesh Chandra Sahoo',
@@ -59,6 +59,83 @@ export const ContactView: React.FC = () => {
         <p className="text-xs text-slate-400 mt-1">
           {t.contactSub}
         </p>
+      </div>
+
+      {/* Official College Information & Global System Settings Overview Card */}
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-amber-500/40 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-12 h-12 rounded-full border border-amber-500/50 p-1 bg-slate-950 overflow-hidden shrink-0">
+              <img
+                src={systemSettings.collegeLogoUrl}
+                alt="College Crest"
+                className="w-full h-full object-cover rounded-full"
+              />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white font-serif">
+                {lang === 'or'
+                  ? (systemSettings.collegeNameOdia || 'ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼')
+                  : systemSettings.collegeName}
+              </h2>
+              <p className="text-xs text-amber-400 font-medium">
+                {lang === 'or'
+                  ? (systemSettings.taglineOdia || 'ଓଡ଼ିଶା ସରକାର | ଉଚ୍ଚଶିକ୍ଷା ବିଭାଗ')
+                  : systemSettings.tagline}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-bold px-3 py-1 rounded-full font-mono">
+              SAMS: {systemSettings.collegeCode || '03071302'}
+            </span>
+            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold px-3 py-1 rounded-full flex items-center">
+              <Award className="w-3.5 h-3.5 mr-1" />
+              {systemSettings.naacGrade || t.naacBadge}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-xs">
+          <div className="flex items-start space-x-2.5 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+            <MapPin className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="text-[10px] uppercase font-mono text-slate-400 block font-bold">
+                {lang === 'or' ? 'ଅଫିସିଆଲ୍ ଠିକଣା' : 'Official Postal Address'}
+              </span>
+              <p className="text-slate-200 mt-0.5">
+                {lang === 'or'
+                  ? (systemSettings.addressOdia || systemSettings.address || t.address)
+                  : (systemSettings.address || t.address)}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start space-x-2.5 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+            <Phone className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="text-[10px] uppercase font-mono text-slate-400 block font-bold">
+                {lang === 'or' ? 'ନାମଲେଖା ହେଲ୍ପଲାଇନ୍' : 'Admission Helpline'}
+              </span>
+              <p className="text-emerald-300 font-bold font-mono mt-0.5">
+                {systemSettings.contactPhone || '06646-230234'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start space-x-2.5 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+            <Mail className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="text-[10px] uppercase font-mono text-slate-400 block font-bold">
+                {lang === 'or' ? 'ଅଫିସିଆଲ୍ ଇମେଲ୍' : 'Official SAMS Email'}
+              </span>
+              <p className="text-blue-300 font-mono mt-0.5">
+                {systemSettings.contactEmail || 'principal.baragada@gmail.com'}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

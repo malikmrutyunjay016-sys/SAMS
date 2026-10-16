@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { DEFAULT_SETTINGS } from '../lib/defaultData';
 import { createDriveBackupSnapshot, parseSnapshotFile } from '../lib/driveService';
 import {
   parseExcelOrCsvFile,
@@ -40,6 +41,7 @@ import {
   AlertTriangle,
   UserPlus,
   Eye,
+  Phone,
   ChevronLeft,
   ChevronRight,
   Sparkles
@@ -240,18 +242,42 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   // SETTINGS STATE
   // ==========================================
   const [settingsForm, setSettingsForm] = useState({
-    collegeName: systemSettings.collegeName,
+    collegeName: systemSettings.collegeName || '',
+    collegeNameOdia: systemSettings.collegeNameOdia || 'ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼',
     collegeCode: systemSettings.collegeCode || '03071302',
-    tagline: systemSettings.tagline,
-    naacGrade: systemSettings.naacGrade,
-    bannerNotice: systemSettings.bannerNotice,
-    prospectusUrl: systemSettings.prospectusUrl,
-    collegeLogoUrl: systemSettings.collegeLogoUrl,
+    tagline: systemSettings.tagline || '',
+    taglineOdia: systemSettings.taglineOdia || 'ଓଡ଼ିଶା ସରକାର | ଉଚ୍ଚଶିକ୍ଷା ବିଭାଗ',
+    naacGrade: systemSettings.naacGrade || '',
+    bannerNotice: systemSettings.bannerNotice || '',
+    bannerNoticeOdia: systemSettings.bannerNoticeOdia || 'ସାମ୍ସ ଡିଗ୍ରୀ ଇ-ନାମଲେଖା ୨୦୨୬-୨୭: ସ୍ପଟ୍ ସିଲେକ୍ସନ୍ ସିଟ୍ ଲାଇଭ୍ ମେରିଟ୍ ତାଲିକା ନିମ୍ନରେ ପ୍ରକାଶିତ।',
+    prospectusUrl: systemSettings.prospectusUrl || '',
+    collegeLogoUrl: systemSettings.collegeLogoUrl || '',
     contactPhone: systemSettings.contactPhone || '06646-230234',
     contactEmail: systemSettings.contactEmail || 'principal.baragada@gmail.com',
     address: systemSettings.address || 'Panchayat College, Baragada, Odisha - 768028',
+    addressOdia: systemSettings.addressOdia || 'ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼, ଓଡ଼ିଶା - ୭୬୮୦୨୮',
   });
   const [settingsSavedMsg, setSettingsSavedMsg] = useState('');
+
+  // Keep settingsForm in sync with global systemSettings updates
+  useEffect(() => {
+    setSettingsForm({
+      collegeName: systemSettings.collegeName || '',
+      collegeNameOdia: systemSettings.collegeNameOdia || 'ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼',
+      collegeCode: systemSettings.collegeCode || '03071302',
+      tagline: systemSettings.tagline || '',
+      taglineOdia: systemSettings.taglineOdia || 'ଓଡ଼ିଶା ସରକାର | ଉଚ୍ଚଶିକ୍ଷା ବିଭାଗ',
+      naacGrade: systemSettings.naacGrade || '',
+      bannerNotice: systemSettings.bannerNotice || '',
+      bannerNoticeOdia: systemSettings.bannerNoticeOdia || 'ସାମ୍ସ ଡିଗ୍ରୀ ଇ-ନାମଲେଖା ୨୦୨୬-୨୭: ସ୍ପଟ୍ ସିଲେକ୍ସନ୍ ସିଟ୍ ଲାଇଭ୍ ମେରିଟ୍ ତାଲିକା ନିମ୍ନରେ ପ୍ରକାଶିତ।',
+      prospectusUrl: systemSettings.prospectusUrl || '',
+      collegeLogoUrl: systemSettings.collegeLogoUrl || '',
+      contactPhone: systemSettings.contactPhone || '06646-230234',
+      contactEmail: systemSettings.contactEmail || 'principal.baragada@gmail.com',
+      address: systemSettings.address || 'Panchayat College, Baragada, Odisha - 768028',
+      addressOdia: systemSettings.addressOdia || 'ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼, ଓଡ଼ିଶା - ୭୬୮୦୨୮',
+    });
+  }, [systemSettings]);
 
   // ==========================================
   // CLOUD BACKUP STATE
@@ -747,7 +773,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateSystemSettings(settingsForm);
-    setSettingsSavedMsg('College details and system configuration saved successfully!');
+    setSettingsSavedMsg('College details and system configuration saved successfully! Changes are live across the portal.');
+    setTimeout(() => setSettingsSavedMsg(''), 4000);
+  };
+
+  const handleResetSettings = () => {
+    updateSystemSettings(DEFAULT_SETTINGS);
+    setSettingsSavedMsg('Restored official default college settings and branding!');
     setTimeout(() => setSettingsSavedMsg(''), 4000);
   };
 
@@ -2348,135 +2380,288 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       {/* ========================================================= */}
       {activeAdminTab === 'settings' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="pb-4 border-b border-slate-800">
-            <h2 className="text-lg font-bold text-white font-serif flex items-center">
-              <Settings className="w-5 h-5 mr-2 text-amber-400" />
-              College Information & Global System Settings
-            </h2>
-            <p className="text-xs text-slate-400">
-              Configure official college name, SAMS code, tagline, NAAC accreditation, header marquee notice, and logo crest.
-            </p>
+          <div className="pb-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-white font-serif flex items-center">
+                <Settings className="w-5 h-5 mr-2 text-amber-400" />
+                College Information & Global System Settings
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Configure official college name, SAMS code, affiliation, NAAC accreditation, contact directory, top marquee banner, and prospectus. Changes reflect instantly across all pages and headers.
+              </p>
+            </div>
+            <div className="flex items-center space-x-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleResetSettings}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold flex items-center transition"
+                title="Restore official default settings"
+              >
+                <RotateCcw className="w-3.5 h-3.5 mr-1.5 text-amber-400" /> Reset to Defaults
+              </button>
+            </div>
           </div>
 
-          <form onSubmit={handleSaveSettings} className="space-y-4 max-w-2xl text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {settingsSavedMsg && (
+            <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 rounded-xl font-bold text-xs flex items-center space-x-2 animate-fadeIn shadow-lg">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{settingsSavedMsg}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSaveSettings} className="space-y-6 text-xs">
+            {/* Section 1: College Identification & Code */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center border-b border-slate-800 pb-2">
+                <Building2 className="w-4 h-4 mr-2" /> 1. College Identification & SAMS Code
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-1">
+                  <label className="text-slate-300 block mb-1 font-semibold">Official College Name (English)</label>
+                  <input
+                    type="text"
+                    required
+                    value={settingsForm.collegeName}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, collegeName: e.target.value })}
+                    placeholder="e.g. SAMS Panchayat College, Baragada"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="md:col-span-1">
+                  <label className="text-slate-300 block mb-1 font-semibold">Official College Name (Odia / ଓଡ଼ିଆ)</label>
+                  <input
+                    type="text"
+                    value={settingsForm.collegeNameOdia}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, collegeNameOdia: e.target.value })}
+                    placeholder="e.g. ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-sans"
+                  />
+                </div>
+
+                <div className="md:col-span-1">
+                  <label className="text-slate-300 block mb-1 font-semibold">Official SAMS College Code</label>
+                  <input
+                    type="text"
+                    required
+                    value={settingsForm.collegeCode}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, collegeCode: e.target.value })}
+                    placeholder="03071302"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-amber-400 font-mono font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Government / Affiliation Tagline (English)</label>
+                  <input
+                    type="text"
+                    value={settingsForm.tagline}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, tagline: e.target.value })}
+                    placeholder="Government of Odisha | Department of Higher Education"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Government / Affiliation Tagline (Odia / ଓଡ଼ିଆ)</label>
+                  <input
+                    type="text"
+                    value={settingsForm.taglineOdia}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, taglineOdia: e.target.value })}
+                    placeholder="ଓଡ଼ିଶା ସରକାର | ଉଚ୍ଚଶିକ୍ଷା ବିଭାଗ"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-sans"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="text-slate-300 block mb-1 font-semibold">Official College Name</label>
+                <label className="text-slate-300 block mb-1 font-semibold">NAAC Accreditation & Estd Details</label>
                 <input
                   type="text"
-                  value={settingsForm.collegeName}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, collegeName: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-300 block mb-1 font-semibold">Official SAMS College Code</label>
-                <input
-                  type="text"
-                  value={settingsForm.collegeCode}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, collegeCode: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-400 font-mono font-bold focus:outline-none focus:border-amber-500"
+                  value={settingsForm.naacGrade}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, naacGrade: e.target.value })}
+                  placeholder="NAAC Accredited Grade B++ | Govt. Degree College Estd. 1960"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="text-slate-300 block mb-1 font-semibold">Government / Affiliation Tagline</label>
-              <input
-                type="text"
-                value={settingsForm.tagline}
-                onChange={(e) => setSettingsForm({ ...settingsForm, tagline: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-              />
-            </div>
+            {/* Section 2: Top Marquee Notice & Publications */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center border-b border-slate-800 pb-2">
+                <Bell className="w-4 h-4 mr-2" /> 2. Top Marquee Notice & Prospectus Publications
+              </h3>
 
-            <div>
-              <label className="text-slate-300 block mb-1 font-semibold">NAAC Accreditation & Estd Details</label>
-              <input
-                type="text"
-                value={settingsForm.naacGrade}
-                onChange={(e) => setSettingsForm({ ...settingsForm, naacGrade: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-              />
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Top Marquee Notice Banner (English)</label>
+                  <textarea
+                    rows={2}
+                    value={settingsForm.bannerNotice}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, bannerNotice: e.target.value })}
+                    placeholder="SAMS Degree e-Admission 2026-27: Spot Selection Live Reporting Desk Open..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
 
-            <div>
-              <label className="text-slate-300 block mb-1 font-semibold">Top Marquee Notice Banner</label>
-              <textarea
-                rows={2}
-                value={settingsForm.bannerNotice}
-                onChange={(e) => setSettingsForm({ ...settingsForm, bannerNotice: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-slate-300 block mb-1 font-semibold">College Crest Logo Image URL</label>
-                <input
-                  type="url"
-                  value={settingsForm.collegeLogoUrl}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, collegeLogoUrl: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                />
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Top Marquee Notice Banner (Odia / ଓଡ଼ିଆ)</label>
+                  <textarea
+                    rows={2}
+                    value={settingsForm.bannerNoticeOdia}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, bannerNoticeOdia: e.target.value })}
+                    placeholder="ସାମ୍ସ ଡିଗ୍ରୀ ଇ-ନାମଲେଖା ୨୦୨୬-୨୭: ସ୍ପଟ୍ ସିଲେକ୍ସନ୍ ସିଟ୍ ଲାଇଭ୍ ମେରିଟ୍ ତାଲିକା ନିମ୍ନରେ ପ୍ରକାଶିତ..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-sans"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="text-slate-300 block mb-1 font-semibold">Common Prospectus (CP) PDF URL</label>
-                <input
-                  type="url"
-                  value={settingsForm.prospectusUrl}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, prospectusUrl: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">College Crest Logo Image URL</label>
+                  <input
+                    type="url"
+                    value={settingsForm.collegeLogoUrl}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, collegeLogoUrl: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="text-slate-300 block mb-1 font-semibold">Contact Phone</label>
-                <input
-                  type="text"
-                  value={settingsForm.contactPhone}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, contactPhone: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-300 block mb-1 font-semibold">Contact Email</label>
-                <input
-                  type="email"
-                  value={settingsForm.contactEmail}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, contactEmail: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-300 block mb-1 font-semibold">Postal Address</label>
-                <input
-                  type="text"
-                  value={settingsForm.address}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, address: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                />
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Common Prospectus (CP) PDF URL</label>
+                  <input
+                    type="url"
+                    value={settingsForm.prospectusUrl}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, prospectusUrl: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
               </div>
             </div>
 
-            {settingsSavedMsg && (
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-xl font-bold">
-                {settingsSavedMsg}
-              </div>
-            )}
+            {/* Section 3: Contact Directory & Address */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center border-b border-slate-800 pb-2">
+                <Phone className="w-4 h-4 mr-2" /> 3. Official Contact Directory & Postal Address
+              </h3>
 
-            <button
-              type="submit"
-              className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-lg flex items-center"
-            >
-              <Save className="w-4 h-4 mr-1.5" /> Save College Settings
-            </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Admission Helpline / Phone</label>
+                  <input
+                    type="text"
+                    value={settingsForm.contactPhone}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, contactPhone: e.target.value })}
+                    placeholder="06646-230234"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Official SAMS Email</label>
+                  <input
+                    type="email"
+                    value={settingsForm.contactEmail}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, contactEmail: e.target.value })}
+                    placeholder="principal.baragada@gmail.com"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Postal Address (English)</label>
+                  <input
+                    type="text"
+                    value={settingsForm.address}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, address: e.target.value })}
+                    placeholder="Panchayat College, Baragada, Odisha - 768028"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Postal Address (Odia / ଓଡ଼ିଆ)</label>
+                  <input
+                    type="text"
+                    value={settingsForm.addressOdia}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, addressOdia: e.target.value })}
+                    placeholder="ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼, ଓଡ଼ିଶା - ୭୬୮୦୨୮"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-sans"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section 4: Live Preview Box */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-amber-500/30 space-y-3">
+              <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-800 pb-2">
+                <span className="flex items-center">
+                  <Eye className="w-4 h-4 mr-2" /> Live Portal Branding Preview
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                  REAL-TIME SYNC
+                </span>
+              </h3>
+
+              {/* Header Preview */}
+              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center space-x-3.5">
+                <div className="w-12 h-12 rounded-full border-2 border-amber-400 p-0.5 bg-slate-950 overflow-hidden shrink-0">
+                  <img
+                    src={settingsForm.collegeLogoUrl || DEFAULT_SETTINGS.collegeLogoUrl}
+                    alt="Emblem"
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex items-center space-x-2">
+                    <h4 className="font-extrabold text-white text-sm font-serif">
+                      {settingsForm.collegeName || 'College Name'}
+                    </h4>
+                    <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.2 rounded font-bold font-mono">
+                      SAMS: {settingsForm.collegeCode || '03071302'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-200/90">
+                    {settingsForm.tagline || 'Tagline'} &bull; {settingsForm.address || 'Address'}
+                  </p>
+                  <p className="text-[10px] text-emerald-400 font-mono">
+                    {settingsForm.naacGrade || 'NAAC Grade'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Marquee Preview */}
+              <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-2.5 rounded-xl text-xs flex items-center space-x-2 overflow-hidden">
+                <span className="bg-amber-500 text-slate-950 text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase shrink-0">
+                  MARQUEE
+                </span>
+                <span className="truncate font-mono text-[11px]">
+                  {settingsForm.bannerNotice || 'No notice banner configured'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <button
+                type="submit"
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs shadow-xl flex items-center transition"
+              >
+                <Save className="w-4 h-4 mr-1.5" /> Save All College Settings
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetSettings}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold flex items-center transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5 mr-1.5 text-amber-400" /> Reset to Defaults
+              </button>
+            </div>
           </form>
         </div>
       )}

@@ -1,1 +1,320 @@
 @import "tailwindcss";
+
+/* ========================================================
+   GLOBAL THEME ARCHITECTURE
+   ======================================================== */
+
+/* Transitions */
+body,
+#root,
+nav,
+header,
+footer,
+main {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+/* ========================================================
+   1. THEME: MAROON (Classic Odisha Heritage Maroon & Gold)
+   ======================================================== */
+.theme-maroon,
+[data-theme="maroon"],
+body[data-theme="maroon"] {
+  background-color: #0c0307 !important;
+  color: #fce7f3 !important;
+}
+
+/* Background layers */
+.theme-maroon .bg-slate-950,
+.theme-maroon .bg-slate-950\/90,
+.theme-maroon .bg-slate-950\/80,
+.theme-maroon .bg-slate-950\/70 {
+  background-color: #120409 !important;
+}
+
+.theme-maroon .bg-slate-900,
+.theme-maroon .bg-slate-900\/90,
+.theme-maroon .bg-slate-900\/80,
+.theme-maroon .bg-slate-900\/70,
+.theme-maroon .bg-slate-900\/50,
+.theme-maroon .bg-slate-900\/40 {
+  background-color: #1a050f !important;
+}
+
+.theme-maroon .bg-slate-800,
+.theme-maroon .bg-slate-800\/90,
+.theme-maroon .bg-slate-800\/80,
+.theme-maroon .bg-slate-800\/60,
+.theme-maroon .bg-slate-800\/50 {
+  background-color: #270918 !important;
+}
+
+.theme-maroon .hover\:bg-slate-800:hover,
+.theme-maroon .hover\:bg-slate-800\/70:hover {
+  background-color: #350c21 !important;
+}
+
+.theme-maroon .hover\:bg-slate-900:hover {
+  background-color: #200613 !important;
+}
+
+/* Borders */
+.theme-maroon .border-slate-800,
+.theme-maroon .border-slate-800\/80,
+.theme-maroon .border-slate-800\/60 {
+  border-color: #420e20 !important;
+}
+
+.theme-maroon .border-slate-700,
+.theme-maroon .border-slate-700\/80 {
+  border-color: #5d142e !important;
+}
+
+/* Typography */
+.theme-maroon .text-slate-300 {
+  color: #fce7f3 !important;
+}
+
+.theme-maroon .text-slate-400 {
+  color: #fbcfe8 !important;
+}
+
+/* Form Controls */
+.theme-maroon input,
+.theme-maroon select,
+.theme-maroon textarea {
+  background-color: #14030a !important;
+  color: #fce7f3 !important;
+  border-color: #4c1125 !important;
+}
+
+.theme-maroon input:focus,
+.theme-maroon select:focus,
+.theme-maroon textarea:focus {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) !important;
+}
+
+/* ========================================================
+   2. THEME: NAVY (SAMS Odisha Oceanic Navy & Sapphire)
+   ======================================================== */
+.theme-navy,
+[data-theme="navy"],
+body[data-theme="navy"] {
+  background-color: #030712 !important;
+  color: #f0f9ff !important;
+}
+
+/* Background layers */
+.theme-navy .bg-slate-950,
+.theme-navy .bg-slate-950\/90,
+.theme-navy .bg-slate-950\/80,
+.theme-navy .bg-slate-950\/70 {
+  background-color: #040915 !important;
+}
+
+.theme-navy .bg-slate-900,
+.theme-navy .bg-slate-900\/90,
+.theme-navy .bg-slate-900\/80,
+.theme-navy .bg-slate-900\/70,
+.theme-navy .bg-slate-900\/50,
+.theme-navy .bg-slate-900\/40 {
+  background-color: #091326 !important;
+}
+
+.theme-navy .bg-slate-800,
+.theme-navy .bg-slate-800\/90,
+.theme-navy .bg-slate-800\/80,
+.theme-navy .bg-slate-800\/60,
+.theme-navy .bg-slate-800\/50 {
+  background-color: #0f2040 !important;
+}
+
+.theme-navy .hover\:bg-slate-800:hover,
+.theme-navy .hover\:bg-slate-800\/70:hover {
+  background-color: #162f5e !important;
+}
+
+.theme-navy .hover\:bg-slate-900:hover {
+  background-color: #0c1c38 !important;
+}
+
+/* Borders */
+.theme-navy .border-slate-800,
+.theme-navy .border-slate-800\/80,
+.theme-navy .border-slate-800\/60 {
+  border-color: #162d57 !important;
+}
+
+.theme-navy .border-slate-700,
+.theme-navy .border-slate-700\/80 {
+  border-color: #21437d !important;
+}
+
+/* Typography */
+.theme-navy .text-slate-300 {
+  color: #e0f2fe !important;
+}
+
+.theme-navy .text-slate-400 {
+  color: #93c5fd !important;
+}
+
+/* Form Controls */
+.theme-navy input,
+.theme-navy select,
+.theme-navy textarea {
+  background-color: #050c18 !important;
+  color: #f0f9ff !important;
+  border-color: #162e59 !important;
+}
+
+.theme-navy input:focus,
+.theme-navy select:focus,
+.theme-navy textarea:focus {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25) !important;
+}
+
+/* ========================================================
+   3. THEME: LIGHT (Academic Odisha Govt Portal - Crisp & Clear)
+   ======================================================== */
+.theme-light,
+[data-theme="light"],
+body[data-theme="light"] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Background layers */
+.theme-light .bg-slate-950,
+.theme-light .bg-slate-950\/90,
+.theme-light .bg-slate-950\/80,
+.theme-light .bg-slate-950\/70 {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+
+.theme-light .bg-slate-900,
+.theme-light .bg-slate-900\/90,
+.theme-light .bg-slate-900\/80,
+.theme-light .bg-slate-900\/70,
+.theme-light .bg-slate-900\/50,
+.theme-light .bg-slate-900\/40 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07) !important;
+}
+
+.theme-light .bg-slate-800,
+.theme-light .bg-slate-800\/90,
+.theme-light .bg-slate-800\/80,
+.theme-light .bg-slate-800\/60,
+.theme-light .bg-slate-800\/50 {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+.theme-light .hover\:bg-slate-800:hover,
+.theme-light .hover\:bg-slate-800\/70:hover {
+  background-color: #edf2f7 !important;
+}
+
+.theme-light .hover\:bg-slate-900:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Borders */
+.theme-light .border-slate-800,
+.theme-light .border-slate-800\/80,
+.theme-light .border-slate-800\/60,
+.theme-light .border-slate-700,
+.theme-light .border-slate-700\/80,
+.theme-light .border-slate-600 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Typography overrides for Light mode */
+.theme-light .text-white,
+.theme-light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+.theme-light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+.theme-light .text-slate-300 {
+  color: #334155 !important;
+}
+
+.theme-light .text-slate-400 {
+  color: #64748b !important;
+}
+
+.theme-light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Buttons and colored elements text contrast */
+.theme-light button.bg-amber-500,
+.theme-light button.bg-amber-600,
+.theme-light .bg-amber-500,
+.theme-light .bg-amber-400 {
+  color: #0f172a !important;
+}
+
+.theme-light .bg-emerald-500,
+.theme-light .bg-emerald-600,
+.theme-light .bg-red-600,
+.theme-light .bg-blue-600,
+.theme-light .bg-indigo-600,
+.theme-light .bg-purple-600 {
+  color: #ffffff !important;
+}
+
+.theme-light .text-slate-950 {
+  color: #020617 !important;
+}
+
+/* Light theme Form Inputs */
+.theme-light input,
+.theme-light select,
+.theme-light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light input::placeholder,
+.theme-light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.theme-light input:focus,
+.theme-light select:focus,
+.theme-light textarea:focus {
+  border-color: #b45309 !important;
+  box-shadow: 0 0 0 2px rgba(180, 83, 9, 0.2) !important;
+}
+
+/* Light theme Table Headers & Rows */
+.theme-light thead th {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light tbody tr {
+  border-color: #f1f5f9 !important;
+}
+
+.theme-light tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Light theme modals */
+.theme-light .fixed.inset-0.bg-slate-950\/80,
+.theme-light .fixed.inset-0.bg-black\/80 {
+  background-color: rgba(15, 23, 42, 0.65) !important;
+}

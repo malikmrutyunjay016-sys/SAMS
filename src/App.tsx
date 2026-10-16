@@ -29,13 +29,16 @@ function AppContent() {
   // Dynamic Theme Classes
   const themeContainerClass =
     themeMode === 'maroon'
-      ? 'bg-slate-950 text-slate-100'
+      ? 'theme-maroon bg-[#0c0307] text-[#fce7f3]'
       : themeMode === 'navy'
-      ? 'bg-slate-950 text-slate-100'
-      : 'bg-slate-100 text-slate-900';
+      ? 'theme-navy bg-[#030712] text-[#f0f9ff]'
+      : 'theme-light bg-slate-50 text-slate-900';
 
   return (
-    <div className={`min-h-screen ${themeContainerClass} flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-300`}>
+    <div
+      data-theme={themeMode}
+      className={`min-h-screen ${themeContainerClass} flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-300`}
+    >
       
       {/* Header */}
       <Header

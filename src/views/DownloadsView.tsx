@@ -3,7 +3,7 @@ import { Download, FileText, CheckCircle2, ExternalLink, Shield } from 'lucide-r
 import { useData } from '../context/DataContext';
 
 export const DownloadsView: React.FC<{ onOpenProspectus: () => void }> = ({ onOpenProspectus }) => {
-  const { t, lang } = useData();
+  const { systemSettings, t, lang } = useData();
   const [downloadToast, setDownloadToast] = useState<string | null>(null);
 
   const triggerDownloadNotice = (title: string) => {
@@ -14,8 +14,8 @@ export const DownloadsView: React.FC<{ onOpenProspectus: () => void }> = ({ onOp
   const downloadsList = [
     {
       title: lang === 'or'
-        ? 'ସାଧାରଣ ପ୍ରୋସ୍ପେକ୍ଟସ୍ (CP) ୨୦୨୬-୨୭ - +୩ ଡିଗ୍ରୀ ନାମଲେଖା'
-        : 'Common Prospectus (CP) 2026-27 - Degree (+3) Admissions',
+        ? `${systemSettings.collegeNameOdia || 'ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ'} - ସାଧାରଣ ପ୍ରୋସ୍ପେକ୍ଟସ୍ (CP) ୨୦୨୬-୨୭`
+        : `${systemSettings.collegeName} - Common Prospectus (CP) 2026-27`,
       category: lang === 'or' ? 'ଅଫିସିଆଲ୍ ପ୍ରୋସ୍ପେକ୍ଟସ୍' : 'Official Prospectus',
       size: '4.2 MB',
       action: onOpenProspectus,

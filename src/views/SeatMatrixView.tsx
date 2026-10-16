@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
+import { translateStream, translateDepartment } from '../lib/translations';
 import { BookOpen, CheckCircle, Sparkles, AlertCircle, Filter, ArrowRight } from 'lucide-react';
 
 export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNavigateSpot }) => {
-  const { seatMatrix, students } = useData();
+  const { seatMatrix, students, t, lang } = useData();
   const [selectedStream, setSelectedStream] = useState<string>('ALL');
   const [selectedType, setSelectedType] = useState<string>('ALL');
 
@@ -31,16 +32,16 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
         <div>
           <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono mb-1">
             <BookOpen className="w-4 h-4" />
-            <span>SAMS PANCHAYAT COLLEGE, BARAGADA &bull; INTAKE MATRIX</span>
+            <span>{lang === 'or' ? 'ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼ • ସିଟ୍ ମ୍ୟାଟ୍ରିକ୍ସ' : 'SAMS PANCHAYAT COLLEGE, BARAGADA • INTAKE MATRIX'}</span>
             <span className="ml-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded font-mono inline-flex items-center">
-              <CheckCircle className="w-3 h-3 mr-1 text-emerald-400" /> Live Synced with Student DB ({students.length} Records)
+              <CheckCircle className="w-3 h-3 mr-1 text-emerald-400" /> {lang === 'or' ? `ଛାତ୍ର ଡାଟାବେସ୍ ସହ ଲାଇଭ୍ ସିଙ୍କ୍ (${students.length} ରେକର୍ଡ)` : `Live Synced with Student DB (${students.length} Records)`}
             </span>
           </div>
           <h1 className="text-2xl font-extrabold text-white font-serif">
-            Sanctioned Seat Matrix & AEDP Specialization Courses
+            {lang === 'or' ? 'ମଞ୍ଜୁରପ୍ରାପ୍ତ ସିଟ୍ ମ୍ୟାଟ୍ରିକ୍ସ ଓ ଏଇଡିପି (AEDP) ସ୍ୱତନ୍ତ୍ର ପାଠ୍ୟକ୍ରମ' : 'Sanctioned Seat Matrix & AEDP Specialization Courses'}
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Official 28 Honours & AEDP intake matrix across Arts, Biological Science, Commerce, Physical Science & Self Financing.
+            {lang === 'or' ? 'କଳା, ଜୈବ ବିଜ୍ଞାନ, ବାଣିଜ୍ୟ, ଭୌତିକ ବିଜ୍ଞାନ ଓ ସ୍ୱୟଂ ପୋଷିତ ଶାଖାର ଅଫିସିଆଲ୍ ୨୮ ଟି ଅନର୍ସ ଓ ଏଇଡିପି ସିଟ୍ ବିବରଣୀ।' : 'Official 28 Honours & AEDP intake matrix across Arts, Biological Science, Commerce, Physical Science & Self Financing.'}
           </p>
         </div>
 
@@ -48,7 +49,7 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
           onClick={onNavigateSpot}
           className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs flex items-center shadow-lg shrink-0"
         >
-          Check Spot Round Vacancies <ArrowRight className="w-4 h-4 ml-1.5" />
+          {lang === 'or' ? 'ସ୍ପଟ୍ ଖାଲି ସିଟ୍ ଯାଞ୍ଚ କରନ୍ତୁ' : 'Check Spot Round Vacancies'} <ArrowRight className="w-4 h-4 ml-1.5" />
         </button>
       </div>
 
@@ -152,7 +153,7 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
         
         <div className="md:col-span-8 flex flex-wrap items-center gap-3">
           <div className="flex flex-wrap items-center gap-1.5 bg-slate-900 border border-slate-800 p-1.5 rounded-xl text-xs">
-            <span className="text-slate-400 px-2 font-semibold">Stream:</span>
+            <span className="text-slate-400 px-2 font-semibold">{t.streamFilter}:</span>
             {['ALL', 'Arts', 'Biological Science', 'Commerce', 'Physical Science', 'Self Financing'].map((s) => (
               <button
                 key={s}
@@ -163,28 +164,28 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                {s}
+                {translateStream(s, lang)}
               </button>
             ))}
           </div>
 
           <div className="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 p-1.5 rounded-xl text-xs">
-            <span className="text-slate-400 px-2 font-semibold">Course Type:</span>
+            <span className="text-slate-400 px-2 font-semibold">{t.courseTypeFilter}:</span>
             {[
-              { id: 'ALL', label: 'All Courses' },
-              { id: 'REGULAR', label: 'Regular Honours' },
-              { id: 'AEDP', label: 'AEDP Specializations' },
-            ].map((t) => (
+              { id: 'ALL', label: t.allCourses },
+              { id: 'REGULAR', label: t.regularHonours },
+              { id: 'AEDP', label: t.aedpSpecializations },
+            ].map((typeObj) => (
               <button
-                key={t.id}
-                onClick={() => setSelectedType(t.id)}
+                key={typeObj.id}
+                onClick={() => setSelectedType(typeObj.id)}
                 className={`px-3 py-1 rounded-lg font-medium transition ${
-                  selectedType === t.id
+                  selectedType === typeObj.id
                     ? 'bg-emerald-500 text-slate-950 font-bold'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                {t.label}
+                {typeObj.label}
               </button>
             ))}
           </div>
@@ -192,15 +193,15 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
 
         <div className="md:col-span-4 grid grid-cols-3 gap-3 text-center">
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 uppercase font-mono block">Sanctioned</span>
+            <span className="text-[10px] text-slate-400 uppercase font-mono block">{t.sanctioned}</span>
             <span className="text-lg font-bold text-white">{totalSanctioned}</span>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 uppercase font-mono block">Admitted</span>
+            <span className="text-[10px] text-slate-400 uppercase font-mono block">{t.admitted}</span>
             <span className="text-lg font-bold text-emerald-400">{totalAdmitted}</span>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 uppercase font-mono block">Vacant</span>
+            <span className="text-[10px] text-slate-400 uppercase font-mono block">{t.vacant}</span>
             <span className="text-lg font-bold text-amber-400">{totalVacant}</span>
           </div>
         </div>
@@ -213,13 +214,13 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
           <table className="w-full text-left text-xs text-slate-200">
             <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
               <tr>
-                <th className="py-3.5 px-4">Subject / Department</th>
-                <th className="py-3.5 px-4">Stream</th>
-                <th className="py-3.5 px-4">Type / Specialization</th>
-                <th className="py-3.5 px-4 text-center">Sanctioned</th>
-                <th className="py-3.5 px-4 text-center">Admitted</th>
-                <th className="py-3.5 px-4 text-center">Vacant Seats</th>
-                <th className="py-3.5 px-4 text-center">Intake Status Bar</th>
+                <th className="py-3.5 px-4">{t.subject}</th>
+                <th className="py-3.5 px-4">{t.stream}</th>
+                <th className="py-3.5 px-4">{t.courseType}</th>
+                <th className="py-3.5 px-4 text-center">{t.sanctioned}</th>
+                <th className="py-3.5 px-4 text-center">{t.admitted}</th>
+                <th className="py-3.5 px-4 text-center">{t.vacant}</th>
+                <th className="py-3.5 px-4 text-center">{t.status}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -228,16 +229,16 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
                 return (
                   <tr key={item.id} className="hover:bg-slate-800/40 transition">
                     <td className="py-3.5 px-4 font-bold text-slate-100 flex items-center">
-                      {item.deptName}
+                      {translateDepartment(item.deptName, lang)}
                       {item.isAedp && (
                         <span className="ml-2 text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-mono">
                           AEDP
                         </span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-400">{item.stream}</td>
+                    <td className="py-3.5 px-4 text-slate-400">{translateStream(item.stream, lang)}</td>
                     <td className="py-3.5 px-4 text-slate-300 font-mono text-[11px]">
-                      {item.specialization || (item.isAedp ? 'AEDP Specialization' : 'Regular Honours')}
+                      {item.specialization || (item.isAedp ? (lang === 'or' ? 'ଏଇଡିପି ସ୍ୱତନ୍ତ୍ର ପାଠ୍ୟକ୍ରମ' : 'AEDP Specialization') : (lang === 'or' ? 'ନିୟମିତ ଅନର୍ସ' : 'Regular Honours'))}
                     </td>
                     <td className="py-3.5 px-4 text-center font-bold text-slate-200">{item.sanctioned}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-emerald-400">{item.admitted}</td>
@@ -251,7 +252,7 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
                     <td className="py-3.5 px-4 min-w-[140px]">
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                          <span>{percentFilled}% Filled</span>
+                          <span>{percentFilled}% {t.seatsFilled}</span>
                           <span>{item.admitted}/{item.sanctioned}</span>
                         </div>
                         <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { generateSpotSelectionPDF, generateWordSelectionListDoc } from '../lib/pdfGenerator';
+import { translateDepartment, translateCategory, translateStatus } from '../lib/translations';
 import { UserCheck, Radio, Download, FileText, CheckCircle2, XCircle, Search, Filter, Sparkles, AlertTriangle, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
 
 export const SpotRoundView: React.FC = () => {
@@ -11,7 +12,9 @@ export const SpotRoundView: React.FC = () => {
     systemSettings,
     reportSpotCandidate,
     registerSpotCandidate,
-    runAutomatedMeritSelection
+    runAutomatedMeritSelection,
+    t,
+    lang,
   } = useData();
   const { role } = useAuth();
 
@@ -68,13 +71,15 @@ export const SpotRoundView: React.FC = () => {
           <AlertTriangle className="w-8 h-8" />
         </div>
         <h2 className="text-2xl font-bold text-white font-serif">
-          Spot Round Seats Portal Currently Offline / Disabled
+          {lang === 'or' ? 'ସ୍ପଟ୍ ରାଉଣ୍ଡ ସିଟ୍ ପୋର୍ଟାଲ୍ ବର୍ତ୍ତମାନ ବନ୍ଦ ରହିଛି' : 'Spot Round Seats Portal Currently Offline / Disabled'}
         </h2>
         <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-          The SAMS Spot Round Selection Live Reporting Desk is currently turned OFF by the College e-Admission Committee. Please check the official Notice Board for upcoming Spot Phase publication dates.
+          {lang === 'or'
+            ? 'କଲେଜ ଇ-ନାମଲେଖା କମିଟି ଦ୍ୱାରା ସାମ୍ସ ସ୍ପଟ୍ ରାଉଣ୍ଡ ଲାଇଭ୍ ରିପୋର୍ଟିଂ ଡେସ୍କ ବର୍ତ୍ତମାନ ବନ୍ଦ କରାଯାଇଛି। ଆଗାମୀ ସ୍ପଟ୍ ପର୍ଯ୍ୟାୟ ତାରିଖ ପାଇଁ ଅଫିସିଆଲ୍ ନୋଟିସ୍ ବୋର୍ଡ ଦେଖନ୍ତୁ।'
+            : 'The SAMS Spot Round Selection Live Reporting Desk is currently turned OFF by the College e-Admission Committee. Please check the official Notice Board for upcoming Spot Phase publication dates.'}
         </p>
         <div className="pt-2 text-xs font-mono text-amber-400">
-          SAMS College Code: 03071302 &bull; Govt. of Odisha
+          {t.samsCode} &bull; {t.govtOdisha}
         </div>
       </div>
     );
@@ -88,13 +93,13 @@ export const SpotRoundView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2 text-emerald-400 text-xs font-mono mb-1">
             <Radio className="w-4 h-4 animate-pulse" />
-            <span>SAMS DEGREE e-ADMISSION 2026-27 &bull; LIVE SPOT REPORTING DESK</span>
+            <span>{lang === 'or' ? 'ସାମ୍ସ ଡିଗ୍ରୀ ଇ-ନାମଲେଖା ୨୦୨୬-୨୭ • ଲାଇଭ୍ ସ୍ପଟ୍ ରିପୋର୍ଟିଂ ଡେସ୍କ' : 'SAMS DEGREE e-ADMISSION 2026-27 • LIVE SPOT REPORTING DESK'}</span>
           </div>
           <h1 className="text-2xl font-extrabold text-white font-serif">
-            Spot Round Seats & Live Automated Merit Selection
+            {t.spotTitle}
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time candidate reporting counter, automated merit selection algorithm, and downloadable official PDF/Word selection lists.
+            {t.spotSub}
           </p>
         </div>
 
@@ -103,14 +108,14 @@ export const SpotRoundView: React.FC = () => {
             onClick={() => runAutomatedMeritSelection()}
             className="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center shadow"
           >
-            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Run Automated Merit Selection
+            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> {t.runSelection}
           </button>
 
           <button
             onClick={() => setShowRegisterModal(true)}
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs font-bold flex items-center shadow-lg"
           >
-            <Plus className="w-4 h-4 mr-1.5" /> Register Spot Candidate
+            <Plus className="w-4 h-4 mr-1.5" /> {t.registerCandidate}
           </button>
         </div>
       </div>
@@ -120,8 +125,11 @@ export const SpotRoundView: React.FC = () => {
         <div className="flex items-center space-x-3 text-xs text-slate-300">
           <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
           <span>
-            Official Formatted Selection Lists for <strong>{filteredCandidates.length} Candidates</strong> (
-            <span className="text-amber-400 font-bold">{selectedCandidatesOnly.length} Provisionally Selected</span>)
+            {lang === 'or' ? (
+              <><strong>{filteredCandidates.length} ଆବେଦନକାରୀଙ୍କ</strong> ଅଫିସିଆଲ୍ ତାଲିକା (<span className="text-amber-400 font-bold">{selectedCandidatesOnly.length} ମନୋନୀତ</span>)</>
+            ) : (
+              <>Official Formatted Selection Lists for <strong>{filteredCandidates.length} Candidates</strong> (<span className="text-amber-400 font-bold">{selectedCandidatesOnly.length} Provisionally Selected</span>)</>
+            )}
           </span>
         </div>
 
@@ -130,14 +138,14 @@ export const SpotRoundView: React.FC = () => {
             onClick={() => generateSpotSelectionPDF(filteredCandidates, seatMatrix)}
             className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold flex items-center transition"
           >
-            <Download className="w-3.5 h-3.5 mr-1.5" /> Download PDF Selection List
+            <Download className="w-3.5 h-3.5 mr-1.5" /> {t.downloadPdf}
           </button>
 
           <button
             onClick={() => generateWordSelectionListDoc(filteredCandidates)}
             className="px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-xs font-bold flex items-center transition"
           >
-            <FileText className="w-3.5 h-3.5 mr-1.5" /> Download Word List (.doc)
+            <FileText className="w-3.5 h-3.5 mr-1.5" /> {t.downloadWord}
           </button>
         </div>
       </div>
@@ -150,7 +158,7 @@ export const SpotRoundView: React.FC = () => {
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Search by candidate name or SAMS Reg No..."
+              placeholder={t.searchCandidate}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
@@ -162,10 +170,10 @@ export const SpotRoundView: React.FC = () => {
             onChange={(e) => setSelectedDeptFilter(e.target.value)}
             className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
           >
-            <option value="ALL">All Departments</option>
+            <option value="ALL">{t.filterDepartment}: {lang === 'or' ? 'ସମସ୍ତ' : 'All'}</option>
             {seatMatrix.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.deptName} ({s.vacant} vacant)
+                {translateDepartment(s.deptName, lang)} ({s.vacant} {lang === 'or' ? 'ଖାଲି' : 'vacant'})
               </option>
             ))}
           </select>
@@ -175,14 +183,18 @@ export const SpotRoundView: React.FC = () => {
             onChange={(e) => setSelectedReportedFilter(e.target.value)}
             className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
           >
-            <option value="ALL">All Reporting Status</option>
-            <option value="Reported">Reported Only</option>
-            <option value="Not Reported">Not Reported Only</option>
+            <option value="ALL">{t.filterReporting}: {lang === 'or' ? 'ସମସ୍ତ' : 'All'}</option>
+            <option value="Reported">{t.reported}</option>
+            <option value="Not Reported">{t.notReported}</option>
           </select>
         </div>
 
         <div className="text-slate-400 font-mono text-[11px]">
-          Showing <strong>{filteredCandidates.length}</strong> applicants
+          {lang === 'or' ? (
+            <>ମୋଟ <strong>{filteredCandidates.length}</strong> ପ୍ରାର୍ଥୀ ପ୍ରଦର୍ଶିତ</>
+          ) : (
+            <>Showing <strong>{filteredCandidates.length}</strong> applicants</>
+          )}
         </div>
 
       </div>
@@ -193,15 +205,15 @@ export const SpotRoundView: React.FC = () => {
           <table className="w-full text-left text-xs text-slate-200">
             <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
               <tr>
-                <th className="py-3.5 px-4 font-mono">Roll / SAMS Reg. No.</th>
-                <th className="py-3.5 px-4">Merit Rank</th>
-                <th className="py-3.5 px-4">Candidate Name</th>
-                <th className="py-3.5 px-4">Department</th>
-                <th className="py-3.5 px-4">Category</th>
-                <th className="py-3.5 px-4 text-center">+2 Marks %</th>
-                <th className="py-3.5 px-4 text-center">Live Reported Status</th>
-                <th className="py-3.5 px-4 text-center">Provisional Selection</th>
-                <th className="py-3.5 px-4 text-center">Desk Actions</th>
+                <th className="py-3.5 px-4 font-mono">{t.samsRegNo}</th>
+                <th className="py-3.5 px-4">{t.meritRank}</th>
+                <th className="py-3.5 px-4">{t.studentName}</th>
+                <th className="py-3.5 px-4">{t.subject}</th>
+                <th className="py-3.5 px-4">{lang === 'or' ? 'ବର୍ଗ (Category)' : 'Category'}</th>
+                <th className="py-3.5 px-4 text-center">{t.marksPercentage}</th>
+                <th className="py-3.5 px-4 text-center">{lang === 'or' ? 'ରିପୋର୍ଟିଂ ସ୍ଥିତି' : 'Live Reported Status'}</th>
+                <th className="py-3.5 px-4 text-center">{lang === 'or' ? 'ମନୋନୟନ ସ୍ଥିତି' : 'Provisional Selection'}</th>
+                <th className="py-3.5 px-4 text-center">{t.action}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -212,8 +224,8 @@ export const SpotRoundView: React.FC = () => {
                     #{cand.waitlistRank || idx + 1}
                   </td>
                   <td className="py-3.5 px-4 font-bold text-slate-100">{cand.studentName}</td>
-                  <td className="py-3.5 px-4 text-slate-300">{cand.deptName}</td>
-                  <td className="py-3.5 px-4 font-mono text-slate-400">{cand.category}</td>
+                  <td className="py-3.5 px-4 text-slate-300">{translateDepartment(cand.deptName, lang)}</td>
+                  <td className="py-3.5 px-4 font-mono text-slate-400">{translateCategory(cand.category, lang)}</td>
                   <td className="py-3.5 px-4 text-center font-bold text-slate-100">
                     {cand.marksPercentage.toFixed(1)}%
                   </td>
@@ -227,11 +239,11 @@ export const SpotRoundView: React.FC = () => {
                     >
                       {cand.reportedStatus === 'Reported' ? (
                         <>
-                          <CheckCircle2 className="w-3 h-3 mr-1" /> Reported
+                          <CheckCircle2 className="w-3 h-3 mr-1" /> {t.reported}
                         </>
                       ) : (
                         <>
-                          <XCircle className="w-3 h-3 mr-1" /> Not Reported
+                          <XCircle className="w-3 h-3 mr-1" /> {t.notReported}
                         </>
                       )}
                     </span>
@@ -246,7 +258,7 @@ export const SpotRoundView: React.FC = () => {
                           : 'bg-slate-800 text-slate-500'
                       }`}
                     >
-                      {cand.selectionStatus}
+                      {translateStatus(cand.selectionStatus, lang)}
                     </span>
                   </td>
                   <td className="py-3.5 px-4 text-center">
@@ -259,7 +271,7 @@ export const SpotRoundView: React.FC = () => {
                             : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
                         }`}
                       >
-                        Mark Reported
+                        {lang === 'or' ? 'ଉପସ୍ଥିତ' : 'Reported'}
                       </button>
                       <button
                         onClick={() => reportSpotCandidate(cand.id, 'Not Reported')}
@@ -269,7 +281,7 @@ export const SpotRoundView: React.FC = () => {
                             : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
                         }`}
                       >
-                        Absent
+                        {lang === 'or' ? 'ଅନୁପସ୍ଥିତ' : 'Absent'}
                       </button>
                     </div>
                   </td>

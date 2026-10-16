@@ -1,59 +1,91 @@
-import React from 'react';
-import { Download, FileText, CheckCircle, ExternalLink, Shield } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, FileText, CheckCircle2, ExternalLink, Shield } from 'lucide-react';
+import { useData } from '../context/DataContext';
 
 export const DownloadsView: React.FC<{ onOpenProspectus: () => void }> = ({ onOpenProspectus }) => {
+  const { t, lang } = useData();
+  const [downloadToast, setDownloadToast] = useState<string | null>(null);
+
+  const triggerDownloadNotice = (title: string) => {
+    setDownloadToast(lang === 'or' ? `ଫାଇଲ୍ ଡାଉନଲୋଡ୍ ଆରମ୍ଭ ହେଲା: ${title}` : `Download triggered: ${title}`);
+    setTimeout(() => setDownloadToast(null), 3000);
+  };
+
   const downloadsList = [
     {
-      title: 'Common Prospectus (CP) 2026-27 - Degree (+3) Admissions',
-      category: 'Official Prospectus',
+      title: lang === 'or'
+        ? 'ସାଧାରଣ ପ୍ରୋସ୍ପେକ୍ଟସ୍ (CP) ୨୦୨୬-୨୭ - +୩ ଡିଗ୍ରୀ ନାମଲେଖା'
+        : 'Common Prospectus (CP) 2026-27 - Degree (+3) Admissions',
+      category: lang === 'or' ? 'ଅଫିସିଆଲ୍ ପ୍ରୋସ୍ପେକ୍ଟସ୍' : 'Official Prospectus',
       size: '4.2 MB',
       action: onOpenProspectus,
       isExternal: false,
     },
     {
-      title: 'Spot Round Application Form & Physical Reporting Intimation',
-      category: 'Admission Form',
+      title: lang === 'or'
+        ? 'ସ୍ପଟ୍ ରାଉଣ୍ଡ ଆବେଦନ ଫର୍ମ ଓ ଶାରୀରିକ ଉପସ୍ଥିତି ସୂଚନା'
+        : 'Spot Round Application Form & Physical Reporting Intimation',
+      category: lang === 'or' ? 'ନାମଲେଖା ଫର୍ମ' : 'Admission Form',
       size: '340 KB',
-      action: () => alert('Spot Application Form download triggered.'),
+      action: () => triggerDownloadNotice('Spot Application Form'),
       isExternal: false,
     },
     {
-      title: 'Subject Combination & Generic Elective (GE) Syllabus Matrix',
-      category: 'Academic Syllabus',
+      title: lang === 'or'
+        ? 'ବିଷୟ ମିଶ୍ରଣ ଓ ଜେନେରିକ୍ ଇଲେକ୍ଟିଭ୍ (GE) ସିଲାବସ୍ ମ୍ୟାଟ୍ରିକ୍ସ'
+        : 'Subject Combination & Generic Elective (GE) Syllabus Matrix',
+      category: lang === 'or' ? 'ଶିକ୍ଷା ସିଲାବସ୍' : 'Academic Syllabus',
       size: '1.8 MB',
-      action: () => alert('Syllabus PDF download triggered.'),
+      action: () => triggerDownloadNotice('Syllabus Matrix PDF'),
       isExternal: false,
     },
     {
-      title: 'Odisha Govt Fee Structure & Hostel Accommodation Rules',
-      category: 'Fee Schedule',
+      title: lang === 'or'
+        ? 'ଓଡ଼ିଶା ସରକାରୀ ଫିସ୍ ସୂଚୀ ଓ ହଷ୍ଟେଲ ନିୟମାବଳୀ'
+        : 'Odisha Govt Fee Structure & Hostel Accommodation Rules',
+      category: lang === 'or' ? 'ଫିସ୍ ବିବରଣୀ' : 'Fee Schedule',
       size: '850 KB',
-      action: () => alert('Fee Schedule PDF download triggered.'),
+      action: () => triggerDownloadNotice('Fee Schedule PDF'),
       isExternal: false,
     },
     {
-      title: 'SAMS Govt. of Odisha Official Portal Link',
-      category: 'External Portal',
-      size: 'SAMS Portal',
-      action: () => window.open('https://samsodisha.gov.in', '_blank'),
+      title: lang === 'or'
+        ? 'ସାମ୍ସ ଓଡ଼ିଶା ସରକାର ଅଫିସିଆଲ୍ ପୋର୍ଟାଲ୍ ଲିଙ୍କ୍'
+        : 'SAMS Govt. of Odisha Official Portal Link',
+      category: lang === 'or' ? 'ବାହ୍ୟ ପୋର୍ଟାଲ୍' : 'External Portal',
+      size: 'samsodisha.gov.in',
+      action: () => {
+        const link = document.createElement('a');
+        link.href = 'https://samsodisha.gov.in';
+        link.target = '_blank';
+        link.rel = 'noreferrer';
+        link.click();
+      },
       isExternal: true,
     },
   ];
 
   return (
-    <div className="space-y-8 pb-12">
-      
+    <div className="space-y-8 pb-12 relative">
+      {/* Toast */}
+      {downloadToast && (
+        <div className="fixed top-5 right-5 z-50 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-2 text-xs font-bold animate-bounce border border-emerald-400">
+          <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+          <span>{downloadToast}</span>
+        </div>
+      )}
+
       {/* Title */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
         <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono mb-1">
           <Download className="w-4 h-4" />
-          <span>OFFICIAL DOCUMENT DOWNLOADS & GUIDELINES</span>
+          <span>{lang === 'or' ? 'ଅଫିସିଆଲ୍ ଦଲିଲ ଡାଉନଲୋଡ୍ ଓ ମାର୍ଗଦର୍ଶିକା' : 'OFFICIAL DOCUMENT DOWNLOADS & GUIDELINES'}</span>
         </div>
         <h1 className="text-2xl font-extrabold text-white font-serif">
-          SAMS Application Forms, Prospectus & Regulations
+          {t.downloadsTitle}
         </h1>
         <p className="text-xs text-slate-400 mt-1">
-          Download official government e-Admission documents, prospectus PDFs, and fee structures.
+          {t.downloadsSub}
         </p>
       </div>
 
@@ -83,11 +115,11 @@ export const DownloadsView: React.FC<{ onOpenProspectus: () => void }> = ({ onOp
             >
               {item.isExternal ? (
                 <>
-                  Visit SAMS Portal <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
+                  {t.visitPortal} <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
                 </>
               ) : (
                 <>
-                  <Download className="w-3.5 h-3.5 mr-1.5" /> Download / View
+                  <Download className="w-3.5 h-3.5 mr-1.5" /> {t.downloadView}
                 </>
               )}
             </button>

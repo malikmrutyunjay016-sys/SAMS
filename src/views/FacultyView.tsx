@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export const FacultyView: React.FC = () => {
-  const { faculty, addFaculty, updateFaculty, deleteFaculty, loadSampleFaculty } = useData();
+  const { faculty, addFaculty, updateFaculty, deleteFaculty, loadSampleFaculty, t, lang } = useData();
   const { isAdmin } = useAuth();
 
   const [searchFaculty, setSearchFaculty] = useState('');
@@ -27,6 +27,7 @@ export const FacultyView: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFaculty, setEditingFaculty] = useState<FacultyMember | null>(null);
+  const [facultyToDelete, setFacultyToDelete] = useState<FacultyMember | null>(null);
 
   // Form State
   const [formName, setFormName] = useState('');
@@ -107,13 +108,13 @@ export const FacultyView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono mb-1">
             <Users className="w-4 h-4" />
-            <span>ACADEMIC FACULTY DIRECTORY &bull; PANCHAYAT COLLEGE BARAGADA</span>
+            <span>{lang === 'or' ? 'ଅଫିସିଆଲ୍ ଅଧ୍ୟାପକ ସୂଚୀ • ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ ବରଗଡ଼' : 'ACADEMIC FACULTY DIRECTORY • PANCHAYAT COLLEGE BARAGADA'}</span>
           </div>
           <h1 className="text-2xl font-extrabold text-white font-serif">
-            Professors, Readers & Department Heads (HODs)
+            {t.facultyTitle}
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Distinguished teaching faculty across Science, Arts, and Commerce streams.
+            {t.facultySub}
           </p>
         </div>
 
@@ -123,7 +124,7 @@ export const FacultyView: React.FC = () => {
               onClick={handleOpenAdd}
               className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 text-xs font-bold flex items-center shadow-lg"
             >
-              <Plus className="w-3.5 h-3.5 mr-1" /> Add Faculty Member
+              <Plus className="w-3.5 h-3.5 mr-1" /> {lang === 'or' ? 'ନୂତନ ଅଧ୍ୟାପକ ଯୋଡ଼ନ୍ତୁ' : 'Add Faculty Member'}
             </button>
           )}
 
@@ -131,7 +132,7 @@ export const FacultyView: React.FC = () => {
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Search faculty name..."
+              placeholder={t.searchFaculty}
               value={searchFaculty}
               onChange={(e) => setSearchFaculty(e.target.value)}
               className="bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 w-44 sm:w-56"
@@ -144,7 +145,7 @@ export const FacultyView: React.FC = () => {
               onChange={(e) => setSelectedDeptFilter(e.target.value)}
               className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
             >
-              <option value="ALL">All Departments</option>
+              <option value="ALL">{t.allDepartments}</option>
               {uniqueDepts.map((d) => (
                 <option key={d} value={d}>
                   {d}
@@ -154,6 +155,39 @@ export const FacultyView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {facultyToDelete && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-red-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl text-slate-100 space-y-3 text-xs">
+            <h3 className="font-bold text-white text-sm">
+              {lang === 'or' ? 'ଅଧ୍ୟାପକ ରେକର୍ଡ ଡିଲିଟ୍ ନିଶ୍ଚିତ କରନ୍ତୁ' : 'Confirm Delete Faculty Record'}
+            </h3>
+            <p className="text-slate-400">
+              {lang === 'or'
+                ? `ଆପଣ ${facultyToDelete.name} ଙ୍କ ରେକର୍ଡ ଡିଲିଟ୍ କରିବାକୁ ନିଶ୍ଚିତ କି?`
+                : `Are you sure you want to delete the record for ${facultyToDelete.name}?`}
+            </p>
+            <div className="flex justify-end space-x-2 pt-2">
+              <button
+                onClick={() => setFacultyToDelete(null)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300"
+              >
+                {lang === 'or' ? 'ବାତିଲ' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => {
+                  deleteFaculty(facultyToDelete.id);
+                  setFacultyToDelete(null);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold"
+              >
+                {lang === 'or' ? 'ଡିଲିଟ୍' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Faculty Cards Grid */}
       {filteredFaculty.length > 0 ? (
@@ -166,7 +200,7 @@ export const FacultyView: React.FC = () => {
               <div className="flex items-center justify-between">
                 {member.isHod ? (
                   <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow flex items-center">
-                    <Award className="w-3 h-3 mr-1" /> HOD Head
+                    <Award className="w-3 h-3 mr-1" /> {lang === 'or' ? 'ବିଭାଗୀୟ ମୁଖ୍ୟ (HOD)' : 'HOD Head'}
                   </div>
                 ) : (
                   <div></div>
@@ -182,11 +216,7 @@ export const FacultyView: React.FC = () => {
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm(`Delete faculty record for ${member.name}?`)) {
-                          deleteFaculty(member.id);
-                        }
-                      }}
+                      onClick={() => setFacultyToDelete(member)}
                       className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-950/40 text-red-400 text-xs transition"
                       title="Delete Faculty Member"
                     >
@@ -202,7 +232,6 @@ export const FacultyView: React.FC = () => {
                   alt={member.name}
                   className="w-16 h-16 rounded-full object-cover border-2 border-amber-500/40 shrink-0"
                   onError={(e) => {
-                    // Fallback avatar image
                     (e.target as HTMLImageElement).src =
                       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80';
                   }}
@@ -211,7 +240,7 @@ export const FacultyView: React.FC = () => {
                   <h3 className="font-bold text-white text-sm">{member.name}</h3>
                   <p className="text-xs text-amber-400 font-semibold">{member.designation}</p>
                   <p className="text-[11px] text-slate-400 flex items-center mt-0.5">
-                    <Building2 className="w-3 h-3 mr-1 text-slate-500" /> Dept of {member.deptName}
+                    <Building2 className="w-3 h-3 mr-1 text-slate-500" /> {lang === 'or' ? `ବିଭାଗ: ${member.deptName}` : `Dept of ${member.deptName}`}
                   </p>
                 </div>
               </div>

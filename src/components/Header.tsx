@@ -62,10 +62,24 @@ export const Header: React.FC<{ onOpenAdminModal: () => void; onOpenHodModal: ()
           {/* Language Switcher Button */}
           <button
             onClick={() => setLang(lang === 'en' ? 'or' : 'en')}
-            className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 px-2.5 py-0.5 rounded text-[11px] font-bold flex items-center transition shadow"
+            className={`px-3 py-1 rounded-lg text-[11px] font-bold flex items-center transition-all duration-200 shadow-md transform hover:scale-[1.03] active:scale-95 ${
+              lang === 'or'
+                ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 text-slate-950 border border-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.55)] ring-2 ring-amber-400/50 font-black'
+                : 'bg-slate-900/90 hover:bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:border-amber-400'
+            }`}
+            title={lang === 'en' ? 'ସମସ୍ତ ବିବରଣୀ ଓଡ଼ିଆରେ ଦେଖନ୍ତୁ (Switch all details to Odia)' : 'Switch back to English'}
           >
-            <Languages className="w-3.5 h-3.5 mr-1 text-amber-400" />
-            {lang === 'en' ? 'ଓଡ଼ିଆ (Odia)' : 'English'}
+            <Languages className={`w-3.5 h-3.5 mr-1.5 ${lang === 'or' ? 'text-slate-950 animate-pulse' : 'text-amber-400'}`} />
+            {lang === 'en' ? (
+              <span>ଓଡ଼ିଆ (Odia)</span>
+            ) : (
+              <span className="flex items-center space-x-1">
+                <span>ଓଡ଼ିଆ ଭାଷା</span>
+                <span className="ml-1 bg-red-900 text-amber-300 text-[9px] px-1 py-0.2 rounded font-extrabold uppercase tracking-wide">
+                  ସକ୍ରିୟ ✓
+                </span>
+              </span>
+            )}
           </button>
 
           {/* Fully Working Color Theme Palette Buttons */}

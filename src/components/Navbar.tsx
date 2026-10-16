@@ -24,16 +24,16 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenP
       icon: UserCheck,
       badge: systemSettings.spotRoundEnabled ? (
         <span className="bg-emerald-500 text-slate-950 font-extrabold text-[9px] px-1.5 py-0.2 rounded-full animate-pulse ml-1 flex items-center">
-          <Radio className="w-2.5 h-2.5 mr-0.5" /> LIVE
+          <Radio className="w-2.5 h-2.5 mr-0.5" /> {t.liveBadge}
         </span>
       ) : (
         <span className="bg-slate-700 text-slate-400 font-bold text-[9px] px-1.5 py-0.2 rounded ml-1">
-          OFF
+          {t.offBadge}
         </span>
       ),
     },
     { id: 'faculty' as TabType, label: t.facultyDir, icon: Users },
-    { id: 'faq' as TabType, label: 'FAQs', icon: HelpCircle },
+    { id: 'faq' as TabType, label: t.faqs, icon: HelpCircle },
     { id: 'stats' as TabType, label: t.samsStats, icon: BarChart3 },
     { id: 'downloads' as TabType, label: t.downloads, icon: Download },
     { id: 'contact' as TabType, label: t.contactUs, icon: PhoneCall },

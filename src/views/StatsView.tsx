@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { normalizeCategory } from '../lib/excelParser';
+import { translateStream, translateDepartment } from '../lib/translations';
 import { StreamType } from '../types';
 import {
   BarChart3,
@@ -76,7 +77,7 @@ const STREAM_CONFIGS: StreamConfig[] = [
 ];
 
 export const StatsView: React.FC = () => {
-  const { students, seatMatrix } = useData();
+  const { students, seatMatrix, t, lang } = useData();
   const [expandedStream, setExpandedStream] = useState<string | null>(null);
 
   // Totals computed directly from live Subjects & Seats Matrix
@@ -130,21 +131,23 @@ export const StatsView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono mb-1">
             <BarChart3 className="w-4 h-4" />
-            <span>SAMS DEMOGRAPHIC & ENROLLMENT ANALYTICS</span>
+            <span>{lang === 'or' ? 'ସାମ୍ସ ଜନସଂଖ୍ୟା ଓ ନାମଲେଖା ପରିସଂଖ୍ୟାନ' : 'SAMS DEMOGRAPHIC & ENROLLMENT ANALYTICS'}</span>
             <span className="ml-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded font-mono inline-flex items-center">
-              <CheckCircle className="w-3 h-3 mr-1 text-emerald-400" /> Synced with Subjects & Seats
+              <CheckCircle className="w-3 h-3 mr-1 text-emerald-400" /> {lang === 'or' ? 'ବିଷୟ ଓ ସିଟ୍ ସହିତ ସିଙ୍କ୍' : 'Synced with Subjects & Seats'}
             </span>
           </div>
           <h1 className="text-2xl font-extrabold text-white font-serif">
-            SAMS Panchayat College Enrollment & Stream Statistics
+            {t.statsTitle}
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Live synchronized metrics across all 5 academic streams (Arts, Biological Science, Commerce, Physical Science & Self Financing) and {seatMatrix.length} sanctioned departments.
+            {lang === 'or'
+              ? `କଳା, ଜୈବ ବିଜ୍ଞାନ, ବାଣିଜ୍ୟ, ଭୌତିକ ବିଜ୍ଞାନ ଓ ସ୍ୱୟଂ ପୋଷିତ ସମସ୍ତ ୫ ଶାଖା ଏବଂ ${seatMatrix.length} ବିଭାଗର ଲାଇଭ୍ ତଥ୍ୟ।`
+              : `Live synchronized metrics across all 5 academic streams (Arts, Biological Science, Commerce, Physical Science & Self Financing) and ${seatMatrix.length} sanctioned departments.`}
           </p>
         </div>
 
         <div className="bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-right">
-          <span className="text-[10px] font-mono text-slate-400 block uppercase">Intake Capacity Fill</span>
+          <span className="text-[10px] font-mono text-slate-400 block uppercase">{lang === 'or' ? 'ସିଟ୍ ପୂରଣ ହାର' : 'Intake Capacity Fill'}</span>
           <span className="text-lg font-bold text-emerald-400 font-mono">
             {totalAdmitted} / {totalSanctioned} ({overallFillPercent}%)
           </span>
@@ -154,33 +157,33 @@ export const StatsView: React.FC = () => {
       {/* Top Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-2">
-          <span className="text-[10px] text-slate-400 uppercase font-mono block">Enrolled from Subjects & Seats</span>
-          <div className="text-3xl font-extrabold text-white font-mono">{totalAdmitted} Scholars</div>
+          <span className="text-[10px] text-slate-400 uppercase font-mono block">{lang === 'or' ? 'ମୋଟ ନାମଲେଖା (ସିଟ୍ ମ୍ୟାଟ୍ରିକ୍ସ)' : 'Enrolled from Subjects & Seats'}</span>
+          <div className="text-3xl font-extrabold text-white font-mono">{totalAdmitted} {lang === 'or' ? 'ଛାତ୍ରଛାତ୍ରୀ' : 'Scholars'}</div>
           <p className="text-xs text-emerald-400 flex items-center font-mono">
-            <CheckCircle className="w-3.5 h-3.5 mr-1" /> {overallFillPercent}% of {totalSanctioned} Sanctioned
+            <CheckCircle className="w-3.5 h-3.5 mr-1" /> {overallFillPercent}% of {totalSanctioned} {lang === 'or' ? 'ମଞ୍ଜୁର ସିଟ୍' : 'Sanctioned'}
           </p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-2">
-          <span className="text-[10px] text-slate-400 uppercase font-mono block">Gender Balance (Girls Ratio)</span>
-          <div className="text-3xl font-extrabold text-amber-400 font-mono">{femalePercent}% Female</div>
+          <span className="text-[10px] text-slate-400 uppercase font-mono block">{t.femaleRatio}</span>
+          <div className="text-3xl font-extrabold text-amber-400 font-mono">{femalePercent}% {lang === 'or' ? 'ଛାତ୍ରୀ' : 'Female'}</div>
           <p className="text-xs text-slate-400 font-mono">
-            {femaleCount} Female / {maleCount} Male
+            {femaleCount} {lang === 'or' ? 'ଛାତ୍ରୀ' : 'Female'} / {maleCount} {lang === 'or' ? 'ଛାତ୍ର' : 'Male'}
           </p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-2">
-          <span className="text-[10px] text-slate-400 uppercase font-mono block">AEDP Specializations Intake</span>
-          <div className="text-3xl font-extrabold text-emerald-400 font-mono">{aedpAdmitted} Enrolled</div>
+          <span className="text-[10px] text-slate-400 uppercase font-mono block">{t.aedpScholars}</span>
+          <div className="text-3xl font-extrabold text-emerald-400 font-mono">{aedpAdmitted} {lang === 'or' ? 'ନାମଲେଖା' : 'Enrolled'}</div>
           <p className="text-xs text-slate-400 font-mono">
-            {aedpItems.length} Specialized Courses ({aedpSanctioned} Seats)
+            {aedpItems.length} {lang === 'or' ? 'ସ୍ୱତନ୍ତ୍ର ପାଠ୍ୟକ୍ରମ' : 'Specialized Courses'} ({aedpSanctioned} {lang === 'or' ? 'ସିଟ୍' : 'Seats'})
           </p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-2">
-          <span className="text-[10px] text-slate-400 uppercase font-mono block">Total Available Vacancies</span>
-          <div className="text-3xl font-extrabold text-amber-400 font-mono">{totalVacant} Seats</div>
-          <p className="text-xs text-slate-400 font-mono">Across {seatMatrix.length} Depts (Spot Round Eligible)</p>
+          <span className="text-[10px] text-slate-400 uppercase font-mono block">{lang === 'or' ? 'ଖାଲିଥିବା ସିଟ୍' : 'Total Available Vacancies'}</span>
+          <div className="text-3xl font-extrabold text-amber-400 font-mono">{totalVacant} {lang === 'or' ? 'ସିଟ୍' : 'Seats'}</div>
+          <p className="text-xs text-slate-400 font-mono">{lang === 'or' ? `${seatMatrix.length} ବିଭାଗରେ ସ୍ପଟ୍ ରାଉଣ୍ଡ ଯୋଗ୍ୟ` : `Across ${seatMatrix.length} Depts (Spot Round Eligible)`}</p>
         </div>
       </div>
 
@@ -193,14 +196,14 @@ export const StatsView: React.FC = () => {
             <div>
               <h3 className="text-sm font-bold text-white flex items-center">
                 <PieChart className="w-4 h-4 mr-2 text-amber-400" />
-                Enrollment by Academic Stream (Subjects & Seats Sync)
+                {t.streamAnalytics}
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Live enrolled scholars, sanctioned strength, and intake progress across all 5 official streams.
+                {lang === 'or' ? 'ସମସ୍ତ ୫ ଶାଖାରେ ଲାଇଭ୍ ନାମଲେଖା, ମଞ୍ଜୁର ସିଟ୍ ଓ ପୂରଣ ହାର।' : 'Live enrolled scholars, sanctioned strength, and intake progress across all 5 official streams.'}
               </p>
             </div>
             <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800">
-              5 Streams &bull; {seatMatrix.length} Depts
+              {lang === 'or' ? `୫ ଶାଖା • ${seatMatrix.length} ବିଭାଗ` : `5 Streams • ${seatMatrix.length} Depts`}
             </span>
           </div>
 
@@ -215,10 +218,10 @@ export const StatsView: React.FC = () => {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center space-x-2">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${st.badgeBg} ${st.textColor} ${st.borderColor}`}>
-                        {st.name}
+                        {translateStream(st.name, lang)}
                       </span>
                       <span className="text-xs font-semibold text-slate-200">{st.degreeLabel}</span>
-                      <span className="text-[10px] text-slate-500 font-mono">({st.deptsCount} Depts)</span>
+                      <span className="text-[10px] text-slate-500 font-mono">({st.deptsCount} {lang === 'or' ? 'ବିଭାଗ' : 'Depts'})</span>
                     </div>
 
                     <div className="flex items-center space-x-3 text-xs">
@@ -226,7 +229,7 @@ export const StatsView: React.FC = () => {
                         {st.admitted} <span className="text-[11px] font-normal text-slate-400">/ {st.sanctioned}</span>
                       </span>
                       <span className={`text-[11px] font-bold font-mono px-2.5 py-0.5 rounded ${st.badgeBg} ${st.textColor} border ${st.borderColor}`}>
-                        {st.fillPercent}% Seats Filled
+                        {st.fillPercent}% {t.percentSeatsFilled}
                       </span>
                       <button
                         onClick={() => setExpandedStream(isExpanded ? null : st.name)}
@@ -247,9 +250,9 @@ export const StatsView: React.FC = () => {
                       ></div>
                     </div>
                     <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
-                      <span>{st.fillPercent}% Stream Seats Filled ({st.admitted} of {st.sanctioned} seats)</span>
+                      <span>{st.fillPercent}% {lang === 'or' ? `ଶାଖା ସିଟ୍ ପୂରଣ (${st.sanctioned} ରୁ ${st.admitted} ସିଟ୍)` : `Stream Seats Filled (${st.admitted} of ${st.sanctioned} seats)`}</span>
                       <span className={st.vacant > 0 ? 'text-amber-400 font-bold' : 'text-slate-500'}>
-                        {st.vacant} Vacant Seats
+                        {st.vacant} {lang === 'or' ? 'ଖାଲି ସିଟ୍' : 'Vacant Seats'}
                       </span>
                     </div>
                   </div>
@@ -258,7 +261,7 @@ export const StatsView: React.FC = () => {
                   {isExpanded && (
                     <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-1.5 animate-fadeIn">
                       <div className="text-[10px] uppercase font-mono text-slate-400 mb-2">
-                        Sanctioned Honours & Specializations in {st.name}:
+                        {lang === 'or' ? `${translateStream(st.name, lang)} ଶାଖାର ମଞ୍ଜୁରପ୍ରାପ୍ତ ବିଷୟ:` : `Sanctioned Honours & Specializations in ${st.name}:`}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                         {st.items.map((c) => (
@@ -268,10 +271,10 @@ export const StatsView: React.FC = () => {
                           >
                             <div className="truncate mr-2">
                               <span className="font-medium text-slate-200 block truncate text-[11px]">
-                                {c.deptName}
+                                {translateDepartment(c.deptName, lang)}
                               </span>
                               {c.isAedp && (
-                                <span className="text-[9px] text-emerald-400 font-mono">AEDP Specialization</span>
+                                <span className="text-[9px] text-emerald-400 font-mono">{lang === 'or' ? 'ଏଇଡିପି ସ୍ୱତନ୍ତ୍ର' : 'AEDP Specialization'}</span>
                               )}
                             </div>
                             <div className="text-right shrink-0 font-mono text-[11px]">
@@ -296,42 +299,42 @@ export const StatsView: React.FC = () => {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center">
               <ShieldCheck className="w-4 h-4 mr-2 text-emerald-400" />
-              Odisha Reservation Quota Distribution
+              {lang === 'or' ? 'ଓଡ଼ିଶା ସଂରକ୍ଷଣ କୋଟା ବଣ୍ଟନ' : 'Odisha Reservation Quota Distribution'}
             </h3>
             <p className="text-xs text-slate-400">
-              Demographic classification based on official Odisha SAMS reservation norms.
+              {lang === 'or' ? 'ସାମ୍ସ ଓଡ଼ିଶା ସରକାରୀ ସଂରକ୍ଷଣ ନିୟମ ଅନୁସାରେ ଛାତ୍ରଛାତ୍ରୀ ବଣ୍ଟନ।' : 'Demographic classification based on official Odisha SAMS reservation norms.'}
             </p>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                <span className="text-slate-400 text-[10px] block font-mono">GENERAL CATEGORY</span>
+                <span className="text-slate-400 text-[10px] block font-mono">{lang === 'or' ? 'ସାଧାରଣ ବର୍ଗ (GEN)' : 'GENERAL CATEGORY'}</span>
                 <span className="text-2xl font-bold text-white font-mono">{genCount}</span>
                 <span className="text-[10px] text-slate-500 block font-mono">
-                  {totalStudents > 0 ? ((genCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
+                  {totalStudents > 0 ? ((genCount / totalStudents) * 100).toFixed(1) : '0.0'}% {lang === 'or' ? 'ମୋଟର' : 'of total'}
                 </span>
               </div>
 
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                <span className="text-slate-400 text-[10px] block font-mono">SCHEDULED CASTE (SC)</span>
+                <span className="text-slate-400 text-[10px] block font-mono">{lang === 'or' ? 'ଅନୁସୂଚିତ ଜାତି (SC)' : 'SCHEDULED CASTE (SC)'}</span>
                 <span className="text-2xl font-bold text-amber-400 font-mono">{scCount}</span>
                 <span className="text-[10px] text-slate-500 block font-mono">
-                  {totalStudents > 0 ? ((scCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
+                  {totalStudents > 0 ? ((scCount / totalStudents) * 100).toFixed(1) : '0.0'}% {lang === 'or' ? 'ମୋଟର' : 'of total'}
                 </span>
               </div>
 
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                <span className="text-slate-400 text-[10px] block font-mono">SCHEDULED TRIBE (ST)</span>
+                <span className="text-slate-400 text-[10px] block font-mono">{lang === 'or' ? 'ଅନୁସୂଚିତ ଜନଜାତି (ST)' : 'SCHEDULED TRIBE (ST)'}</span>
                 <span className="text-2xl font-bold text-emerald-400 font-mono">{stCount}</span>
                 <span className="text-[10px] text-slate-500 block font-mono">
-                  {totalStudents > 0 ? ((stCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
+                  {totalStudents > 0 ? ((stCount / totalStudents) * 100).toFixed(1) : '0.0'}% {lang === 'or' ? 'ମୋଟର' : 'of total'}
                 </span>
               </div>
 
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                <span className="text-slate-400 text-[10px] block font-mono">SEBC / OBC</span>
+                <span className="text-slate-400 text-[10px] block font-mono">{lang === 'or' ? 'ଏସଇବିସି / ଓବିସି (SEBC)' : 'SEBC / OBC'}</span>
                 <span className="text-2xl font-bold text-blue-400 font-mono">{sebcCount}</span>
                 <span className="text-[10px] text-slate-500 block font-mono">
-                  {totalStudents > 0 ? ((sebcCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
+                  {totalStudents > 0 ? ((sebcCount / totalStudents) * 100).toFixed(1) : '0.0'}% {lang === 'or' ? 'ମୋଟର' : 'of total'}
                 </span>
               </div>
             </div>
@@ -341,20 +344,22 @@ export const StatsView: React.FC = () => {
           <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-emerald-500/30 rounded-2xl p-6 shadow-xl space-y-3">
             <div className="flex items-center space-x-2 text-emerald-400 text-xs font-mono">
               <Sparkles className="w-4 h-4" />
-              <span>DHE ODISHA &bull; APPRENTICESHIP EMBEDDED DEGREE (AEDP)</span>
+              <span>{lang === 'or' ? 'ଉଚ୍ଚଶିକ୍ଷା ବିଭାଗ ଓଡ଼ିଶା • ଏଇଡିପି (AEDP) ଯୋଜନା' : 'DHE ODISHA • APPRENTICESHIP EMBEDDED DEGREE (AEDP)'}</span>
             </div>
-            <h4 className="text-sm font-bold text-white">Apprenticeship Embedded Degree Programme (AEDP)</h4>
+            <h4 className="text-sm font-bold text-white">{t.aedpFlagshipTitle}</h4>
             <p className="text-xs text-slate-300 leading-relaxed">
-              NEP 2020 aligned UG degree combining regular Honours with a <strong>mandatory 1-year paid industrial apprenticeship</strong> in the 3rd year. Students earn a <strong>monthly stipend</strong> and graduate with degrees officially certified as 100% equivalent to conventional UG degrees for Master's/Ph.D. admissions.
+              {lang === 'or'
+                ? 'ଜାତୀୟ ଶିକ୍ଷାନୀତି (NEP 2020) ଆଧାରିତ ସ୍ନାତକ ଡିଗ୍ରୀ, ଯେଉଁଥିରେ ନିୟମିତ ଅନର୍ସ ସହିତ ୩ୟ ବର୍ଷରେ ୧-ବର୍ଷର ବାଧ୍ୟତାମୂଳକ ବେତନଯୁକ୍ତ ଶିଳ୍ପ ଶିକ୍ଷାନବିଶୀ ମିଳେ। ଛାତ୍ରଛାତ୍ରୀ ମାସିକ ଷ୍ଟାଇପେଣ୍ଡ୍ ପାଆନ୍ତି ଏବଂ ଏହା ସାଧାରଣ ଡିଗ୍ରୀ ସହ ୧୦୦% ସମତୁଲ୍ୟ।'
+                : "NEP 2020 aligned UG degree combining regular Honours with a mandatory 1-year paid industrial apprenticeship in the 3rd year. Students earn a monthly stipend and graduate with degrees officially certified as 100% equivalent to conventional UG degrees for Master's/Ph.D. admissions."}
             </p>
             <div className="pt-2 grid grid-cols-2 gap-2 text-center text-xs">
               <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl">
-                <span className="text-[10px] text-slate-400 block font-mono">AEDP Enrolled</span>
-                <span className="text-base font-bold text-emerald-400 font-mono">{aedpAdmitted} Scholars</span>
+                <span className="text-[10px] text-slate-400 block font-mono">{lang === 'or' ? 'ଏଇଡିପି ନାମଲେଖା' : 'AEDP Enrolled'}</span>
+                <span className="text-base font-bold text-emerald-400 font-mono">{aedpAdmitted} {lang === 'or' ? 'ଛାତ୍ରଛାତ୍ରୀ' : 'Scholars'}</span>
               </div>
               <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl">
-                <span className="text-[10px] text-slate-400 block font-mono">AEDP Sanctioned</span>
-                <span className="text-base font-bold text-white font-mono">{aedpSanctioned} Seats</span>
+                <span className="text-[10px] text-slate-400 block font-mono">{lang === 'or' ? 'ମଞ୍ଜୁରପ୍ରାପ୍ତ ସିଟ୍' : 'AEDP Sanctioned'}</span>
+                <span className="text-base font-bold text-white font-mono">{aedpSanctioned} {lang === 'or' ? 'ସିଟ୍' : 'Seats'}</span>
               </div>
             </div>
           </div>

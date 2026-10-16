@@ -1,13 +1,19 @@
 {
   "entities": {
     "Student": {
-      "title": "Student Record",
-      "description": "SAMS admitted or applicant student record",
+      "title": "Student",
+      "description": "Student admission and roster record",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "name": { "type": "string" },
         "rollNo": { "type": "string" },
         "samsRegNo": { "type": "string" },
+        "barcode": { "type": "string" },
+        "parentName": { "type": "string" },
+        "dob": { "type": "string" },
+        "maxMarks": { "type": "number" },
+        "marksSecured": { "type": "number" },
         "department": { "type": "string" },
         "stream": { "type": "string" },
         "isAedp": { "type": "boolean" },
@@ -19,13 +25,14 @@
         "status": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["name", "samsRegNo", "department", "stream", "category"]
+      "required": ["id", "name", "samsRegNo", "department", "stream"]
     },
-    "SeatMatrix": {
-      "title": "Seat Matrix",
-      "description": "Sanctioned vs Admitted vs Vacant seat count per subject/specialization",
+    "SeatMatrixItem": {
+      "title": "SeatMatrixItem",
+      "description": "Department intake seat matrix and vacancy status",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "deptName": { "type": "string" },
         "stream": { "type": "string" },
         "isAedp": { "type": "boolean" },
@@ -35,42 +42,82 @@
         "vacant": { "type": "number" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["deptName", "stream", "sanctioned", "vacant"]
+      "required": ["id", "deptName", "stream", "sanctioned"]
     },
     "SpotCandidate": {
-      "title": "Spot Round Candidate",
-      "description": "Candidate applicant for Spot Round Seats with live reported status and merit selection",
+      "title": "SpotCandidate",
+      "description": "Spot round selection and waitlist candidate",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "studentName": { "type": "string" },
         "samsRegNo": { "type": "string" },
         "deptId": { "type": "string" },
+        "deptName": { "type": "string" },
+        "stream": { "type": "string" },
         "category": { "type": "string" },
         "marksPercentage": { "type": "number" },
         "waitlistRank": { "type": "number" },
         "reportedStatus": { "type": "string" },
         "selectionStatus": { "type": "string" },
-        "appliedAt": { "type": "string" }
+        "appliedAt": { "type": "string" },
+        "phone": { "type": "string" }
       },
-      "required": ["studentName", "samsRegNo", "deptId", "marksPercentage"]
+      "required": ["id", "studentName", "samsRegNo", "deptName"]
     },
-    "AuditLog": {
-      "title": "System Audit Log",
-      "description": "Audit trails for administrative actions",
+    "Notice": {
+      "title": "Notice",
+      "description": "College notice board announcements",
       "type": "object",
       "properties": {
-        "timestamp": { "type": "string" },
-        "adminName": { "type": "string" },
-        "actionType": { "type": "string" },
-        "description": { "type": "string" }
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "deptId": { "type": "string" },
+        "date": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "isImportant": { "type": "boolean" },
+        "content": { "type": "string" }
       },
-      "required": ["timestamp", "actionType", "description"]
+      "required": ["id", "title", "category", "date"]
+    },
+    "FacultyMember": {
+      "title": "FacultyMember",
+      "description": "Faculty member directory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "deptId": { "type": "string" },
+        "deptName": { "type": "string" },
+        "name": { "type": "string" },
+        "designation": { "type": "string" },
+        "qualification": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "isHod": { "type": "boolean" }
+      },
+      "required": ["id", "deptName", "name", "designation"]
+    },
+    "FAQItem": {
+      "title": "FAQItem",
+      "description": "Frequently asked questions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "category": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "question", "answer", "category"]
     },
     "HodAccount": {
-      "title": "HOD Credentials & Info",
-      "description": "Departmental account and HOD information",
+      "title": "HodAccount",
+      "description": "Department HOD account credentials and info",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "deptName": { "type": "string" },
         "username": { "type": "string" },
         "password": { "type": "string" },
@@ -79,82 +126,54 @@
         "email": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["deptName", "username", "password", "hodName"]
+      "required": ["id", "deptName", "username", "password"]
     },
     "SystemSettings": {
-      "title": "System Settings & Controls",
-      "description": "Global switches including Spot Round toggle, logo, notices",
+      "title": "SystemSettings",
+      "description": "College profile and global configuration settings",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "spotRoundEnabled": { "type": "boolean" },
         "collegeLogoUrl": { "type": "string" },
-        "prospectusUrl": { "type": "string" },
+        "collegeName": { "type": "string" },
+        "collegeCode": { "type": "string" },
+        "tagline": { "type": "string" },
+        "naacGrade": { "type": "string" },
         "bannerNotice": { "type": "string" },
+        "prospectusUrl": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "address": { "type": "string" },
+        "sheetSyncUrl": { "type": "string" },
+        "lastSheetSync": { "type": "string" },
         "updatedAt": { "type": "string" }
-      }
+      },
+      "required": ["id", "collegeName"]
     },
-    "Notice": {
-      "title": "Official Notice",
-      "description": "Public and departmental notices",
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System audit trail records",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "category": { "type": "string" },
-        "deptId": { "type": "string" },
-        "date": { "type": "string" },
-        "downloadUrl": { "type": "string" },
-        "isImportant": { "type": "boolean" }
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "adminName": { "type": "string" },
+        "actionType": { "type": "string" },
+        "description": { "type": "string" }
       },
-      "required": ["title", "category", "date"]
-    },
-    "Faculty": {
-      "title": "Faculty Profile",
-      "description": "Departmental faculty directory member",
-      "type": "object",
-      "properties": {
-        "deptId": { "type": "string" },
-        "name": { "type": "string" },
-        "designation": { "type": "string" },
-        "qualification": { "type": "string" },
-        "email": { "type": "string" },
-        "phone": { "type": "string" },
-        "photoUrl": { "type": "string" }
-      },
-      "required": ["deptId", "name", "designation"]
+      "required": ["id", "timestamp", "actionType", "description"]
     }
   },
   "firestore": {
-    "/students/{studentId}": {
-      "schema": { "$ref": "#/entities/Student" },
-      "description": "SAMS Student database"
-    },
-    "/seatMatrix/{seatId}": {
-      "schema": { "$ref": "#/entities/SeatMatrix" },
-      "description": "Seat intake matrix"
-    },
-    "/spotCandidates/{candidateId}": {
-      "schema": { "$ref": "#/entities/SpotCandidate" },
-      "description": "Spot round applicant list"
-    },
-    "/auditLogs/{logId}": {
-      "schema": { "$ref": "#/entities/AuditLog" },
-      "description": "System administrative logs"
-    },
-    "/hodAccounts/{hodId}": {
-      "schema": { "$ref": "#/entities/HodAccount" },
-      "description": "HOD accounts and department passwords"
-    },
-    "/systemSettings/{settingId}": {
-      "schema": { "$ref": "#/entities/SystemSettings" },
-      "description": "System settings and switches"
-    },
-    "/notices/{noticeId}": {
-      "schema": { "$ref": "#/entities/Notice" },
-      "description": "College notices"
-    },
-    "/faculty/{facultyId}": {
-      "schema": { "$ref": "#/entities/Faculty" },
-      "description": "Faculty profiles"
-    }
+    "students/{studentId}": { "schema": "Student", "description": "Student DB records" },
+    "seatMatrix/{deptId}": { "schema": "SeatMatrixItem", "description": "Seat matrix records" },
+    "spotCandidates/{candidateId}": { "schema": "SpotCandidate", "description": "Spot candidates" },
+    "notices/{noticeId}": { "schema": "Notice", "description": "Notice board entries" },
+    "faculty/{facultyId}": { "schema": "FacultyMember", "description": "Faculty directory" },
+    "faqs/{faqId}": { "schema": "FAQItem", "description": "College FAQs" },
+    "hodAccounts/{deptId}": { "schema": "HodAccount", "description": "HOD credentials and info" },
+    "systemSettings/{settingsId}": { "schema": "SystemSettings", "description": "College settings" },
+    "auditLogs/{logId}": { "schema": "AuditLog", "description": "Audit trail logs" }
   }
 }

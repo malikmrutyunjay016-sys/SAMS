@@ -247,8 +247,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeSaveLocalStorage(LS_PREFIX + 'faqs', JSON.stringify(faqs));
   }, [faqs]);
 
-  // Firestore optional sync
+  // -------------------------------------------------------------
+  // REAL-TIME FIRESTORE LISTENERS ACROSS ALL DEVICES
+  // -------------------------------------------------------------
   useEffect(() => {
+    // 1. Seat Matrix
+    const unsubSeatMatrix = onSnapshot(
+      collection(db, 'seatMatrix'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map((d) => d.data() as SeatMatrixItem);
+          setSeatMatrix(docs);
+        } else {
+          DEFAULT_SEAT_MATRIX.forEach((item) => setDoc(doc(db, 'seatMatrix', item.id), item).catch(() => {}));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'seatMatrix')
+    );
+
+    // 2. System Settings
     const unsubSettings = onSnapshot(
       collection(db, 'systemSettings'),
       (snapshot) => {
@@ -256,13 +273,117 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const docs = snapshot.docs.map((d) => d.data() as SystemSettings);
           const globalSetting = docs.find((s) => s.id === 'global') || docs[0];
           if (globalSetting) setSystemSettings(globalSetting);
+        } else {
+          setDoc(doc(db, 'systemSettings', 'global'), DEFAULT_SETTINGS).catch(() => {});
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'systemSettings')
     );
 
+    // 3. Faculty
+    const unsubFaculty = onSnapshot(
+      collection(db, 'faculty'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map((d) => d.data() as FacultyMember);
+          setFaculty(docs);
+        } else {
+          DEFAULT_FACULTY.forEach((item) => setDoc(doc(db, 'faculty', item.id), item).catch(() => {}));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'faculty')
+    );
+
+    // 4. Notices
+    const unsubNotices = onSnapshot(
+      collection(db, 'notices'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map((d) => d.data() as Notice);
+          setNotices(docs);
+        } else {
+          DEFAULT_NOTICES.forEach((item) => setDoc(doc(db, 'notices', item.id), item).catch(() => {}));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'notices')
+    );
+
+    // 5. FAQs
+    const unsubFaqs = onSnapshot(
+      collection(db, 'faqs'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map((d) => d.data() as FAQItem);
+          setFaqs(docs);
+        } else {
+          DEFAULT_FAQS.forEach((item) => setDoc(doc(db, 'faqs', item.id), item).catch(() => {}));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'faqs')
+    );
+
+    // 6. HOD Accounts
+    const unsubHodAccounts = onSnapshot(
+      collection(db, 'hodAccounts'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map((d) => d.data() as HodAccount);
+          setHodAccounts(docs);
+        } else {
+          DEFAULT_HOD_ACCOUNTS.forEach((item) => setDoc(doc(db, 'hodAccounts', item.id), item).catch(() => {}));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'hodAccounts')
+    );
+
+    // 7. Spot Candidates
+    const unsubSpotCandidates = onSnapshot(
+      collection(db, 'spotCandidates'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map((d) => d.data() as SpotCandidate);
+          setSpotCandidates(docs);
+        } else {
+          DEFAULT_SPOT_CANDIDATES.forEach((item) => setDoc(doc(db, 'spotCandidates', item.id), item).catch(() => {}));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'spotCandidates')
+    );
+
+    // 8. Students
+    const unsubStudents = onSnapshot(
+      collection(db, 'students'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map((d) => d.data() as Student);
+          setStudents(docs);
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'students')
+    );
+
+    // 9. Audit Logs
+    const unsubAuditLogs = onSnapshot(
+      collection(db, 'auditLogs'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map((d) => d.data() as AuditLog);
+          setAuditLogs(docs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'auditLogs')
+    );
+
     return () => {
+      unsubSeatMatrix();
       unsubSettings();
+      unsubFaculty();
+      unsubNotices();
+      unsubFaqs();
+      unsubHodAccounts();
+      unsubSpotCandidates();
+      unsubStudents();
+      unsubAuditLogs();
     };
   }, []);
 
@@ -291,33 +412,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
     setStudents((prev) => [newStudent, ...prev]);
+    setDoc(doc(db, 'students', newStudent.id), newStudent).catch(() => {});
     addAuditLog('STUDENT_ADDED', `New student added: ${newStudent.name} (${newStudent.rollNo || newStudent.samsRegNo})`);
   };
 
   const updateStudent = (id: string, updated: Partial<Student>) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id === id) {
-          return {
-            ...s,
-            ...updated,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return s;
-      })
-    );
+    const target = students.find((s) => s.id === id);
+    if (!target) return;
+    const updatedStudent = { ...target, ...updated, updatedAt: new Date().toISOString() };
+    setStudents((prev) => prev.map((s) => (s.id === id ? updatedStudent : s)));
+    setDoc(doc(db, 'students', id), updatedStudent).catch(() => {});
     addAuditLog('STUDENT_UPDATED', `Student ${id} record updated.`);
   };
 
   const deleteStudent = (id: string) => {
     const target = students.find((s) => s.id === id);
     setStudents((prev) => prev.filter((s) => s.id !== id));
+    deleteDoc(doc(db, 'students', id)).catch(() => {});
     addAuditLog('STUDENT_DELETED', `Student ${target?.name || id} deleted from database.`);
   };
 
   const clearAllStudents = () => {
     const count = students.length;
+    students.forEach((s) => deleteDoc(doc(db, 'students', s.id)).catch(() => {}));
     setStudents([]);
     localStorage.removeItem(LS_PREFIX + 'students');
     setSeatMatrix((prev) =>
@@ -334,6 +451,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const bulkImportStudents = (importedStudents: Student[], replace: boolean = false) => {
     if (!importedStudents || !Array.isArray(importedStudents) || importedStudents.length === 0) return;
+
+    if (replace) {
+      students.forEach((s) => deleteDoc(doc(db, 'students', s.id)).catch(() => {}));
+    }
 
     // Sanitize and guarantee valid properties for all records
     const sanitized: Student[] = importedStudents.map((s, idx) => {
@@ -396,6 +517,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     });
 
+    sanitized.forEach((s) => {
+      setDoc(doc(db, 'students', s.id), s).catch(() => {});
+    });
+
     setStudents((prev) => {
       const updatedList = replace ? sanitized : [...sanitized, ...prev];
       safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updatedList.slice(0, 5000)));
@@ -411,12 +536,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (!item.isAedp && !s.isAedp && sDept.includes(mDept)) return true;
             return false;
           }).length;
-          return {
+          const updatedItem = {
             ...item,
             admitted: admittedCount,
             vacant: Math.max(0, item.sanctioned - admittedCount),
             updatedAt: new Date().toISOString(),
           };
+          setDoc(doc(db, 'seatMatrix', item.id), updatedItem).catch(() => {});
+          return updatedItem;
         });
         safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(synced));
         return synced;
@@ -435,12 +562,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setStudents((prev) =>
       prev.map((s) => {
         if (s.id === studentId) {
-          return {
+          const updated = {
             ...s,
             rollNo: newRollNo,
             status: (newStatus as any) || s.status,
             updatedAt: new Date().toISOString(),
           };
+          setDoc(doc(db, 'students', studentId), updated).catch(() => {});
+          return updated;
         }
         return s;
       })
@@ -450,6 +579,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadSampleStudents = () => {
     const sample = generate1100Students().slice(0, 150);
+    sample.forEach((s) => setDoc(doc(db, 'students', s.id), s).catch(() => {}));
     setStudents(sample);
     addAuditLog('SAMPLE_STUDENTS_LOADED', 'Loaded sample student records for demonstration.');
   };
@@ -460,6 +590,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const newSyncedCount = 20;
     const newStudents = generate1100Students().slice(0, newSyncedCount);
+    newStudents.forEach((s) => setDoc(doc(db, 'students', s.id), s).catch(() => {}));
     setStudents((prev) => [...newStudents, ...prev]);
 
     const updatedSettings = {
@@ -468,6 +599,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastSheetSync: new Date().toISOString(),
     };
     setSystemSettings(updatedSettings);
+    setDoc(doc(db, 'systemSettings', 'global'), updatedSettings).catch(() => {});
 
     addAuditLog('SAMS_GOOGLE_SHEET_SYNC', `Successfully synced live SAMS Google Sheet: ${sheetUrl}`);
     setIsLoading(false);
@@ -480,13 +612,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const norm = normalizeDepartmentAndStream(s.department, s.stream);
       if (s.department !== norm.department || s.stream !== norm.stream || s.isAedp !== norm.isAedp) {
         correctedCount++;
-        return {
+        const correctedStudent = {
           ...s,
           department: norm.department,
           stream: norm.stream,
           isAedp: norm.isAedp,
           updatedAt: new Date().toISOString(),
         };
+        setDoc(doc(db, 'students', s.id), correctedStudent).catch(() => {});
+        return correctedStudent;
       }
       return s;
     });
@@ -508,30 +642,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: `fac_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     };
     setFaculty((prev) => [newFaculty, ...prev]);
+    setDoc(doc(db, 'faculty', newFaculty.id), newFaculty).catch(() => {});
     addAuditLog('FACULTY_ADDED', `Added faculty member: ${newFaculty.name} (${newFaculty.deptName})`);
   };
 
   const updateFaculty = (id: string, updated: Partial<FacultyMember>) => {
-    setFaculty((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, ...updated } : f))
-    );
+    const target = faculty.find((f) => f.id === id);
+    if (!target) return;
+    const updatedFaculty = { ...target, ...updated };
+    setFaculty((prev) => prev.map((f) => (f.id === id ? updatedFaculty : f)));
+    setDoc(doc(db, 'faculty', id), updatedFaculty).catch(() => {});
     addAuditLog('FACULTY_UPDATED', `Updated faculty member ${id}.`);
   };
 
   const deleteFaculty = (id: string) => {
     const target = faculty.find((f) => f.id === id);
     setFaculty((prev) => prev.filter((f) => f.id !== id));
+    deleteDoc(doc(db, 'faculty', id)).catch(() => {});
     addAuditLog('FACULTY_DELETED', `Deleted faculty member ${target?.name || id}.`);
   };
 
   const clearAllFaculty = () => {
     const count = faculty.length;
+    faculty.forEach((f) => deleteDoc(doc(db, 'faculty', f.id)).catch(() => {}));
     setFaculty([]);
     localStorage.removeItem(LS_PREFIX + 'faculty');
     addAuditLog('FACULTY_CLEARED', `Cleared all ${count} faculty records from directory.`);
   };
 
   const loadSampleFaculty = () => {
+    DEFAULT_FACULTY.forEach((f) => setDoc(doc(db, 'faculty', f.id), f).catch(() => {}));
     setFaculty(DEFAULT_FACULTY);
     addAuditLog('SAMPLE_FACULTY_LOADED', 'Restored default faculty members directory.');
   };
@@ -547,6 +687,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
     setSeatMatrix((prev) => [...prev, newItem]);
+    setDoc(doc(db, 'seatMatrix', newItem.id), newItem).catch(() => {});
     addAuditLog('SEAT_MATRIX_ADD', `Added department seat matrix for ${newItem.deptName}.`);
   };
 
@@ -573,9 +714,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedAt: new Date().toISOString(),
           };
 
-          try {
-            setDoc(doc(db, 'seatMatrix', item.id), updatedItem).catch(() => {});
-          } catch (e) {}
+          setDoc(doc(db, 'seatMatrix', item.id), updatedItem).catch(() => {});
 
           return updatedItem;
         }
@@ -587,22 +726,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteSeatMatrixItem = (id: string) => {
     setSeatMatrix((prev) => prev.filter((item) => item.id !== id));
+    deleteDoc(doc(db, 'seatMatrix', id)).catch(() => {});
     addAuditLog('SEAT_MATRIX_DELETE', `Deleted department ${id} from seat matrix.`);
   };
 
   const resetSeatMatrixToBenchmark = () => {
+    DEFAULT_SEAT_MATRIX.forEach((item) => setDoc(doc(db, 'seatMatrix', item.id), item).catch(() => {}));
     setSeatMatrix(DEFAULT_SEAT_MATRIX);
     safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(DEFAULT_SEAT_MATRIX));
     addAuditLog('SEAT_MATRIX_RESET', 'Cleared and reset seat intake matrix to official 28 departments.');
   };
 
   const clearSeatMatrix = () => {
-    const cleared = DEFAULT_SEAT_MATRIX.map((item) => ({
-      ...item,
-      admitted: 0,
-      vacant: item.sanctioned,
-      updatedAt: new Date().toISOString(),
-    }));
+    const cleared = DEFAULT_SEAT_MATRIX.map((item) => {
+      const cl = {
+        ...item,
+        admitted: 0,
+        vacant: item.sanctioned,
+        updatedAt: new Date().toISOString(),
+      };
+      setDoc(doc(db, 'seatMatrix', cl.id), cl).catch(() => {});
+      return cl;
+    });
     setSeatMatrix(cleared);
     safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(cleared));
     addAuditLog('SEAT_MATRIX_CLEARED', 'Cleared seat matrix and reset intake to official 28 departments.');
@@ -617,18 +762,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: `notice_${Date.now()}`,
     };
     setNotices((prev) => [newNotice, ...prev]);
+    setDoc(doc(db, 'notices', newNotice.id), newNotice).catch(() => {});
     addAuditLog('NOTICE_POSTED', `New notice posted: "${notice.title}"`);
   };
 
   const updateNotice = (id: string, updated: Partial<Notice>) => {
-    setNotices((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, ...updated } : n))
-    );
+    const target = notices.find((n) => n.id === id);
+    if (!target) return;
+    const updatedNotice = { ...target, ...updated };
+    setNotices((prev) => prev.map((n) => (n.id === id ? updatedNotice : n)));
+    setDoc(doc(db, 'notices', id), updatedNotice).catch(() => {});
     addAuditLog('NOTICE_UPDATED', `Updated notice ${id}.`);
   };
 
   const deleteNotice = (noticeId: string) => {
     setNotices((prev) => prev.filter((n) => n.id !== noticeId));
+    deleteDoc(doc(db, 'notices', noticeId)).catch(() => {});
     addAuditLog('NOTICE_DELETED', `Notice ${noticeId} removed.`);
   };
 
@@ -644,18 +793,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
     setFaqs((prev) => [newFaq, ...prev]);
+    setDoc(doc(db, 'faqs', newFaq.id), newFaq).catch(() => {});
     addAuditLog('FAQ_ADDED', `New FAQ added: "${question}"`);
   };
 
   const updateFAQ = (id: string, question: string, answer: string, category: string) => {
-    setFaqs((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, question, answer, category, updatedAt: new Date().toISOString() } : f))
-    );
+    const target = faqs.find((f) => f.id === id);
+    if (!target) return;
+    const updatedFaq = { ...target, question, answer, category, updatedAt: new Date().toISOString() };
+    setFaqs((prev) => prev.map((f) => (f.id === id ? updatedFaq : f)));
+    setDoc(doc(db, 'faqs', id), updatedFaq).catch(() => {});
     addAuditLog('FAQ_UPDATED', `FAQ ${id} updated.`);
   };
 
   const deleteFAQ = (id: string) => {
     setFaqs((prev) => prev.filter((f) => f.id !== id));
+    deleteDoc(doc(db, 'faqs', id)).catch(() => {});
     addAuditLog('FAQ_DELETED', `FAQ ${id} deleted.`);
   };
 
@@ -669,36 +822,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
     setHodAccounts((prev) => [...prev, newAcc]);
+    setDoc(doc(db, 'hodAccounts', newAcc.id), newAcc).catch(() => {});
     addAuditLog('HOD_ACCOUNT_ADDED', `Created HOD account for Department of ${newAcc.deptName}`);
   };
 
   const updateHodAccount = (id: string, updated: Partial<HodAccount>) => {
-    setHodAccounts((prev) =>
-      prev.map((acc) => (acc.id === id ? { ...acc, ...updated, updatedAt: new Date().toISOString() } : acc))
-    );
+    const target = hodAccounts.find((h) => h.id === id);
+    if (!target) return;
+    const updatedAcc = { ...target, ...updated, updatedAt: new Date().toISOString() };
+    setHodAccounts((prev) => prev.map((acc) => (acc.id === id ? updatedAcc : acc)));
+    setDoc(doc(db, 'hodAccounts', id), updatedAcc).catch(() => {});
     addAuditLog('HOD_ACCOUNT_UPDATED', `Updated HOD account ${id}.`);
   };
 
   const deleteHodAccount = (id: string) => {
     setHodAccounts((prev) => prev.filter((acc) => acc.id !== id));
+    deleteDoc(doc(db, 'hodAccounts', id)).catch(() => {});
     addAuditLog('HOD_ACCOUNT_DELETED', `Deleted HOD account ${id}.`);
   };
 
   const updateHodPassword = (deptId: string, newPass: string, hodName?: string) => {
-    setHodAccounts((prev) =>
-      prev.map((acc) => {
-        if (acc.id === deptId) {
-          const updated = {
-            ...acc,
-            password: newPass,
-            hodName: hodName || acc.hodName,
-            updatedAt: new Date().toISOString(),
-          };
-          return updated;
-        }
-        return acc;
-      })
-    );
+    const target = hodAccounts.find((h) => h.id === deptId);
+    if (!target) return;
+    const updatedAcc = {
+      ...target,
+      password: newPass,
+      hodName: hodName || target.hodName,
+      updatedAt: new Date().toISOString(),
+    };
+    setHodAccounts((prev) => prev.map((acc) => (acc.id === deptId ? updatedAcc : acc)));
+    setDoc(doc(db, 'hodAccounts', deptId), updatedAcc).catch(() => {});
     addAuditLog('HOD_CREDENTIALS_UPDATE', `Updated security password for department ${deptId}.`);
   };
 
@@ -723,31 +876,38 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setSpotCandidates((prev) => [newCand, ...prev]);
+    setDoc(doc(db, 'spotCandidates', newCand.id), newCand).catch(() => {});
     addAuditLog('SPOT_CANDIDATE_REGISTRATION', `New candidate registered for Spot Round: ${newCand.studentName} (${newCand.samsRegNo})`);
   };
 
   const updateSpotCandidate = (id: string, updated: Partial<SpotCandidate>) => {
-    setSpotCandidates((prev) =>
-      prev.map((cand) => (cand.id === id ? { ...cand, ...updated } : cand))
-    );
+    const target = spotCandidates.find((c) => c.id === id);
+    if (!target) return;
+    const updatedCand = { ...target, ...updated };
+    setSpotCandidates((prev) => prev.map((cand) => (cand.id === id ? updatedCand : cand)));
+    setDoc(doc(db, 'spotCandidates', id), updatedCand).catch(() => {});
     addAuditLog('SPOT_CANDIDATE_UPDATED', `Updated spot candidate ${id}.`);
   };
 
   const deleteSpotCandidate = (id: string) => {
     setSpotCandidates((prev) => prev.filter((cand) => cand.id !== id));
+    deleteDoc(doc(db, 'spotCandidates', id)).catch(() => {});
     addAuditLog('SPOT_CANDIDATE_DELETED', `Deleted spot candidate ${id}.`);
   };
 
   const clearAllSpotCandidates = () => {
     const count = spotCandidates.length;
+    spotCandidates.forEach((c) => deleteDoc(doc(db, 'spotCandidates', c.id)).catch(() => {}));
     setSpotCandidates([]);
     addAuditLog('SPOT_CANDIDATES_CLEARED', `Cleared all ${count} spot candidates.`);
   };
 
   const reportSpotCandidate = (candidateId: string, status: 'Reported' | 'Not Reported') => {
-    setSpotCandidates((prev) =>
-      prev.map((cand) => (cand.id === candidateId ? { ...cand, reportedStatus: status } : cand))
-    );
+    const target = spotCandidates.find((c) => c.id === candidateId);
+    if (!target) return;
+    const updatedCand = { ...target, reportedStatus: status };
+    setSpotCandidates((prev) => prev.map((cand) => (cand.id === candidateId ? updatedCand : cand)));
+    setDoc(doc(db, 'spotCandidates', candidateId), updatedCand).catch(() => {});
     addAuditLog('SPOT_CANDIDATE_REPORTING', `Updated candidate ${candidateId} reported status to ${status}`);
   };
 
@@ -759,6 +919,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const deptSeats = seatMatrix.find((s) => s.id === cand.deptId);
         const vacantCount = deptSeats ? deptSeats.vacant : 2;
 
+        let res = cand;
         if (cand.reportedStatus === 'Reported') {
           const deptReported = prev
             .filter((c) => c.deptId === cand.deptId && c.reportedStatus === 'Reported')
@@ -766,12 +927,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           const candidateIndex = deptReported.findIndex((c) => c.id === cand.id);
           if (candidateIndex >= 0 && candidateIndex < vacantCount) {
-            return { ...cand, selectionStatus: 'Selected' as const, waitlistRank: candidateIndex + 1 };
+            res = { ...cand, selectionStatus: 'Selected' as const, waitlistRank: candidateIndex + 1 };
           } else if (candidateIndex >= 0) {
-            return { ...cand, selectionStatus: 'Waiting' as const, waitlistRank: candidateIndex + 1 };
+            res = { ...cand, selectionStatus: 'Waiting' as const, waitlistRank: candidateIndex + 1 };
           }
+        } else {
+          res = { ...cand, selectionStatus: 'Rejected' as const };
         }
-        return { ...cand, selectionStatus: 'Rejected' as const };
+        setDoc(doc(db, 'spotCandidates', res.id), res).catch(() => {});
+        return res;
       });
 
       return updated;

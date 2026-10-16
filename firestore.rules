@@ -1,53 +1,45 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function
-    function isSignedIn() {
-      return request.auth != null;
+
+    // Allow read and write access to all public collections for live real-time sync
+    match /students/{document=**} {
+      allow read, write: if true;
     }
 
-    match /students/{studentId} {
-      allow read: if true;
-      allow write: if true;
+    match /seatMatrix/{document=**} {
+      allow read, write: if true;
     }
 
-    match /seatMatrix/{seatId} {
-      allow read: if true;
-      allow write: if true;
+    match /spotCandidates/{document=**} {
+      allow read, write: if true;
     }
 
-    match /spotCandidates/{candidateId} {
-      allow read: if true;
-      allow write: if true;
+    match /notices/{document=**} {
+      allow read, write: if true;
     }
 
-    match /auditLogs/{logId} {
-      allow read: if true;
-      allow write: if true;
+    match /faculty/{document=**} {
+      allow read, write: if true;
     }
 
-    match /hodAccounts/{hodId} {
-      allow read: if true;
-      allow write: if true;
+    match /faqs/{document=**} {
+      allow read, write: if true;
     }
 
-    match /systemSettings/{settingId} {
-      allow read: if true;
-      allow write: if true;
+    match /hodAccounts/{document=**} {
+      allow read, write: if true;
     }
 
-    match /notices/{noticeId} {
-      allow read: if true;
-      allow write: if true;
+    match /systemSettings/{document=**} {
+      allow read, write: if true;
     }
 
-    match /faculty/{facultyId} {
-      allow read: if true;
-      allow write: if true;
+    match /auditLogs/{document=**} {
+      allow read, write: if true;
     }
 
-    // Default deny catch-all
     match /{document=**} {
       allow read, write: if false;
     }

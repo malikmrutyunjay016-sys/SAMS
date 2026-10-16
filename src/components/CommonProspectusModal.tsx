@@ -59,20 +59,40 @@ export const CommonProspectusModal: React.FC<{ isOpen: boolean; onClose: () => v
           </div>
 
           {/* Section 2: Regular vs AEDP */}
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-            <h3 className="text-sm font-bold text-emerald-400 flex items-center">
-              <CheckCircle className="w-4 h-4 mr-1.5" /> 2. Regular Honours vs. AEDP Specialization Courses
-            </h3>
-            <p>
-              Under the Department of Higher Education Govt. of Odisha initiative, Panchayat College Baragada offers specialized <strong className="text-emerald-300">AEDP (Academic Excellence and Skill Development Program)</strong> options alongside traditional Regular Honours degrees:
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-emerald-400 flex items-center">
+                <CheckCircle className="w-4 h-4 mr-1.5" /> 2. Apprenticeship Embedded Degree Programme (AEDP) vs. Regular Honours
+              </h3>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-mono">
+                UGC & DHE Odisha
+              </span>
+            </div>
+            <p className="text-slate-300 text-xs leading-relaxed">
+              In accordance with the <strong>National Education Policy (NEP) 2020</strong> and <strong>UGC Apprenticeship Embedded Degree Guidelines</strong>, the Department of Higher Education (DHE), Govt. of Odisha has introduced the <strong className="text-emerald-300">Apprenticeship Embedded Degree Programme (AEDP)</strong> across premier colleges in Odisha including Panchayat College, Baragada.
             </p>
-            <ul className="list-disc list-inside space-y-1 text-slate-300 pl-2">
-              <li><strong>Physics AEDP:</strong> Focuses on Renewable Energy, Solar Technology & Applied Electronics.</li>
-              <li><strong>Botany AEDP:</strong> Plant Tissue Culture, Hydroponics & Vertical Farming Laboratory training.</li>
-              <li><strong>Zoology AEDP:</strong> Integrative Bioscience, Diagnostic Biotechnology & Aquaponics.</li>
-              <li><strong>Mathematics AEDP:</strong> Data Analytics, Computational Mathematics & Python Programming.</li>
-              <li><strong>Chemistry AEDP:</strong> Industrial Quality Assurance, Chemical Processing & Lab Safety.</li>
-            </ul>
+            <div className="bg-slate-900/90 border border-slate-800 p-3 rounded-lg text-xs space-y-1.5">
+              <div className="text-amber-400 font-semibold font-mono text-[11px]">Key Highlights of AEDP in Odisha:</div>
+              <ul className="list-disc list-inside space-y-1 text-slate-300 pl-1 text-[11px]">
+                <li><strong className="text-white">1-Year Mandatory Paid Apprenticeship:</strong> Students undergo real on-the-job industrial apprenticeship in their 3rd year.</li>
+                <li><strong className="text-white">Monthly Stipend:</strong> Apprentices receive monthly stipends disbursed by industry partners under national apprenticeship norms.</li>
+                <li><strong className="text-white">100% UG Degree Equivalency:</strong> The Odisha Govt. has directed all universities that AEDP degrees are 100% equivalent to conventional degrees for M.A., M.Sc., M.Com., Ph.D. admissions, and civil/public service examinations.</li>
+                <li><strong className="text-white">Centrally Administered:</strong> Applied through the official SAMS Odisha degree portal (<code className="text-amber-300">samsodisha.gov.in</code>).</li>
+              </ul>
+            </div>
+            <div className="text-[11px] text-slate-300">
+              <span className="font-semibold text-white block mb-1">Sanctioned AEDP Courses at Panchayat College:</span>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-slate-300 pl-2">
+                <li>• B.A in Economics and Data Analytics (AEDP)</li>
+                <li>• B.A in English and Translation & Digital Humanities (AEDP)</li>
+                <li>• B.A in History with Tourism and Hospitality Operations (AEDP)</li>
+                <li>• B.Com in Banking, Financial Services & Insurance (BFSI) (AEDP)</li>
+                <li>• B.Sc in Botany with Tissue Culture & Vertical Gardening (AEDP)</li>
+                <li>• B.Sc in Zoology and Integrative Bioscience (AEDP)</li>
+                <li>• B.Sc in Chemistry and Industrial Chemistry (AEDP)</li>
+                <li>• B.Sc in Mathematics & Computing (AEDP)</li>
+              </ul>
+            </div>
           </div>
 
           {/* Section 3: Quota Policy */}

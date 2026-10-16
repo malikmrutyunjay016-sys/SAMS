@@ -52,20 +52,99 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
         </button>
       </div>
 
-      {/* AEDP Highlight Banner */}
-      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-emerald-500/40 p-5 rounded-2xl text-xs space-y-3 shadow-xl">
-        <div className="flex items-center justify-between">
-          <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded uppercase font-mono flex items-center">
-            <Sparkles className="w-3 h-3 mr-1" /> Government Skill Enhancement Initiative
+      {/* AEDP Official Odisha Initiative Showcase Banner */}
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-emerald-500/40 p-6 rounded-2xl text-xs space-y-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center space-x-2">
+            <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded uppercase font-mono flex items-center">
+              <Sparkles className="w-3 h-3 mr-1" /> DHE Odisha & UGC Initiative
+            </span>
+            <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded uppercase font-mono">
+              NEP 2020 Aligned
+            </span>
+          </div>
+          <span className="text-slate-400 font-mono text-[11px]">
+            SAMS Portal Admission &bull; 100% Equivalent to Conventional UG Degrees
           </span>
-          <span className="text-slate-400 font-mono">DHE Odisha AEDP Scheme</span>
         </div>
-        <h3 className="text-sm font-bold text-white">
-          AEDP (Academic Excellence & Skill Development Program) Specializations
-        </h3>
-        <p className="text-slate-300 leading-relaxed">
-          Panchayat College Baragada offers specialized AEDP seats across faculties: <strong>B.A in Economics and data analytics</strong>, <strong>B.A in English and Translation & digital humanities</strong>, <strong>B.A in History with Tourism and Hospitality Operations</strong>, <strong>B.SC in Botany with Tissue culture and vertical gardening</strong>, <strong>B.SC in Zoology and integrative bioscience</strong>, <strong>B.Com in Banking, Financial Services and Insurance</strong>, <strong>B.SC in Chemistry and Industrial Chemistry</strong>, and <strong>B.Sc. in Mathematics & Computing</strong>.
-        </p>
+
+        <div>
+          <h3 className="text-base font-bold text-white font-serif flex items-center">
+            Apprenticeship Embedded Degree Programme (AEDP)
+          </h3>
+          <p className="text-slate-300 text-xs mt-1 leading-relaxed">
+            The Government of Odisha (Department of Higher Education) has introduced the <strong>Apprenticeship Embedded Degree Programme (AEDP)</strong> to integrate academic honours degree education with <strong>a mandatory 1-year paid on-the-job industrial apprenticeship</strong>. Students receive a <strong>monthly stipend</strong> during their 3rd year apprenticeship, graduate with hands-on industrial expertise, and hold a degree recognized as fully equivalent to conventional +3 degrees for PG/Master's and Ph.D. admissions across all universities.
+          </p>
+        </div>
+
+        {/* 4 Feature Pillars */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+          <div className="bg-slate-950/80 border border-emerald-500/20 p-3 rounded-xl space-y-1">
+            <span className="text-[10px] uppercase font-mono font-bold text-emerald-400 block">1. 1-Year Paid Apprenticeship</span>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              Structured on-the-job industrial training in the final year with reputed corporate and research partners.
+            </p>
+          </div>
+          <div className="bg-slate-950/80 border border-emerald-500/20 p-3 rounded-xl space-y-1">
+            <span className="text-[10px] uppercase font-mono font-bold text-emerald-400 block">2. Monthly Stipend</span>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              Enrolled scholars receive a monthly stipend during their apprenticeship under NAPS / industry partnership norms.
+            </p>
+          </div>
+          <div className="bg-slate-950/80 border border-emerald-500/20 p-3 rounded-xl space-y-1">
+            <span className="text-[10px] uppercase font-mono font-bold text-emerald-400 block">3. 100% UG Equivalency</span>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              Odisha Govt. directive ensures AEDP degrees have identical eligibility for M.A, M.Sc, M.Com, Ph.D. & competitive exams.
+            </p>
+          </div>
+          <div className="bg-slate-950/80 border border-emerald-500/20 p-3 rounded-xl space-y-1">
+            <span className="text-[10px] uppercase font-mono font-bold text-emerald-400 block">4. SAMS Central Admission</span>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              Admissions conducted via SAMS Odisha Common Admission Form (CAF) with standard merit & reservation quotas.
+            </p>
+          </div>
+        </div>
+
+        {/* 8 Course Specializations Grid */}
+        <div className="pt-1 border-t border-slate-800">
+          <span className="text-[11px] font-mono text-slate-400 block mb-2">
+            Sanctioned AEDP Specializations at Panchayat College Baragada:
+          </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+            <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-lg">
+              <strong className="text-purple-300 block">B.A Economics & Data Analytics</strong>
+              <span className="text-[10px] text-slate-400">Financial Modeling & Analytics</span>
+            </div>
+            <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-lg">
+              <strong className="text-purple-300 block">B.A English & Digital Humanities</strong>
+              <span className="text-[10px] text-slate-400">Translation & Media Publishing</span>
+            </div>
+            <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-lg">
+              <strong className="text-purple-300 block">B.A History & Tourism/Hospitality</strong>
+              <span className="text-[10px] text-slate-400">Heritage & Tourism Operations</span>
+            </div>
+            <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-lg">
+              <strong className="text-blue-300 block">B.Com Banking, Finance & Insurance</strong>
+              <span className="text-[10px] text-slate-400">BFSI Sector Skill Certification</span>
+            </div>
+            <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-lg">
+              <strong className="text-emerald-300 block">B.Sc Botany Tissue Culture</strong>
+              <span className="text-[10px] text-slate-400">Vertical Gardening & Biotech</span>
+            </div>
+            <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-lg">
+              <strong className="text-emerald-300 block">B.Sc Zoology Integrative Bioscience</strong>
+              <span className="text-[10px] text-slate-400">Biomedical & Wildlife Labs</span>
+            </div>
+            <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-lg">
+              <strong className="text-teal-300 block">B.Sc Chemistry & Industrial Chem</strong>
+              <span className="text-[10px] text-slate-400">Pharma QA/QC & Chemical Labs</span>
+            </div>
+            <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-lg">
+              <strong className="text-teal-300 block">B.Sc Mathematics & Computing</strong>
+              <span className="text-[10px] text-slate-400">Software Algorithms & Python</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filters & Summary Stat Cards */}

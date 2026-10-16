@@ -136,6 +136,104 @@ export const HomeView: React.FC<{
       </div>
 
 
+      {/* AEDP Feature Section: Apprenticeship Embedded Degree Programme */}
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-emerald-500/40 p-6 sm:p-8 rounded-3xl shadow-2xl relative overflow-hidden space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded font-mono uppercase inline-flex items-center">
+                <Award className="w-3.5 h-3.5 mr-1" /> DHE Odisha Flagship Initiative
+              </span>
+              <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded font-mono uppercase">
+                NEP 2020 &bull; UGC Guidelines
+              </span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-white font-serif">
+              Apprenticeship Embedded Degree Programme (AEDP)
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
+              Panchayat College Baragada offers Odisha Government-sanctioned AEDP courses that combine conventional honours degrees with <strong>a mandatory 1-year paid on-the-job industrial apprenticeship</strong> in the 3rd year. Students earn a <strong>monthly stipend</strong> and graduate with degrees officially certified by the Higher Education Department as <strong>100% equivalent to regular degrees</strong> for PG/Master&apos;s and Ph.D. admissions across all universities.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap sm:flex-col gap-2 shrink-0">
+            <button
+              onClick={() => onNavigateTab('seats')}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-slate-950 font-bold text-xs flex items-center shadow-lg transition"
+            >
+              <BookOpen className="w-4 h-4 mr-1.5" /> Explore AEDP Seat Matrix
+            </button>
+            <button
+              onClick={onOpenProspectus}
+              className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center justify-center transition"
+            >
+              <FileText className="w-4 h-4 mr-1.5" /> AEDP Prospectus Guidelines
+            </button>
+          </div>
+        </div>
+
+        {/* 4 Pillars Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-800/80">
+          <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-xl">
+            <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold block mb-1">1-Year Apprenticeship</span>
+            <p className="text-xs text-slate-300">
+              Structured on-the-job industrial exposure in 3rd year with leading corporate, biotech, banking & IT partners.
+            </p>
+          </div>
+          <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-xl">
+            <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold block mb-1">Monthly Stipend</span>
+            <p className="text-xs text-slate-300">
+              Students receive a monthly stipend during the 1-year apprenticeship under national & state apprenticeship schemes.
+            </p>
+          </div>
+          <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-xl">
+            <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold block mb-1">100% UG Degree Equivalence</span>
+            <p className="text-xs text-slate-300">
+              Recognized for PG/M.A./M.Sc./M.Com., Ph.D. research, and UPSC/OPSC public service exams identically to regular degrees.
+            </p>
+          </div>
+          <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-xl">
+            <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold block mb-1">SAMS Central Admission</span>
+            <p className="text-xs text-slate-300">
+              Apply via Common Admission Form (CAF) at <span className="text-amber-400 font-mono">samsodisha.gov.in</span> with standard merit quotas.
+            </p>
+          </div>
+        </div>
+
+        {/* Course Tags */}
+        <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
+          <div className="text-[11px] font-mono text-slate-400 mb-2">
+            8 Sanctioned AEDP Courses at Panchayat College Baragada:
+          </div>
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            <span className="bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2.5 py-1 rounded-lg">
+              B.A in Economics &amp; Data Analytics (16 Seats)
+            </span>
+            <span className="bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2.5 py-1 rounded-lg">
+              B.A in English &amp; Digital Humanities (16 Seats)
+            </span>
+            <span className="bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2.5 py-1 rounded-lg">
+              B.A in History &amp; Tourism/Hospitality (16 Seats)
+            </span>
+            <span className="bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2.5 py-1 rounded-lg">
+              B.Com in Banking, Finance &amp; Insurance (BFSI) (64 Seats)
+            </span>
+            <span className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+              B.Sc in Botany with Tissue Culture &amp; Vertical Gardening (16 Seats)
+            </span>
+            <span className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+              B.Sc in Zoology &amp; Integrative Bioscience (16 Seats)
+            </span>
+            <span className="bg-teal-500/10 text-teal-300 border border-teal-500/20 px-2.5 py-1 rounded-lg">
+              B.Sc in Chemistry &amp; Industrial Chemistry (16 Seats)
+            </span>
+            <span className="bg-teal-500/10 text-teal-300 border border-teal-500/20 px-2.5 py-1 rounded-lg">
+              B.Sc in Mathematics &amp; Computing (16 Seats)
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Main Section: Official Notice Board */}
       <div className="grid grid-cols-1 gap-8">
         

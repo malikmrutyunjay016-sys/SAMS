@@ -283,10 +283,49 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       collection(db, 'seatMatrix'),
       (snapshot) => {
         if (!snapshot.empty) {
-          const docs = snapshot.docs.map((d) => d.data() as SeatMatrixItem);
-          setSeatMatrix(docs);
+          const docs = snapshot.docs.map((d) => {
+            const data = d.data() as SeatMatrixItem;
+            // Match against benchmark default seat matrix to ensure stream is accurately normalized
+            const bench = DEFAULT_SEAT_MATRIX.find(
+              (b) => b.id === data.id || b.deptName.toLowerCase() === (data.deptName || '').toLowerCase()
+            );
+            if (bench) {
+              const needsUpdate = data.stream !== bench.stream || data.isAedp !== bench.isAedp || !data.specialization;
+              if (needsUpdate) {
+                const fixed = {
+                  ...data,
+                  deptName: bench.deptName,
+                  stream: bench.stream,
+                  isAedp: bench.isAedp,
+                  specialization: bench.specialization || data.specialization,
+                };
+                setDoc(doc(db, 'seatMatrix', d.id), fixed).catch(() => {});
+                return fixed;
+              }
+            } else if (data.stream === 'Science' || !data.stream) {
+              const norm = normalizeDepartmentAndStream(data.deptName, data.stream);
+              const fixed = { ...data, stream: norm.stream, isAedp: norm.isAedp };
+              setDoc(doc(db, 'seatMatrix', d.id), fixed).catch(() => {});
+              return fixed;
+            }
+            return data;
+          });
+
+          const existingIds = new Set(docs.map((d) => d.id));
+          const missingItems = DEFAULT_SEAT_MATRIX.filter((item) => !existingIds.has(item.id));
+
+          if (missingItems.length > 0) {
+            missingItems.forEach((item) => {
+              setDoc(doc(db, 'seatMatrix', item.id), item).catch(() => {});
+            });
+            const merged = [...docs, ...missingItems];
+            setSeatMatrix(merged);
+          } else {
+            setSeatMatrix(docs);
+          }
         } else {
           DEFAULT_SEAT_MATRIX.forEach((item) => setDoc(doc(db, 'seatMatrix', item.id), item).catch(() => {}));
+          setSeatMatrix(DEFAULT_SEAT_MATRIX);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'seatMatrix')
@@ -1035,13 +1074,46 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const syncedSeatMatrix = useMemo(() => {
     return seatMatrix.map((item) => {
       const admittedCount = students.filter((s) => {
-        if (s.status && s.status !== 'Admitted') return false;
+        // Only count enrolled/admitted students (exclude Spot Applied, Rejected, Cancelled, Withdrawn)
+        if (s.status && s.status !== 'Admitted' && s.status !== 'Verified') {
+          return false;
+        }
 
+        const norm = normalizeDepartmentAndStream(s.department, s.stream);
         const sDept = (s.department || '').toLowerCase().trim();
         const mDept = (item.deptName || '').toLowerCase().trim();
+        const sRoll = (s.rollNo || '').toUpperCase().trim();
+
+        // 1. Direct Normalized Match
+        if (norm.department.toLowerCase() === mDept && norm.isAedp === item.isAedp) {
+          return true;
+        }
 
         if (sDept === mDept) return true;
 
+        // 2. Special handling for Computer Science (Self Financing)
+        // Strictly matches students enrolled in Computer Science / CS roll prefix (CS24-xxx)
+        // Prevents matching general science students with BS prefixes (Botany, Zoology, Physics, Chem, Math, Stats)
+        if (
+          item.id === 'sf_computer_science' ||
+          mDept.includes('computer') ||
+          item.stream === 'Self Financing'
+        ) {
+          const isExplicitCS =
+            norm.department === 'Computer Science' ||
+            sDept === 'computer science' ||
+            sDept.includes('computer') ||
+            sDept === 'cs' ||
+            sDept === 'csa' ||
+            sDept === 'it' ||
+            sDept.includes('information tech') ||
+            sRoll.startsWith('CS');
+
+          if (isExplicitCS) return true;
+          return false;
+        }
+
+        // 3. Regular & AEDP Department Matchers
         if (item.isAedp) {
           if (!s.isAedp && !sDept.includes('aedp')) return false;
           if (mDept.includes('econ') && sDept.includes('econ')) return true;
@@ -1073,7 +1145,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (mDept.includes('mathematics') && sDept.includes('math')) return true;
           if (mDept.includes('physics') && sDept.includes('phys')) return true;
           if (mDept.includes('statistics') && sDept.includes('stat')) return true;
-          if (mDept.includes('computer') && (sDept.includes('comp') || sDept.includes('cs'))) return true;
         }
 
         return false;
@@ -1086,6 +1157,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     });
   }, [seatMatrix, students]);
+
+  // Sync recalculated seat matrix to Firestore in real time
+  useEffect(() => {
+    if (!syncedSeatMatrix || syncedSeatMatrix.length === 0) return;
+    syncedSeatMatrix.forEach((item) => {
+      setDoc(doc(db, 'seatMatrix', item.id), item).catch(() => {});
+    });
+  }, [syncedSeatMatrix]);
 
   return (
     <DataContext.Provider

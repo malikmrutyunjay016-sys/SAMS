@@ -83,8 +83,15 @@ export function normalizeCategory(val: any): CategoryType {
  * Infer stream based on Honours subject or department name
  */
 export function inferStream(dept: string): StreamType {
-  const d = (dept || '').toLowerCase();
-  if (d.includes('comp') || d.includes('csa') || d.includes('it') || d.includes('self financ')) {
+  const d = (dept || '').toLowerCase().trim();
+  if (
+    d.includes('computer') ||
+    d === 'cs' ||
+    d === 'csa' ||
+    d === 'it' ||
+    d.includes('information technology') ||
+    d.includes('self financ')
+  ) {
     return 'Self Financing';
   }
   if (
@@ -148,7 +155,13 @@ export function normalizeDepartmentAndStream(
   }
 
   // 3. Keyword / alias mapping fallback
-  if (dLower.includes('comp') || dLower.includes('csa') || dLower.includes('it') || dLower.includes('self')) {
+  if (
+    dLower.includes('computer') ||
+    dLower.includes('csa') ||
+    dLower.includes('information tech') ||
+    dLower === 'cs' ||
+    dLower === 'comp'
+  ) {
     return { department: 'Computer Science', stream: 'Self Financing', isAedp: false };
   }
   if (dLower.includes('botan') || dLower.includes('tissue') || dLower.includes('vertical')) {

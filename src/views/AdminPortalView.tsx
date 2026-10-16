@@ -294,11 +294,11 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
 
     if (st.includes('bio') || st.includes('botan') || st.includes('zool')) return 'Biological Science';
     if (st.includes('phys') || st.includes('chem') || st.includes('math') || st.includes('stat')) return 'Physical Science';
-    if (st.includes('self') || st.includes('comp') || st.includes('csa') || st.includes('it')) return 'Self Financing';
+    if (st.includes('self') || st.includes('computer') || st === 'cs' || st === 'csa' || st === 'it' || st.includes('information tech')) return 'Self Financing';
     if (st.includes('comm') || st.includes('b.com') || st.includes('bcom')) return 'Commerce';
     if (st.includes('art') || st.includes('b.a') || st.includes('ba')) return 'Arts';
 
-    if (dept.includes('comp') || dept.includes('csa') || dept.includes('it') || dept.includes('self')) return 'Self Financing';
+    if (dept.includes('computer') || dept === 'cs' || dept === 'csa' || dept === 'it' || dept.includes('information tech') || dept.includes('self financ')) return 'Self Financing';
     if (dept.includes('botan') || dept.includes('zool') || dept.includes('bio') || dept.includes('tissue') || dept.includes('integrative')) return 'Biological Science';
     if (dept.includes('phys') || dept.includes('chem') || dept.includes('math') || dept.includes('stat') || dept.includes('industr') || dept.includes('computing')) return 'Physical Science';
     if (dept.includes('comm') || dept.includes('bank') || dept.includes('bfsi')) return 'Commerce';
@@ -1710,101 +1710,282 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       {/* ========================================================= */}
       {/* TAB 4: SEAT MATRIX EDITOR (ADD / EDIT / DELETE)           */}
       {/* ========================================================= */}
-      {activeAdminTab === 'seats' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-            <div>
-              <h2 className="text-lg font-bold text-white font-serif flex items-center">
-                <Edit2 className="w-5 h-5 mr-2 text-amber-400" />
-                Department Intake & Seat Matrix Editor ({seatMatrix.length} Departments)
-              </h2>
-              <p className="text-xs text-slate-400">
-                Adjust sanctioned seats, admitted scholars, or add new subjects and streams.
-              </p>
+      {activeAdminTab === 'seats' && (() => {
+        const streamCounts = {
+          Arts: { sanctioned: 0, admitted: 0, vacant: 0, depts: 0 },
+          'Biological Science': { sanctioned: 0, admitted: 0, vacant: 0, depts: 0 },
+          Commerce: { sanctioned: 0, admitted: 0, vacant: 0, depts: 0 },
+          'Physical Science': { sanctioned: 0, admitted: 0, vacant: 0, depts: 0 },
+          'Self Financing': { sanctioned: 0, admitted: 0, vacant: 0, depts: 0 },
+        };
+
+        seatMatrix.forEach((item) => {
+          const st = item.stream || 'Arts';
+          if (streamCounts[st as keyof typeof streamCounts]) {
+            streamCounts[st as keyof typeof streamCounts].sanctioned += item.sanctioned;
+            streamCounts[st as keyof typeof streamCounts].admitted += item.admitted;
+            streamCounts[st as keyof typeof streamCounts].vacant += item.vacant;
+            streamCounts[st as keyof typeof streamCounts].depts += 1;
+          }
+        });
+
+        const totalSanctionedAll = seatMatrix.reduce((a, b) => a + b.sanctioned, 0);
+        const totalAdmittedAll = seatMatrix.reduce((a, b) => a + b.admitted, 0);
+        const totalVacantAll = seatMatrix.reduce((a, b) => a + b.vacant, 0);
+
+        const filteredSeatMatrix = seatMatrix.filter((item) => {
+          const matchesStream =
+            streamFilter === 'ALL' ||
+            item.stream === streamFilter ||
+            (streamFilter === 'Science' && (item.stream === 'Physical Science' || item.stream === 'Biological Science'));
+          return matchesStream;
+        });
+
+        return (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <h2 className="text-lg font-bold text-white font-serif flex items-center">
+                  <Edit2 className="w-5 h-5 mr-2 text-amber-400" />
+                  Department Intake & Seat Matrix Editor ({seatMatrix.length} Departments)
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Live synchronized intake strengths, enrolled honours scholars, and vacancies across all 5 streams from the student database.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleOpenAddSeat}
+                  className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center shadow"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Add Department / Subject
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Clear all enrolled counts and re-initialize seat matrix with official 28 departments and intake strengths?')) {
+                      clearSeatMatrix();
+                      showToast('success', 'Cleared seat matrix and reset to official 28 departments.');
+                    }
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold flex items-center"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Clear Seat Matrix (28 Depts)
+                </button>
+                <button
+                  onClick={() => {
+                    resetSeatMatrixToBenchmark();
+                    showToast('success', 'Reset seat matrix to Govt benchmark.');
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Reset to Govt Benchmark
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={handleOpenAddSeat}
-                className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center shadow"
-              >
-                <Plus className="w-3.5 h-3.5 mr-1" /> Add Department / Subject
-              </button>
-              <button
-                onClick={() => {
-                  if (window.confirm('Clear all enrolled counts and re-initialize seat matrix with official 28 departments and intake strengths?')) {
-                    clearSeatMatrix();
-                    showToast('success', 'Cleared seat matrix and reset to official 28 departments.');
-                  }
-                }}
-                className="px-3.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold flex items-center"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Clear Seat Matrix (28 Depts)
-              </button>
-              <button
-                onClick={() => {
-                  resetSeatMatrixToBenchmark();
-                  showToast('success', 'Reset seat matrix to Govt benchmark.');
-                }}
-                className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center"
-              >
-                <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Reset to Govt Benchmark
-              </button>
+            {/* Stream Overview Grid Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
+              {(Object.keys(streamCounts) as (keyof typeof streamCounts)[]).map((stKey) => {
+                const data = streamCounts[stKey];
+                const fillPct = data.sanctioned > 0 ? Math.round((data.admitted / data.sanctioned) * 100) : 0;
+                return (
+                  <div
+                    key={stKey}
+                    onClick={() => setStreamFilter(stKey)}
+                    className={`p-3 rounded-xl border transition cursor-pointer ${
+                      streamFilter === stKey
+                        ? 'bg-slate-800 border-amber-500 shadow-md ring-1 ring-amber-500/50'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
+                      <span className="truncate">{stKey}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">{data.depts} Depts</span>
+                    </div>
+                    <div className="mt-2 flex items-baseline justify-between">
+                      <span className="text-base font-extrabold text-white">{data.admitted}</span>
+                      <span className="text-[11px] font-mono text-slate-400">/ {data.sanctioned} seats</span>
+                    </div>
+                    <div className="mt-1.5 w-full bg-slate-900 rounded-full h-1.5 overflow-hidden border border-slate-800">
+                      <div
+                        className="bg-emerald-500 h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(100, fillPct)}%` }}
+                      ></div>
+                    </div>
+                    <div className="mt-1 flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>{fillPct}% Filled</span>
+                      <span className="text-amber-400 font-bold">{data.vacant} Vacant</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
-            <table className="w-full text-left text-xs text-slate-200">
-              <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
-                <tr>
-                  <th className="py-3 px-4">Department / Subject</th>
-                  <th className="py-3 px-4">Stream</th>
-                  <th className="py-3 px-4">Specialization</th>
-                  <th className="py-3 px-4 text-center">Sanctioned</th>
-                  <th className="py-3 px-4 text-center">Admitted</th>
-                  <th className="py-3 px-4 text-center">Vacant</th>
-                  <th className="py-3 px-4 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {seatMatrix.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-bold text-white">{item.deptName}</td>
-                    <td className="py-3 px-4 text-slate-400">{item.stream}</td>
-                    <td className="py-3 px-4 text-slate-400 text-[11px]">{item.specialization || 'Regular'}</td>
-                    <td className="py-3 px-4 text-center font-bold text-slate-100">{item.sanctioned}</td>
-                    <td className="py-3 px-4 text-center font-bold text-emerald-400">{item.admitted}</td>
-                    <td className="py-3 px-4 text-center font-bold text-amber-400">{item.vacant}</td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center space-x-1">
-                        <button
-                          onClick={() => handleOpenEditSeat(item)}
-                          className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs"
-                          title="Edit Seat Matrix"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Delete seat matrix for ${item.deptName}?`)) {
-                              deleteSeatMatrixItem(item.id);
-                              showToast('success', `Deleted department ${item.deptName}.`);
-                            }
-                          }}
-                          className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400 text-xs"
-                          title="Delete Department"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+            {/* Stream Filter Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-slate-400 font-mono text-[11px] font-semibold mr-1">Filter Stream:</span>
+                {['ALL', 'Arts', 'Biological Science', 'Commerce', 'Physical Science', 'Self Financing'].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStreamFilter(s)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                      streamFilter === s
+                        ? 'bg-amber-500 text-slate-950 border-amber-500'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {s}
+                  </button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+
+              <span className="text-slate-400 font-mono text-[11px]">
+                Overall Roster Intake: <strong className="text-emerald-400">{totalAdmittedAll}</strong> Admitted / <strong className="text-white">{totalSanctionedAll}</strong> Sanctioned (<strong className="text-amber-400">{totalVacantAll}</strong> Vacant)
+              </span>
+            </div>
+
+            {/* Seat Matrix Table with Live Student Database Roster Details */}
+            <div className="overflow-x-auto rounded-xl border border-slate-800">
+              <table className="w-full text-left text-xs text-slate-200">
+                <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Department / Honours Subject</th>
+                    <th className="py-3 px-4">Stream & Type</th>
+                    <th className="py-3 px-4 text-center">Sanctioned</th>
+                    <th className="py-3 px-4 text-center">Admitted</th>
+                    <th className="py-3 px-4 text-center">Vacant</th>
+                    <th className="py-3 px-4">Live Student DB Roster Breakdown</th>
+                    <th className="py-3 px-4 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredSeatMatrix.map((item) => {
+                    const enrolled = students.filter((s) => {
+                      if (s.status && s.status !== 'Admitted') return false;
+                      const sDept = (s.department || '').toLowerCase().trim();
+                      const mDept = (item.deptName || '').toLowerCase().trim();
+                      if (sDept === mDept) return true;
+                      if (item.isAedp && s.isAedp && (sDept.includes(mDept) || mDept.includes(sDept))) return true;
+                      if (!item.isAedp && !s.isAedp && sDept.includes(mDept)) return true;
+                      return false;
+                    });
+
+                    const mCount = enrolled.filter((s) => (s.gender || '').toLowerCase().startsWith('m')).length;
+                    const fCount = enrolled.filter((s) => (s.gender || '').toLowerCase().startsWith('f')).length;
+                    const genC = enrolled.filter((s) => normalizeCategory(s.category) === 'GEN').length;
+                    const scC = enrolled.filter((s) => normalizeCategory(s.category) === 'SC').length;
+                    const stC = enrolled.filter((s) => normalizeCategory(s.category) === 'ST').length;
+                    const sebcC = enrolled.filter((s) => normalizeCategory(s.category) === 'SEBC').length;
+                    const avgPct = enrolled.length > 0
+                      ? (enrolled.reduce((a, b) => a + (b.marksPercentage || 0), 0) / enrolled.length).toFixed(1)
+                      : null;
+
+                    const percentFilled = Math.round((item.admitted / item.sanctioned) * 100);
+
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-800/40 transition">
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-white flex items-center">
+                            {item.deptName}
+                            {item.isAedp && (
+                              <span className="ml-2 text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded font-mono">
+                                AEDP
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 block font-mono">
+                            {item.specialization || (item.isAedp ? 'AEDP Specialization' : 'Regular Honours')}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            item.stream === 'Arts' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
+                            item.stream === 'Biological Science' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
+                            item.stream === 'Commerce' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
+                            item.stream === 'Physical Science' ? 'bg-teal-500/20 text-teal-300 border-teal-500/30' :
+                            'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          }`}>
+                            {item.stream}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-bold text-slate-200">{item.sanctioned}</td>
+                        <td className="py-3.5 px-4 text-center font-bold text-emerald-400">{item.admitted}</td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded font-bold text-xs ${
+                            item.vacant > 0 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-800 text-slate-500'
+                          }`}>
+                            {item.vacant}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                              <span className="bg-slate-950 text-slate-300 px-1.5 py-0.5 rounded border border-slate-800">
+                                M: <strong className="text-blue-400">{mCount}</strong> | F: <strong className="text-pink-400">{fCount}</strong>
+                              </span>
+                              <span className="bg-slate-950 text-slate-300 px-1.5 py-0.5 rounded border border-slate-800">
+                                GEN:{genC} SC:{scC} ST:{stC} SEBC:{sebcC}
+                              </span>
+                              {avgPct && (
+                                <span className="bg-emerald-500/10 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                                  Avg: {avgPct}%
+                                </span>
+                              )}
+                            </div>
+                            <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
+                              <div
+                                className={`h-full rounded-full ${
+                                  percentFilled >= 90 ? 'bg-emerald-500' : percentFilled >= 70 ? 'bg-amber-500' : 'bg-blue-500'
+                                }`}
+                                style={{ width: `${percentFilled}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              onClick={() => {
+                                setStudentSearch(item.deptName);
+                                setActiveAdminTab('students');
+                              }}
+                              className="p-1.5 rounded bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs flex items-center font-semibold"
+                              title="View Enrolled Students Roster"
+                            >
+                              <Eye className="w-3.5 h-3.5 mr-1" /> Roster
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditSeat(item)}
+                              className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs"
+                              title="Edit Seat Matrix"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete seat matrix for ${item.deptName}?`)) {
+                                  deleteSeatMatrixItem(item.id);
+                                  showToast('success', `Deleted department ${item.deptName}.`);
+                                }
+                              }}
+                              className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400 text-xs"
+                              title="Delete Department"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================= */}
       {/* TAB 5: NOTICES & ANNOUNCEMENTS MANAGER                    */}
@@ -1932,10 +2113,8 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     </button>
                     <button
                       onClick={() => {
-                        if (window.confirm('Delete this FAQ?')) {
-                          deleteFAQ(faq.id);
-                          showToast('success', 'FAQ deleted successfully.');
-                        }
+                        deleteFAQ(faq.id);
+                        showToast('success', `FAQ deleted successfully.`);
                       }}
                       className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400"
                       title="Delete FAQ"

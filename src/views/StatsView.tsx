@@ -1,174 +1,367 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
-import { BarChart3, Users, Award, ShieldCheck, PieChart } from 'lucide-react';
+import { normalizeCategory } from '../lib/excelParser';
+import { StreamType } from '../types';
+import {
+  BarChart3,
+  Users,
+  Award,
+  ShieldCheck,
+  PieChart,
+  BookOpen,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  GraduationCap,
+  CheckCircle,
+} from 'lucide-react';
+
+interface StreamConfig {
+  name: StreamType;
+  degreeLabel: string;
+  themeColor: string;
+  badgeBg: string;
+  textColor: string;
+  barColor: string;
+  borderColor: string;
+}
+
+const STREAM_CONFIGS: StreamConfig[] = [
+  {
+    name: 'Arts',
+    degreeLabel: '+3 B.A Degree',
+    themeColor: 'from-purple-500/20 to-purple-600/10',
+    badgeBg: 'bg-purple-500/20',
+    textColor: 'text-purple-300',
+    barColor: 'bg-purple-500',
+    borderColor: 'border-purple-500/30',
+  },
+  {
+    name: 'Biological Science',
+    degreeLabel: '+3 B.Sc Bio-Science',
+    themeColor: 'from-emerald-500/20 to-emerald-600/10',
+    badgeBg: 'bg-emerald-500/20',
+    textColor: 'text-emerald-300',
+    barColor: 'bg-emerald-500',
+    borderColor: 'border-emerald-500/30',
+  },
+  {
+    name: 'Commerce',
+    degreeLabel: '+3 B.Com Degree',
+    themeColor: 'from-blue-500/20 to-blue-600/10',
+    badgeBg: 'bg-blue-500/20',
+    textColor: 'text-blue-300',
+    barColor: 'bg-blue-500',
+    borderColor: 'border-blue-500/30',
+  },
+  {
+    name: 'Physical Science',
+    degreeLabel: '+3 B.Sc Physical Science',
+    themeColor: 'from-teal-500/20 to-teal-600/10',
+    badgeBg: 'bg-teal-500/20',
+    textColor: 'text-teal-300',
+    barColor: 'bg-teal-500',
+    borderColor: 'border-teal-500/30',
+  },
+  {
+    name: 'Self Financing',
+    degreeLabel: '+3 B.Sc (Hons) Self-Financing',
+    themeColor: 'from-rose-500/20 to-rose-600/10',
+    badgeBg: 'bg-rose-500/20',
+    textColor: 'text-rose-300',
+    barColor: 'bg-rose-500',
+    borderColor: 'border-rose-500/30',
+  },
+];
 
 export const StatsView: React.FC = () => {
   const { students, seatMatrix } = useData();
+  const [expandedStream, setExpandedStream] = useState<string | null>(null);
 
+  // Totals computed directly from live Subjects & Seats Matrix
+  const totalSanctioned = seatMatrix.reduce((a, b) => a + (b.sanctioned || 0), 0);
+  const totalAdmitted = seatMatrix.reduce((a, b) => a + (b.admitted || 0), 0);
+  const totalVacant = seatMatrix.reduce((a, b) => a + (b.vacant || 0), 0);
+  const overallFillPercent = totalSanctioned > 0 ? ((totalAdmitted / totalSanctioned) * 100).toFixed(1) : '0.0';
+
+  // AEDP Specializations from Subjects & Seats Matrix
+  const aedpItems = seatMatrix.filter((item) => item.isAedp);
+  const aedpSanctioned = aedpItems.reduce((a, b) => a + (b.sanctioned || 0), 0);
+  const aedpAdmitted = aedpItems.reduce((a, b) => a + (b.admitted || 0), 0);
+
+  // Student database demographics
   const totalStudents = students.length;
   const femaleCount = students.filter((s) => s.gender === 'Female').length;
   const maleCount = students.filter((s) => s.gender === 'Male').length;
   const femalePercent = totalStudents > 0 ? ((femaleCount / totalStudents) * 100).toFixed(1) : '0.0';
 
-  const genCount = students.filter((s) => s.category === 'GEN').length;
-  const scCount = students.filter((s) => s.category === 'SC').length;
-  const stCount = students.filter((s) => s.category === 'ST').length;
-  const sebcCount = students.filter((s) => s.category === 'SEBC').length;
+  // Category Distribution normalized
+  const genCount = students.filter((s) => normalizeCategory(s.category) === 'GEN').length;
+  const scCount = students.filter((s) => normalizeCategory(s.category) === 'SC').length;
+  const stCount = students.filter((s) => normalizeCategory(s.category) === 'ST').length;
+  const sebcCount = students.filter((s) => normalizeCategory(s.category) === 'SEBC').length;
 
-  const scienceCount = students.filter((s) => s.stream === 'Science').length;
-  const artsCount = students.filter((s) => s.stream === 'Arts').length;
-  const commerceCount = students.filter((s) => s.stream === 'Commerce').length;
+  // Stream-wise Analytics synchronized directly with Subjects & Seats Matrix
+  const streamStats = STREAM_CONFIGS.map((config) => {
+    const streamItems = seatMatrix.filter((item) => item.stream === config.name);
+    const sanctioned = streamItems.reduce((a, b) => a + (b.sanctioned || 0), 0);
+    const admitted = streamItems.reduce((a, b) => a + (b.admitted || 0), 0);
+    const vacant = streamItems.reduce((a, b) => a + (b.vacant || 0), 0);
+    const fillPercent = sanctioned > 0 ? ((admitted / sanctioned) * 100).toFixed(1) : '0.0';
+    const collegeShare = totalAdmitted > 0 ? ((admitted / totalAdmitted) * 100).toFixed(1) : '0.0';
 
-  const aedpCount = students.filter((s) => s.isAedp).length;
+    return {
+      ...config,
+      items: streamItems,
+      deptsCount: streamItems.length,
+      sanctioned,
+      admitted,
+      vacant,
+      fillPercent,
+      collegeShare,
+    };
+  });
 
   return (
     <div className="space-y-8 pb-12">
-      
-      {/* Title */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono mb-1">
-          <BarChart3 className="w-4 h-4" />
-          <span>SAMS DEMOGRAPHIC & ENROLLMENT METRICS</span>
+      {/* Title Header */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono mb-1">
+            <BarChart3 className="w-4 h-4" />
+            <span>SAMS DEMOGRAPHIC & ENROLLMENT ANALYTICS</span>
+            <span className="ml-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded font-mono inline-flex items-center">
+              <CheckCircle className="w-3 h-3 mr-1 text-emerald-400" /> Synced with Subjects & Seats
+            </span>
+          </div>
+          <h1 className="text-2xl font-extrabold text-white font-serif">
+            SAMS Panchayat College Enrollment & Stream Statistics
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Live synchronized metrics across all 5 academic streams (Arts, Biological Science, Commerce, Physical Science & Self Financing) and {seatMatrix.length} sanctioned departments.
+          </p>
         </div>
-        <h1 className="text-2xl font-extrabold text-white font-serif">
-          SAMS Panchayat College Enrollment & Gender Ratio Statistics
-        </h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Real-time analytics across 1,100+ student records, stream distribution, and Odisha reservation category quotas.
-        </p>
+
+        <div className="bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-right">
+          <span className="text-[10px] font-mono text-slate-400 block uppercase">Intake Capacity Fill</span>
+          <span className="text-lg font-bold text-emerald-400 font-mono">
+            {totalAdmitted} / {totalSanctioned} ({overallFillPercent}%)
+          </span>
+        </div>
       </div>
 
-      {/* Metric Cards Grid */}
+      {/* Top Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-2">
-          <span className="text-[10px] text-slate-400 uppercase font-mono block">Total Active Enrollment</span>
-          <div className="text-3xl font-extrabold text-white">{totalStudents.toLocaleString()} Students</div>
-          <p className="text-xs text-emerald-400">Pre-seeded & synced in SAMS DB</p>
+          <span className="text-[10px] text-slate-400 uppercase font-mono block">Enrolled from Subjects & Seats</span>
+          <div className="text-3xl font-extrabold text-white font-mono">{totalAdmitted} Scholars</div>
+          <p className="text-xs text-emerald-400 flex items-center font-mono">
+            <CheckCircle className="w-3.5 h-3.5 mr-1" /> {overallFillPercent}% of {totalSanctioned} Sanctioned
+          </p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-2">
           <span className="text-[10px] text-slate-400 uppercase font-mono block">Gender Balance (Girls Ratio)</span>
-          <div className="text-3xl font-extrabold text-amber-400">{femalePercent}% Female</div>
-          <p className="text-xs text-slate-400">{femaleCount} Female / {maleCount} Male</p>
+          <div className="text-3xl font-extrabold text-amber-400 font-mono">{femalePercent}% Female</div>
+          <p className="text-xs text-slate-400 font-mono">
+            {femaleCount} Female / {maleCount} Male
+          </p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-2">
-          <span className="text-[10px] text-slate-400 uppercase font-mono block">AEDP Specialization Enrolled</span>
-          <div className="text-3xl font-extrabold text-emerald-400">{aedpCount} Scholars</div>
-          <p className="text-xs text-slate-400">Skill Development Track</p>
+          <span className="text-[10px] text-slate-400 uppercase font-mono block">AEDP Specializations Intake</span>
+          <div className="text-3xl font-extrabold text-emerald-400 font-mono">{aedpAdmitted} Enrolled</div>
+          <p className="text-xs text-slate-400 font-mono">
+            {aedpItems.length} Specialized Courses ({aedpSanctioned} Seats)
+          </p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-2">
-          <span className="text-[10px] text-slate-400 uppercase font-mono block">Sanctioned Stream Intake</span>
-          <div className="text-3xl font-extrabold text-blue-400">
-            {seatMatrix.reduce((a, b) => a + b.sanctioned, 0)} Seats
-          </div>
-          <p className="text-xs text-slate-400">Regular + AEDP</p>
+          <span className="text-[10px] text-slate-400 uppercase font-mono block">Total Available Vacancies</span>
+          <div className="text-3xl font-extrabold text-amber-400 font-mono">{totalVacant} Seats</div>
+          <p className="text-xs text-slate-400 font-mono">Across {seatMatrix.length} Depts (Spot Round Eligible)</p>
         </div>
-
       </div>
 
-      {/* Visual Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      {/* Main Analytics: Academic Stream Enrollment vs Categories */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Stream Breakdown */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h3 className="text-sm font-bold text-white flex items-center">
-            <PieChart className="w-4 h-4 mr-2 text-amber-400" /> Enrollment by Academic Stream
-          </h3>
-
-          <div className="space-y-3 text-xs">
+        {/* Stream Breakdown synced with Subjects & Seats */}
+        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
             <div>
-              <div className="flex justify-between font-semibold mb-1">
-                <span className="text-blue-300">Science Stream (+3 B.Sc)</span>
-                <span className="text-slate-200">
-                  {scienceCount} ({totalStudents > 0 ? ((scienceCount / totalStudents) * 100).toFixed(1) : '0.0'}%)
-                </span>
-              </div>
-              <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
-                <div
-                  className="bg-blue-500 h-full rounded-full"
-                  style={{ width: `${totalStudents > 0 ? (scienceCount / totalStudents) * 100 : 0}%` }}
-                ></div>
-              </div>
+              <h3 className="text-sm font-bold text-white flex items-center">
+                <PieChart className="w-4 h-4 mr-2 text-amber-400" />
+                Enrollment by Academic Stream (Subjects & Seats Sync)
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Live enrolled scholars, sanctioned strength, and intake progress across all 5 official streams.
+              </p>
             </div>
+            <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800">
+              5 Streams &bull; {seatMatrix.length} Depts
+            </span>
+          </div>
 
-            <div>
-              <div className="flex justify-between font-semibold mb-1">
-                <span className="text-amber-300">Arts Stream (+3 B.A)</span>
-                <span className="text-slate-200">
-                  {artsCount} ({totalStudents > 0 ? ((artsCount / totalStudents) * 100).toFixed(1) : '0.0'}%)
-                </span>
-              </div>
-              <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+          <div className="space-y-4">
+            {streamStats.map((st) => {
+              const isExpanded = expandedStream === st.name;
+              return (
                 <div
-                  className="bg-amber-500 h-full rounded-full"
-                  style={{ width: `${totalStudents > 0 ? (artsCount / totalStudents) * 100 : 0}%` }}
-                ></div>
-              </div>
-            </div>
+                  key={st.name}
+                  className="bg-slate-950 border border-slate-800/80 hover:border-slate-700 rounded-xl p-4 transition space-y-2.5"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${st.badgeBg} ${st.textColor} ${st.borderColor}`}>
+                        {st.name}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-200">{st.degreeLabel}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">({st.deptsCount} Depts)</span>
+                    </div>
 
-            <div>
-              <div className="flex justify-between font-semibold mb-1">
-                <span className="text-emerald-300">Commerce Stream (+3 B.Com)</span>
-                <span className="text-slate-200">
-                  {commerceCount} ({totalStudents > 0 ? ((commerceCount / totalStudents) * 100).toFixed(1) : '0.0'}%)
-                </span>
-              </div>
-              <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
-                <div
-                  className="bg-emerald-500 h-full rounded-full"
-                  style={{ width: `${totalStudents > 0 ? (commerceCount / totalStudents) * 100 : 0}%` }}
-                ></div>
-              </div>
-            </div>
+                    <div className="flex items-center space-x-3 text-xs">
+                      <span className="text-white font-mono font-bold text-sm">
+                        {st.admitted} <span className="text-[11px] font-normal text-slate-400">/ {st.sanctioned}</span>
+                      </span>
+                      <span className={`text-[11px] font-bold font-mono px-2.5 py-0.5 rounded ${st.badgeBg} ${st.textColor} border ${st.borderColor}`}>
+                        {st.fillPercent}% Seats Filled
+                      </span>
+                      <button
+                        onClick={() => setExpandedStream(isExpanded ? null : st.name)}
+                        className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition"
+                        title={isExpanded ? 'Collapse courses' : 'View courses'}
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="space-y-1">
+                    <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                      <div
+                        className={`${st.barColor} h-full rounded-full transition-all duration-500`}
+                        style={{ width: `${Math.min(100, parseFloat(st.fillPercent))}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
+                      <span>{st.fillPercent}% Stream Seats Filled ({st.admitted} of {st.sanctioned} seats)</span>
+                      <span className={st.vacant > 0 ? 'text-amber-400 font-bold' : 'text-slate-500'}>
+                        {st.vacant} Vacant Seats
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Expanded Courses List */}
+                  {isExpanded && (
+                    <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-1.5 animate-fadeIn">
+                      <div className="text-[10px] uppercase font-mono text-slate-400 mb-2">
+                        Sanctioned Honours & Specializations in {st.name}:
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {st.items.map((c) => (
+                          <div
+                            key={c.id}
+                            className="bg-slate-900/80 border border-slate-800 p-2 rounded-lg flex items-center justify-between"
+                          >
+                            <div className="truncate mr-2">
+                              <span className="font-medium text-slate-200 block truncate text-[11px]">
+                                {c.deptName}
+                              </span>
+                              {c.isAedp && (
+                                <span className="text-[9px] text-emerald-400 font-mono">AEDP Specialization</span>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0 font-mono text-[11px]">
+                              <span className="text-emerald-400 font-bold">{c.admitted}</span>
+                              <span className="text-slate-500"> / {c.sanctioned}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Category Reservation Quota Breakdown */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h3 className="text-sm font-bold text-white flex items-center">
-            <ShieldCheck className="w-4 h-4 mr-2 text-emerald-400" /> Odisha Reservation Quota Distribution
-          </h3>
+        {/* Right Column: Reservation Quotas & Demographics */}
+        <div className="lg:col-span-5 space-y-6">
+          
+          {/* Reservation Quotas */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <h3 className="text-sm font-bold text-white flex items-center">
+              <ShieldCheck className="w-4 h-4 mr-2 text-emerald-400" />
+              Odisha Reservation Quota Distribution
+            </h3>
+            <p className="text-xs text-slate-400">
+              Demographic classification based on official Odisha SAMS reservation norms.
+            </p>
 
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-              <span className="text-slate-400 text-[10px] block font-mono">GENERAL CATEGORY</span>
-              <span className="text-xl font-bold text-white">{genCount}</span>
-              <span className="text-[10px] text-slate-500 block">
-                {totalStudents > 0 ? ((genCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
-              </span>
-            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+                <span className="text-slate-400 text-[10px] block font-mono">GENERAL CATEGORY</span>
+                <span className="text-2xl font-bold text-white font-mono">{genCount}</span>
+                <span className="text-[10px] text-slate-500 block font-mono">
+                  {totalStudents > 0 ? ((genCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
+                </span>
+              </div>
 
-            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-              <span className="text-slate-400 text-[10px] block font-mono">SCHEDULED CASTE (SC)</span>
-              <span className="text-xl font-bold text-amber-400">{scCount}</span>
-              <span className="text-[10px] text-slate-500 block">
-                {totalStudents > 0 ? ((scCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
-              </span>
-            </div>
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+                <span className="text-slate-400 text-[10px] block font-mono">SCHEDULED CASTE (SC)</span>
+                <span className="text-2xl font-bold text-amber-400 font-mono">{scCount}</span>
+                <span className="text-[10px] text-slate-500 block font-mono">
+                  {totalStudents > 0 ? ((scCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
+                </span>
+              </div>
 
-            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-              <span className="text-slate-400 text-[10px] block font-mono">SCHEDULED TRIBE (ST)</span>
-              <span className="text-xl font-bold text-emerald-400">{stCount}</span>
-              <span className="text-[10px] text-slate-500 block">
-                {totalStudents > 0 ? ((stCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
-              </span>
-            </div>
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+                <span className="text-slate-400 text-[10px] block font-mono">SCHEDULED TRIBE (ST)</span>
+                <span className="text-2xl font-bold text-emerald-400 font-mono">{stCount}</span>
+                <span className="text-[10px] text-slate-500 block font-mono">
+                  {totalStudents > 0 ? ((stCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
+                </span>
+              </div>
 
-            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-              <span className="text-slate-400 text-[10px] block font-mono">SEBC / OBC</span>
-              <span className="text-xl font-bold text-blue-400">{sebcCount}</span>
-              <span className="text-[10px] text-slate-500 block">
-                {totalStudents > 0 ? ((sebcCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
-              </span>
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+                <span className="text-slate-400 text-[10px] block font-mono">SEBC / OBC</span>
+                <span className="text-2xl font-bold text-blue-400 font-mono">{sebcCount}</span>
+                <span className="text-[10px] text-slate-500 block font-mono">
+                  {totalStudents > 0 ? ((sebcCount / totalStudents) * 100).toFixed(1) : '0.0'}% of total
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* Apprenticeship Embedded Degree Programme (AEDP) Highlight Card */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-emerald-500/30 rounded-2xl p-6 shadow-xl space-y-3">
+            <div className="flex items-center space-x-2 text-emerald-400 text-xs font-mono">
+              <Sparkles className="w-4 h-4" />
+              <span>DHE ODISHA &bull; APPRENTICESHIP EMBEDDED DEGREE (AEDP)</span>
+            </div>
+            <h4 className="text-sm font-bold text-white">Apprenticeship Embedded Degree Programme (AEDP)</h4>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              NEP 2020 aligned UG degree combining regular Honours with a <strong>mandatory 1-year paid industrial apprenticeship</strong> in the 3rd year. Students earn a <strong>monthly stipend</strong> and graduate with degrees officially certified as 100% equivalent to conventional UG degrees for Master's/Ph.D. admissions.
+            </p>
+            <div className="pt-2 grid grid-cols-2 gap-2 text-center text-xs">
+              <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl">
+                <span className="text-[10px] text-slate-400 block font-mono">AEDP Enrolled</span>
+                <span className="text-base font-bold text-emerald-400 font-mono">{aedpAdmitted} Scholars</span>
+              </div>
+              <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl">
+                <span className="text-[10px] text-slate-400 block font-mono">AEDP Sanctioned</span>
+                <span className="text-base font-bold text-white font-mono">{aedpSanctioned} Seats</span>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>
-
     </div>
   );
 };

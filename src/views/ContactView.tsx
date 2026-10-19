@@ -19,16 +19,28 @@ export const ContactView: React.FC = () => {
 
   const keyOfficers = [
     {
-      name: lang === 'or' ? 'ପ୍ରଫେସର ଅମରେନ୍ଦ୍ର ପଣ୍ଡା' : 'Prof. Amarendra Panda',
+      name: (lang === 'or' ? systemSettings.principalNameOdia : systemSettings.principalName) || (lang === 'or' ? 'ପ୍ରଫେସର ଅମରେନ୍ଦ୍ର ପଣ୍ଡା' : 'Prof. Amarendra Panda'),
       role: t.principalInCharge,
-      phone: systemSettings.contactPhone || '06646-230234',
-      email: systemSettings.contactEmail || 'principal.baragada@gmail.com',
+      phone: systemSettings.principalPhone || systemSettings.contactPhone || '06646-230234',
+      email: systemSettings.principalEmail || systemSettings.contactEmail || 'principal.baragada@gmail.com',
     },
     {
-      name: lang === 'or' ? 'ଡଃ ରମେଶ ଚନ୍ଦ୍ର ସାହୁ' : 'Dr. Ramesh Chandra Sahoo',
-      role: lang === 'or' ? 'ସାମ୍ସ ନାମଲେଖା ମୁଖ୍ୟ' : 'SAMS Admission In-Charge',
-      phone: '9437123401',
-      email: 'sams.admission@baragada.edu.in',
+      name: (lang === 'or' ? systemSettings.admissionIncharge1NameOdia : systemSettings.admissionIncharge1Name) || (lang === 'or' ? 'ଡଃ ମନୋରଞ୍ଜନ ଦାଶ' : 'Dr. Manoranjan Dash'),
+      role: t.admissionIncharge1Title || (lang === 'or' ? 'ନାମଲେଖା ପ୍ରଭାରୀ (କଳା ଓ ବାଣିଜ୍ୟ)' : 'Admission In-Charge (Arts & Commerce)'),
+      phone: systemSettings.admissionIncharge1Phone || '+91 94371 88201',
+      email: systemSettings.admissionIncharge1Email || 'admission.arts.pcb@gmail.com',
+    },
+    {
+      name: (lang === 'or' ? systemSettings.admissionIncharge2NameOdia : systemSettings.admissionIncharge2Name) || (lang === 'or' ? 'ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ' : 'Dr. Sasmita Panigrahi'),
+      role: t.admissionIncharge2Title || (lang === 'or' ? 'ନାମଲେଖା ପ୍ରଭାରୀ (ବିଜ୍ଞାନ ଓ AEDP)' : 'Admission In-Charge (Science & AEDP)'),
+      phone: systemSettings.admissionIncharge2Phone || '+91 94372 65430',
+      email: systemSettings.admissionIncharge2Email || 'admission.science.pcb@gmail.com',
+    },
+    {
+      name: (lang === 'or' ? systemSettings.deoNameOdia : systemSettings.deoName) || (lang === 'or' ? 'ଶ୍ରୀ ରାଜେଶ କୁମାର ମେହେର' : 'Sri Rajesh Kumar Meher'),
+      role: t.deoTitle || (lang === 'or' ? 'ଡାଟା ଏଣ୍ଟ୍ରି ଅପରେଟର୍ (DEO)' : 'Data Entry Operator (DEO)'),
+      phone: systemSettings.deoPhone || '+91 79780 45129',
+      email: systemSettings.deoEmail || 'deo.sams.pcb@gmail.com',
     },
     {
       name: lang === 'or' ? 'ଡଃ ସୁନୀତା ମହାପାତ୍ର' : 'Dr. Sunita Mohapatra',

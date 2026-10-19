@@ -407,12 +407,13 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           if (colMap['name'] === undefined) colMap['name'] = cIdx;
         }
         // 2. Barcode / CAF No / App No
-        else if (matchesField(['barcode', 'caf', 'cafno', 'barcodeno', 'applno', 'applicationno', 'formno', 'mrno', 'ackno'])) {
-          if (colMap['barcode'] === undefined) colMap['barcode'] = cIdx;
-        }
-        // 3. Parent / Guardian Name
-        else if (matchesField(['father', 'mother', 'parent', 'guardian', 'fname', 'mname', 'careof'])) {
+        // 2. Father Name
+        else if (matchesField(['father', 'fname', 'fathername'])) {
           if (colMap['parentName'] === undefined) colMap['parentName'] = cIdx;
+        }
+        // 3. Mother Name
+        else if (matchesField(['mother', 'mname', 'mothername'])) {
+          if (colMap['motherName'] === undefined) colMap['motherName'] = cIdx;
         }
         // 4. Category
         else if (matchesField(['category', 'cat', 'caste', 'social', 'community', 'reservation'])) {
@@ -422,8 +423,8 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         else if (matchesField(['dob', 'birth', 'dateofbirth', 'bdate'])) {
           if (colMap['dob'] === undefined) colMap['dob'] = cIdx;
         }
-        // 6. Roll Number
-        else if (matchesField(['roll', 'rollno', 'collegeroll', 'classroll', 'rno', 'universityroll', 'examroll'])) {
+        // 6. Roll Number (University Roll Number)
+        else if (matchesField(['roll', 'rollno', 'collegeroll', 'classroll', 'rno', 'universityroll', 'examroll', 'universityrollno'])) {
           if (colMap['rollNo'] === undefined) colMap['rollNo'] = cIdx;
         }
         // 7. SAMS Registration No
@@ -442,7 +443,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         else if (matchesField(['percent', 'percentage', 'pct', '%', 'career', 'weightage', 'merit'])) {
           if (colMap['percentage'] === undefined) colMap['percentage'] = cIdx;
         }
-        // 11. Max / Full / Total Marks (explicitly checked before general marks)
+        // 11. Max / Full / Total Marks
         else if (
           !matchesField(['secured', 'obtained', 'markssecured', 'marksobtained', 'securedmark', 'markssec', 'obtmarks', 'scoreobt', 'sec', 'obt', 'roll', 'rank', 'phone']) &&
           matchesField([
@@ -454,7 +455,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         ) {
           if (colMap['maxMarks'] === undefined) colMap['maxMarks'] = cIdx;
         }
-        // 12. Marks Secured / Obtained / General Marks
+        // 12. Marks Secured / Obtained
         else if (
           matchesField([
             'secured', 'obtained', 'markssecured', 'marksobtained', 'securedmark', 'markssec',
@@ -463,8 +464,9 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         ) {
           if (colMap['marksSecured'] === undefined) colMap['marksSecured'] = cIdx;
         }
-        // 13. Phone
-        else if (matchesField(['phone', 'mobile', 'contact', 'cell', 'tel', 'whatsapp'])) {
+        // 13. Mobile / Phone Number
+        else if (matchesField(['mobile', 'mob', 'cell', 'whatsapp', 'phone', 'contact', 'tel', 'mobilenumber'])) {
+          if (colMap['mobileNumber'] === undefined) colMap['mobileNumber'] = cIdx;
           if (colMap['phone'] === undefined) colMap['phone'] = cIdx;
         }
         // 14. Gender
@@ -568,13 +570,33 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         // Clean Name
         const name = rawName.replace(/^[0-9.\s]+/, '').trim() || `Student ${rowIdx + 1}`;
 
-        // Barcode / CAF
-        const rawBarcode = colMap['barcode'] !== undefined ? String(row[colMap['barcode']] || '').trim() : '';
-        const barcode = rawBarcode || `BAR-${Date.now().toString().slice(-4)}${rowIdx + 100}`;
-
-        // Parent Name
+        // Parent Name (Father Name)
         const rawParent = colMap['parentName'] !== undefined ? String(row[colMap['parentName']] || '').trim() : '';
         const parentName = rawParent || 'Parent / Guardian';
+
+        // Mother Name
+        const rawMother = colMap['motherName'] !== undefined ? String(row[colMap['motherName']] || '').trim() : '';
+        const motherName = rawMother || 'Mother Name';
+
+        // Mobile Number / Phone
+        let rawMobile = '';
+        if (colMap['mobileNumber'] !== undefined && row[colMap['mobileNumber']] !== undefined) {
+          rawMobile = String(row[colMap['mobileNumber']] || '').trim();
+        } else if (colMap['phone'] !== undefined && row[colMap['phone']] !== undefined) {
+          rawMobile = String(row[colMap['phone']] || '').trim();
+        } else {
+          for (const cell of row) {
+            const s = String(cell || '').trim();
+            const digits = s.replace(/[^0-9]/g, '');
+            if (digits.length >= 10 && (digits.startsWith('9') || digits.startsWith('8') || digits.startsWith('7') || digits.startsWith('6'))) {
+              rawMobile = digits;
+              break;
+            }
+          }
+        }
+        const cleanDigits = rawMobile.replace(/[^0-9]/g, '');
+        const mobileNumber = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : `9437${Math.floor(100000 + Math.random() * 900000)}`;
+        const phone = mobileNumber;
 
         // Category
         const rawCat = colMap['category'] !== undefined ? row[colMap['category']] : 'GEN';
@@ -597,6 +619,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         let maxMarks = 0;
         let percentage = 0;
         let maxMarksFound = false;
+        let marksSecuredFound = false;
 
         // 1. Check if marksSecured cell contains slash (e.g. "480/600" or "480 / 600")
         if (colMap['marksSecured'] !== undefined && row[colMap['marksSecured']] !== undefined) {
@@ -605,18 +628,24 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
             const parts = rawSecuredStr.split('/');
             const pSec = parseFloat(parts[0].replace(/[^0-9.]/g, ''));
             const pMax = parseFloat(parts[1].replace(/[^0-9.]/g, ''));
-            if (!isNaN(pSec) && pSec >= 0) marksSecured = pSec;
+            if (!isNaN(pSec) && pSec >= 0) {
+              marksSecured = pSec;
+              marksSecuredFound = true;
+            }
             if (!isNaN(pMax) && pMax > 0) {
               maxMarks = pMax;
               maxMarksFound = true;
             }
           } else {
             const parsedSecured = parseFloat(rawSecuredStr.replace(/[^0-9.]/g, ''));
-            if (!isNaN(parsedSecured) && parsedSecured >= 0) marksSecured = parsedSecured;
+            if (!isNaN(parsedSecured) && parsedSecured >= 0) {
+              marksSecured = parsedSecured;
+              marksSecuredFound = true;
+            }
           }
         }
 
-        // 2. Read explicit Max Marks column
+        // 2. Read explicit Max Marks column from Excel
         if (colMap['maxMarks'] !== undefined && row[colMap['maxMarks']] !== undefined) {
           const rawMaxStr = String(row[colMap['maxMarks']]).trim();
           if (rawMaxStr.includes('/')) {
@@ -635,26 +664,47 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           }
         }
 
-        // 3. Read Percentage
+        // 3. Fallback scan for marks secured and max marks if not found via column headers
+        if (!marksSecuredFound || !maxMarksFound) {
+          const rowNumbers: number[] = [];
+          for (let i = 0; i < row.length; i++) {
+            if (i === colMap['name'] || i === colMap['rollNo'] || i === colMap['samsRegNo']) continue;
+            const val = parseFloat(String(row[i] || '').replace(/[^0-9.]/g, ''));
+            if (!isNaN(val) && val > 0 && val <= 2500) {
+              rowNumbers.push(val);
+            }
+          }
+          // If we found numbers, sort descending. Typically max marks is the larger number (e.g. 600) and secured marks is smaller (e.g. 480)
+          if (rowNumbers.length >= 2) {
+            rowNumbers.sort((a, b) => b - a);
+            if (!maxMarksFound) {
+              const potentialMax = rowNumbers.find((n) => [500, 600, 700, 800, 900, 1000, 1200].includes(n) || n >= 400);
+              if (potentialMax) {
+                maxMarks = potentialMax;
+                maxMarksFound = true;
+              }
+            }
+            if (!marksSecuredFound) {
+              const potentialSec = rowNumbers.find((n) => n !== maxMarks && n <= maxMarks);
+              if (potentialSec !== undefined) {
+                marksSecured = potentialSec;
+                marksSecuredFound = true;
+              } else if (rowNumbers.length > 0) {
+                marksSecured = rowNumbers[rowNumbers.length - 1];
+                marksSecuredFound = true;
+              }
+            }
+          } else if (rowNumbers.length === 1 && !marksSecuredFound) {
+            marksSecured = rowNumbers[0];
+            marksSecuredFound = true;
+          }
+        }
+
+        // 4. Read Percentage
         if (colMap['percentage'] !== undefined && row[colMap['percentage']] !== undefined) {
           const rawPct = parseFloat(String(row[colMap['percentage']]).replace(/[^0-9.]/g, ''));
           if (!isNaN(rawPct) && rawPct > 0) {
             percentage = rawPct <= 1.0 ? parseFloat((rawPct * 100).toFixed(2)) : parseFloat(rawPct.toFixed(2));
-          }
-        }
-
-        // 4. Scan unassigned cells for typical maxMarks benchmark values (e.g. 500, 600, 700, 800, 1000)
-        if (!maxMarksFound) {
-          for (let i = 0; i < row.length; i++) {
-            if (i === colMap['name'] || i === colMap['rollNo'] || i === colMap['samsRegNo'] || i === colMap['phone']) continue;
-            const cellNum = parseFloat(String(row[i] || '').replace(/[^0-9.]/g, ''));
-            if (!isNaN(cellNum) && [500, 600, 700, 800, 900, 1000, 1200].includes(cellNum)) {
-              if (cellNum >= marksSecured) {
-                maxMarks = cellNum;
-                maxMarksFound = true;
-                break;
-              }
-            }
           }
         }
 
@@ -670,7 +720,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           }
         }
 
-        // 6. Default fallback if completely missing (CHSE Odisha Higher Secondary benchmark is 600)
+        // 6. Fallback maxMarks if completely missing
         if (!maxMarksFound || maxMarks <= 0) {
           maxMarks = 600;
         }
@@ -692,7 +742,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           percentage = 75.0;
         }
 
-        // Roll Number
+        // Roll Number (University Roll Number)
         const rawRoll = colMap['rollNo'] !== undefined ? String(row[colMap['rollNo']] || '').trim() : '';
         const prefix =
           stream === 'Arts'
@@ -706,11 +756,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
 
         // SAMS Reg No
         const rawSams = colMap['samsRegNo'] !== undefined ? String(row[colMap['samsRegNo']] || '').trim() : '';
-        const samsRegNo = rawSams || (barcode.length >= 8 ? barcode : `24D${15000 + rowIdx}`);
-
-        // Phone
-        const rawPhone = colMap['phone'] !== undefined ? String(row[colMap['phone']] || '').replace(/[^0-9]/g, '') : '';
-        const phone = rawPhone.length >= 10 ? rawPhone.slice(-10) : `9437${Math.floor(100000 + Math.random() * 900000)}`;
+        const samsRegNo = rawSams || `24D${15000 + rowIdx}`;
 
         // Gender
         let rawGender = colMap['gender'] !== undefined ? String(row[colMap['gender']] || '').trim().toLowerCase() : '';
@@ -734,8 +780,9 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           name,
           rollNo,
           samsRegNo,
-          barcode,
           parentName,
+          motherName,
+          mobileNumber,
           dob,
           maxMarks,
           marksSecured,
@@ -796,9 +843,10 @@ export function downloadStudentTemplateExcel() {
     {
       'University Roll No': 'BA24-001',
       'SAMS Reg No': '24D10829',
-      'Barcode': '24D1082934',
       'Student Name': 'Rajesh Kumar Sahoo',
-      'Father Name / Mother Name': 'Bikash Chandra Sahoo',
+      'Father Name': 'Bikash Chandra Sahoo',
+      'Mother Name': 'Sunita Sahoo',
+      'Mobile Number': '9437123456',
       'Category': 'GEN',
       'Date of Birth': '2005-06-15',
       'Maximum Marks': 600,
@@ -807,16 +855,16 @@ export function downloadStudentTemplateExcel() {
       'Department': 'Economics',
       'Stream': 'Arts',
       'Gender': 'Male',
-      'Phone': '9437123456',
       'Blood Group': 'O+',
       'Status': 'Admitted'
     },
     {
       'University Roll No': 'BS24-001',
       'SAMS Reg No': '24D10830',
-      'Barcode': '24D1082935',
       'Student Name': 'Priyanka Mohapatra',
-      'Father Name / Mother Name': 'Ranjan Mohapatra',
+      'Father Name': 'Ranjan Mohapatra',
+      'Mother Name': 'Geetanjali Mohapatra',
+      'Mobile Number': '9861234567',
       'Category': 'SEBC',
       'Date of Birth': '2005-08-22',
       'Maximum Marks': 600,
@@ -825,16 +873,16 @@ export function downloadStudentTemplateExcel() {
       'Department': 'B.SC in Botany with Tissue culture and vertical gardening (AEDP)',
       'Stream': 'Biological Science',
       'Gender': 'Female',
-      'Phone': '9861234567',
       'Blood Group': 'B+',
       'Status': 'Admitted'
     },
     {
       'University Roll No': 'BS24-002',
       'SAMS Reg No': '24D10831',
-      'Barcode': '24D1082936',
       'Student Name': 'Dibakar Naik',
-      'Father Name / Mother Name': 'Kailash Naik',
+      'Father Name': 'Kailash Naik',
+      'Mother Name': 'Sabita Naik',
+      'Mobile Number': '9439876543',
       'Category': 'ST',
       'Date of Birth': '2004-11-10',
       'Maximum Marks': 600,
@@ -843,7 +891,6 @@ export function downloadStudentTemplateExcel() {
       'Department': 'Physics',
       'Stream': 'Physical Science',
       'Gender': 'Male',
-      'Phone': '9439876543',
       'Blood Group': 'A+',
       'Status': 'Admitted'
     }
@@ -862,9 +909,10 @@ export function downloadStudentTemplateCSV() {
   const headers = [
     'University Roll No',
     'SAMS Reg No',
-    'Barcode',
     'Student Name',
-    'Father Name / Mother Name',
+    'Father Name',
+    'Mother Name',
+    'Mobile Number',
     'Category',
     'Date of Birth',
     'Maximum Marks',
@@ -873,15 +921,14 @@ export function downloadStudentTemplateCSV() {
     'Department',
     'Stream',
     'Gender',
-    'Phone',
     'Blood Group',
     'Status'
   ];
 
   const rows = [
-    'BA24-001,24D10829,24D1082934,Rajesh Kumar Sahoo,Bikash Chandra Sahoo,GEN,2005-06-15,600,516,86.0,Economics,Arts,Male,9437123456,O+,Admitted',
-    'BS24-001,24D10830,24D1082935,Priyanka Mohapatra,Ranjan Mohapatra,SEBC,2005-08-22,600,534,89.0,B.SC in Botany with Tissue culture and vertical gardening (AEDP),Biological Science,Female,9861234567,B+,Admitted',
-    'BS24-002,24D10831,24D1082936,Dibakar Naik,Kailash Naik,ST,2004-11-10,600,456,76.0,Physics,Physical Science,Male,9439876543,A+,Admitted'
+    'BA24-001,24D10829,Rajesh Kumar Sahoo,Bikash Chandra Sahoo,Sunita Sahoo,9437123456,GEN,2005-06-15,600,516,86.0,Economics,Arts,Male,O+,Admitted',
+    'BS24-001,24D10830,Priyanka Mohapatra,Ranjan Mohapatra,Geetanjali Mohapatra,9861234567,SEBC,2005-08-22,600,534,89.0,B.SC in Botany with Tissue culture and vertical gardening (AEDP),Biological Science,Female,B+,Admitted',
+    'BS24-002,24D10831,Dibakar Naik,Kailash Naik,Sabita Naik,9439876543,ST,2004-11-10,600,456,76.0,Physics,Physical Science,Male,A+,Admitted'
   ];
 
   const csvContent = [headers.join(','), ...rows].join('\n');

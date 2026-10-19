@@ -20,7 +20,7 @@ import { AdminPortalView } from './views/AdminPortalView';
 import { FaqView } from './views/FaqView';
 
 function AppContent() {
-  const { themeMode } = useData();
+  const { themeMode, isQuotaExceeded } = useData();
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [showProspectus, setShowProspectus] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -45,6 +45,27 @@ function AppContent() {
         onOpenAdminModal={() => setShowAdminModal(true)}
         onOpenHodModal={() => setShowHodModal(true)}
       />
+
+      {isQuotaExceeded && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-300 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center space-x-2">
+            <span className="font-bold uppercase tracking-wider bg-amber-500/20 px-2 py-0.5 rounded text-[10px]">
+              Local Cache Mode
+            </span>
+            <span>
+              Cloud database daily free write quota reached for today. All changes are saved safely in your local browser storage and the portal is fully operational.
+            </span>
+          </div>
+          <a
+            href="https://console.firebase.google.com/project/gen-lang-client-0743522657/firestore/databases/ai-studio-d7d173c0-b7d1-4d2c-8274-6f17561cf0cf/data?openUpgradeDialog=true"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-amber-100 font-semibold shrink-0"
+          >
+            Upgrade Plan / Firebase Console &rarr;
+          </a>
+        </div>
+      )}
 
       {/* Navigation Bar */}
       <Navbar

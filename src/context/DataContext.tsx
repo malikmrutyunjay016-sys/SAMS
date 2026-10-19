@@ -9,7 +9,7 @@ import {
   Notice,
   FacultyMember,
   FAQItem,
-  StreamType
+  StreamType,
 } from '../types';
 import {
   DEFAULT_SETTINGS,
@@ -20,12 +20,20 @@ import {
   DEFAULT_SPOT_CANDIDATES,
   DEFAULT_AUDIT_LOGS,
   DEFAULT_FAQS,
-  generate1100Students
+  generate1100Students,
 } from '../lib/defaultData';
 import { TRANSLATIONS, Language } from '../lib/translations';
 import { normalizeDepartmentAndStream } from '../lib/excelParser';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import {
+  db,
+  handleFirestoreError,
+  OperationType,
+  safeSetDoc,
+  safeDeleteDoc,
+  isFirestoreQuotaExceeded,
+  subscribeQuotaState,
+} from '../lib/firebase';
+import { collection, onSnapshot, doc } from 'firebase/firestore';
 
 export type ThemeMode = 'maroon' | 'navy' | 'light';
 
@@ -46,6 +54,7 @@ interface DataContextType {
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
   t: typeof TRANSLATIONS.en;
+  isQuotaExceeded: boolean;
 
   // Student Actions
   addStudent: (student: Omit<Student, 'id' | 'updatedAt'>) => void;
@@ -67,7 +76,13 @@ interface DataContextType {
 
   // Seat Matrix Actions
   addSeatMatrixItem: (item: Omit<SeatMatrixItem, 'id' | 'updatedAt'>) => void;
-  updateSeatMatrixItem: (id: string, sanctioned: number, admitted?: number, deptName?: string, stream?: StreamType) => void;
+  updateSeatMatrixItem: (
+    id: string,
+    sanctioned: number,
+    admitted?: number,
+    deptName?: string,
+    stream?: StreamType
+  ) => void;
   deleteSeatMatrixItem: (id: string) => void;
   resetSeatMatrixToBenchmark: () => void;
   clearSeatMatrix: () => void;
@@ -140,6 +155,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved === 'maroon' || saved === 'navy' || saved === 'light' ? saved : 'maroon';
   });
 
+  const [isQuotaExceeded, setIsQuotaExceeded] = useState<boolean>(() => isFirestoreQuotaExceeded());
+
+  useEffect(() => {
+    return subscribeQuotaState((exceeded) => {
+      setIsQuotaExceeded(exceeded);
+    });
+  }, []);
+
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);
     try {
@@ -149,13 +172,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {}
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     document.documentElement.setAttribute('data-theme', themeMode);
     document.body.setAttribute('data-theme', themeMode);
   }, [themeMode]);
 
   // Load students from storage or start clean
   const [students, setStudents] = useState<Student[]>(() => {
+    const isCleared = safeGetLocalStorage(LS_PREFIX + 'studentsCleared') === 'true';
+    if (isCleared) return [];
     const saved = safeGetLocalStorage(LS_PREFIX + 'students');
     if (saved) {
       try {
@@ -168,6 +193,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return [];
   });
 
+  useEffect(() => {
+    safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify([]));
+    safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'true');
+    setStudents([]);
+  }, []);
+
   const [faculty, setFaculty] = useState<FacultyMember[]>(() => {
     const saved = safeGetLocalStorage(LS_PREFIX + 'faculty');
     if (saved) {
@@ -176,7 +207,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (Array.isArray(parsed)) return parsed;
       } catch {}
     }
-    return [];
+    return DEFAULT_FACULTY;
   });
 
   const [seatMatrix, setSeatMatrix] = useState<SeatMatrixItem[]>(() => {
@@ -187,7 +218,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (
           Array.isArray(parsed) &&
           parsed.length > 0 &&
-          parsed.some((p: SeatMatrixItem) => p.stream === 'Biological Science' || p.stream === 'Physical Science' || p.stream === 'Arts')
+          parsed.some(
+            (p: SeatMatrixItem) =>
+              p.stream === 'Biological Science' ||
+              p.stream === 'Physical Science' ||
+              p.stream === 'Arts'
+          )
         ) {
           return parsed;
         }
@@ -214,7 +250,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [systemSettings, setSystemSettings] = useState<SystemSettings>(() => {
     const saved = safeGetLocalStorage(LS_PREFIX + 'systemSettings');
-    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return { ...DEFAULT_SETTINGS, ...parsed };
+      } catch {
+        return DEFAULT_SETTINGS;
+      }
+    }
+    return DEFAULT_SETTINGS;
   });
 
   const [notices, setNotices] = useState<Notice[]>(() => {
@@ -231,36 +275,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
 
-  // Safe Sync to LocalStorage
+  // Safe Sync to LocalStorage (Never loops or triggers Firestore writes)
   useEffect(() => {
     safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(students.slice(0, 5000)));
-  }, [students]);
-
-  // Auto-normalize student classifications to guarantee 100% sync with Subjects & Seats matrix
-  useEffect(() => {
-    if (!students || students.length === 0) return;
-
-    let needsUpdate = false;
-    const normalized = students.map((s) => {
-      const norm = normalizeDepartmentAndStream(s.department, s.stream);
-      if (s.department !== norm.department || s.stream !== norm.stream || s.isAedp !== norm.isAedp) {
-        needsUpdate = true;
-        const updated = {
-          ...s,
-          department: norm.department,
-          stream: norm.stream,
-          isAedp: norm.isAedp,
-          updatedAt: new Date().toISOString(),
-        };
-        setDoc(doc(db, 'students', s.id), updated).catch(() => {});
-        return updated;
-      }
-      return s;
-    });
-
-    if (needsUpdate) {
-      setStudents(normalized);
-    }
   }, [students]);
 
   useEffect(() => {
@@ -296,7 +313,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [faqs]);
 
   // -------------------------------------------------------------
-  // REAL-TIME FIRESTORE LISTENERS ACROSS ALL DEVICES
+  // REAL-TIME FIRESTORE LISTENERS ACROSS ALL DEVICES (READ ONLY)
+  // CRITICAL: NEVER CALL setDoc/deleteDoc INSIDE onSnapshot!
   // -------------------------------------------------------------
   useEffect(() => {
     // 1. Seat Matrix
@@ -306,46 +324,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!snapshot.empty) {
           const docs = snapshot.docs.map((d) => {
             const data = d.data() as SeatMatrixItem;
-            // Match against benchmark default seat matrix to ensure stream is accurately normalized
             const bench = DEFAULT_SEAT_MATRIX.find(
-              (b) => b.id === data.id || b.deptName.toLowerCase() === (data.deptName || '').toLowerCase()
+              (b) =>
+                b.id === data.id || b.deptName.toLowerCase() === (data.deptName || '').toLowerCase()
             );
             if (bench) {
-              const needsUpdate = data.stream !== bench.stream || data.isAedp !== bench.isAedp || !data.specialization;
-              if (needsUpdate) {
-                const fixed = {
-                  ...data,
-                  deptName: bench.deptName,
-                  stream: bench.stream,
-                  isAedp: bench.isAedp,
-                  specialization: bench.specialization || data.specialization,
-                };
-                setDoc(doc(db, 'seatMatrix', d.id), fixed).catch(() => {});
-                return fixed;
-              }
-            } else if (data.stream === 'Science' || !data.stream) {
+              return {
+                ...data,
+                deptName: bench.deptName,
+                stream: bench.stream,
+                isAedp: bench.isAedp,
+                specialization: bench.specialization || data.specialization,
+              };
+            }
+            if (data.stream === 'Science' || !data.stream) {
               const norm = normalizeDepartmentAndStream(data.deptName, data.stream);
-              const fixed = { ...data, stream: norm.stream, isAedp: norm.isAedp };
-              setDoc(doc(db, 'seatMatrix', d.id), fixed).catch(() => {});
-              return fixed;
+              return { ...data, stream: norm.stream, isAedp: norm.isAedp };
             }
             return data;
           });
 
           const existingIds = new Set(docs.map((d) => d.id));
           const missingItems = DEFAULT_SEAT_MATRIX.filter((item) => !existingIds.has(item.id));
-
-          if (missingItems.length > 0) {
-            missingItems.forEach((item) => {
-              setDoc(doc(db, 'seatMatrix', item.id), item).catch(() => {});
-            });
-            const merged = [...docs, ...missingItems];
-            setSeatMatrix(merged);
-          } else {
-            setSeatMatrix(docs);
-          }
+          setSeatMatrix([...docs, ...missingItems]);
         } else {
-          DEFAULT_SEAT_MATRIX.forEach((item) => setDoc(doc(db, 'seatMatrix', item.id), item).catch(() => {}));
           setSeatMatrix(DEFAULT_SEAT_MATRIX);
         }
       },
@@ -359,9 +361,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!snapshot.empty) {
           const docs = snapshot.docs.map((d) => d.data() as SystemSettings);
           const globalSetting = docs.find((s) => s.id === 'global') || docs[0];
-          if (globalSetting) setSystemSettings(globalSetting);
+          if (globalSetting) setSystemSettings((prev) => ({ ...DEFAULT_SETTINGS, ...prev, ...globalSetting }));
         } else {
-          setDoc(doc(db, 'systemSettings', 'global'), DEFAULT_SETTINGS).catch(() => {});
+          setSystemSettings(DEFAULT_SETTINGS);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'systemSettings')
@@ -375,7 +377,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const docs = snapshot.docs.map((d) => d.data() as FacultyMember);
           setFaculty(docs);
         } else {
-          DEFAULT_FACULTY.forEach((item) => setDoc(doc(db, 'faculty', item.id), item).catch(() => {}));
+          setFaculty(DEFAULT_FACULTY);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'faculty')
@@ -389,7 +391,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const docs = snapshot.docs.map((d) => d.data() as Notice);
           setNotices(docs);
         } else {
-          DEFAULT_NOTICES.forEach((item) => setDoc(doc(db, 'notices', item.id), item).catch(() => {}));
+          setNotices(DEFAULT_NOTICES);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'notices')
@@ -403,7 +405,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const docs = snapshot.docs.map((d) => d.data() as FAQItem);
           setFaqs(docs);
         } else {
-          DEFAULT_FAQS.forEach((item) => setDoc(doc(db, 'faqs', item.id), item).catch(() => {}));
+          setFaqs(DEFAULT_FAQS);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'faqs')
@@ -417,7 +419,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const docs = snapshot.docs.map((d) => d.data() as HodAccount);
           setHodAccounts(docs);
         } else {
-          DEFAULT_HOD_ACCOUNTS.forEach((item) => setDoc(doc(db, 'hodAccounts', item.id), item).catch(() => {}));
+          setHodAccounts(DEFAULT_HOD_ACCOUNTS);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'hodAccounts')
@@ -431,7 +433,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const docs = snapshot.docs.map((d) => d.data() as SpotCandidate);
           setSpotCandidates(docs);
         } else {
-          DEFAULT_SPOT_CANDIDATES.forEach((item) => setDoc(doc(db, 'spotCandidates', item.id), item).catch(() => {}));
+          setSpotCandidates(DEFAULT_SPOT_CANDIDATES);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'spotCandidates')
@@ -441,9 +443,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubStudents = onSnapshot(
       collection(db, 'students'),
       (snapshot) => {
+        const isCleared = safeGetLocalStorage(LS_PREFIX + 'studentsCleared') === 'true';
+        if (isCleared) {
+          setStudents([]);
+          return;
+        }
         if (!snapshot.empty) {
-          const docs = snapshot.docs.map((d) => d.data() as Student);
+          const docs = snapshot.docs.map((d) => {
+            const data = d.data() as Student;
+            const norm = normalizeDepartmentAndStream(data.department, data.stream);
+            return {
+              ...data,
+              department: norm.department,
+              stream: norm.stream,
+              isAedp: norm.isAedp,
+            };
+          });
           setStudents(docs);
+        } else {
+          setStudents([]);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'students')
@@ -455,7 +473,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (snapshot) => {
         if (!snapshot.empty) {
           const docs = snapshot.docs.map((d) => d.data() as AuditLog);
-          setAuditLogs(docs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+          setAuditLogs(
+            docs.sort(
+              (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            )
+          );
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'auditLogs')
@@ -483,16 +505,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       description,
     };
     setAuditLogs((prev) => [newLog, ...prev.slice(0, 100)]);
-
-    try {
-      setDoc(doc(db, 'auditLogs', newLog.id), newLog).catch(() => {});
-    } catch (e) {}
+    safeSetDoc(doc(db, 'auditLogs', newLog.id), newLog);
   };
 
   // ==========================================
   // STUDENT ACTIONS
   // ==========================================
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt'>) => {
+    try { localStorage.removeItem(LS_PREFIX + 'studentsCleared'); } catch {}
     const norm = normalizeDepartmentAndStream(studentData.department, studentData.stream);
     const newStudent: Student = {
       ...studentData,
@@ -503,8 +523,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
     setStudents((prev) => [newStudent, ...prev]);
-    setDoc(doc(db, 'students', newStudent.id), newStudent).catch(() => {});
-    addAuditLog('STUDENT_ADDED', `New student added: ${newStudent.name} (${newStudent.rollNo || newStudent.samsRegNo})`);
+    safeSetDoc(doc(db, 'students', newStudent.id), newStudent);
+    addAuditLog(
+      'STUDENT_ADDED',
+      `New student added: ${newStudent.name} (${newStudent.rollNo || newStudent.samsRegNo})`
+    );
   };
 
   const updateStudent = (id: string, updated: Partial<Student>) => {
@@ -523,22 +546,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
     setStudents((prev) => prev.map((s) => (s.id === id ? updatedStudent : s)));
-    setDoc(doc(db, 'students', id), updatedStudent).catch(() => {});
+    safeSetDoc(doc(db, 'students', id), updatedStudent);
     addAuditLog('STUDENT_UPDATED', `Student ${id} record updated.`);
   };
 
   const deleteStudent = (id: string) => {
     const target = students.find((s) => s.id === id);
     setStudents((prev) => prev.filter((s) => s.id !== id));
-    deleteDoc(doc(db, 'students', id)).catch(() => {});
+    safeDeleteDoc(doc(db, 'students', id));
     addAuditLog('STUDENT_DELETED', `Student ${target?.name || id} deleted from database.`);
   };
 
   const clearAllStudents = () => {
     const count = students.length;
-    students.forEach((s) => deleteDoc(doc(db, 'students', s.id)).catch(() => {}));
     setStudents([]);
-    localStorage.removeItem(LS_PREFIX + 'students');
+    safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify([]));
+    safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'true');
+    
+    // Delete in background / try-catch to prevent quota explosion
+    try {
+      students.forEach((s) => safeDeleteDoc(doc(db, 'students', s.id)));
+    } catch (e) {
+      console.warn('Firestore bulk delete skipped due to quota limit');
+    }
+
     setSeatMatrix((prev) =>
       prev.map((item) => ({
         ...item,
@@ -552,49 +583,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const bulkImportStudents = (importedStudents: Student[], replace: boolean = false) => {
-    if (!importedStudents || !Array.isArray(importedStudents) || importedStudents.length === 0) return;
-
-    if (replace) {
-      students.forEach((s) => deleteDoc(doc(db, 'students', s.id)).catch(() => {}));
-    }
-
-    // Sanitize and guarantee valid properties for all records
+    try { localStorage.removeItem(LS_PREFIX + 'studentsCleared'); } catch {}
     const sanitized: Student[] = importedStudents.map((s, idx) => {
-      const parsedMax =
-        typeof s.maxMarks === 'number' && s.maxMarks > 0
-          ? s.maxMarks
-          : s.maxMarks
-          ? Number(String(s.maxMarks).replace(/[^0-9.]/g, '')) || 600
-          : 600;
+      const norm = normalizeDepartmentAndStream(s.department, s.stream);
+      const parsedMax = Number(s.maxMarks) || 600;
+      const parsedSec = Number(s.marksSecured) || 450;
+      const pct =
+        s.marksPercentage ||
+        (parsedMax > 0 ? parseFloat(((parsedSec / parsedMax) * 100).toFixed(2)) : 75.0);
 
-      const parsedSec =
-        typeof s.marksSecured === 'number' && s.marksSecured >= 0
-          ? s.marksSecured
-          : s.marksSecured
-          ? Number(String(s.marksSecured).replace(/[^0-9.]/g, '')) || 0
-          : 0;
-
-      let pct =
-        typeof s.marksPercentage === 'number' && s.marksPercentage > 0
-          ? s.marksPercentage
-          : parsedSec > 0 && parsedMax > 0
-          ? parseFloat(((parsedSec / parsedMax) * 100).toFixed(2))
-          : 75.0;
-
-      if (pct > 100 && parsedSec <= parsedMax) {
-        pct = parseFloat(((parsedSec / parsedMax) * 100).toFixed(2));
-      }
-
-      const norm = normalizeDepartmentAndStream(s.department || 'Economics', s.stream);
-      const stream: StreamType = norm.stream;
       const prefix =
-        stream === 'Arts'
+        norm.stream === 'Arts'
           ? 'BA24'
-          : stream === 'Commerce'
+          : norm.stream === 'Commerce'
           ? 'BC24'
-          : stream === 'Self Financing'
-          ? 'CS24'
-          : 'BS24';
+          : norm.stream === 'Physical Science' || norm.stream === 'Biological Science'
+          ? 'BS24'
+          : 'SF24';
 
       return {
         ...s,
@@ -602,8 +607,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: s.name || `Student ${idx + 1}`,
         rollNo: s.rollNo || `${prefix}-${String(idx + 1).padStart(3, '0')}`,
         samsRegNo: s.samsRegNo || `24D${15000 + idx}`,
-        barcode: s.barcode || s.samsRegNo || `BAR-${Date.now().toString().slice(-4)}${idx}`,
         parentName: s.parentName || 'Parent / Guardian',
+        motherName: s.motherName || 'Mother Name',
+        mobileNumber: s.mobileNumber || s.phone || '9437123456',
         category: s.category || 'GEN',
         dob: s.dob || '2005-01-01',
         maxMarks: parsedMax,
@@ -621,21 +627,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     sanitized.forEach((s) => {
-      setDoc(doc(db, 'students', s.id), s).catch(() => {});
+      safeSetDoc(doc(db, 'students', s.id), s);
     });
 
     setStudents((prev) => {
       const updatedList = replace ? sanitized : [...sanitized, ...prev];
       safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updatedList.slice(0, 5000)));
 
-      // Also dynamically sync Seat Matrix admitted scholars & remaining vacancies!
+      // Sync Seat Matrix admitted counts
       setSeatMatrix((prevMatrix) => {
         const synced = prevMatrix.map((item) => {
           const admittedCount = updatedList.filter((s) => {
             const sDept = (s.department || '').toLowerCase().trim();
             const mDept = (item.deptName || '').toLowerCase().trim();
             if (sDept === mDept) return true;
-            if (item.isAedp && s.isAedp && (sDept.includes(mDept) || mDept.includes(sDept))) return true;
+            if (item.isAedp && s.isAedp && (sDept.includes(mDept) || mDept.includes(sDept)))
+              return true;
             if (!item.isAedp && !s.isAedp && sDept.includes(mDept)) return true;
             return false;
           }).length;
@@ -645,7 +652,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             vacant: Math.max(0, item.sanctioned - admittedCount),
             updatedAt: new Date().toISOString(),
           };
-          setDoc(doc(db, 'seatMatrix', item.id), updatedItem).catch(() => {});
+          safeSetDoc(doc(db, 'seatMatrix', item.id), updatedItem);
           return updatedItem;
         });
         safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(synced));
@@ -671,7 +678,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             status: (newStatus as any) || s.status,
             updatedAt: new Date().toISOString(),
           };
-          setDoc(doc(db, 'students', studentId), updated).catch(() => {});
+          safeSetDoc(doc(db, 'students', studentId), updated);
           return updated;
         }
         return s;
@@ -681,8 +688,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loadSampleStudents = () => {
+    try { localStorage.removeItem(LS_PREFIX + 'studentsCleared'); } catch {}
     const sample = generate1100Students().slice(0, 150);
-    sample.forEach((s) => setDoc(doc(db, 'students', s.id), s).catch(() => {}));
+    sample.forEach((s) => safeSetDoc(doc(db, 'students', s.id), s));
     setStudents(sample);
     addAuditLog('SAMPLE_STUDENTS_LOADED', 'Loaded sample student records for demonstration.');
   };
@@ -693,7 +701,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const newSyncedCount = 20;
     const newStudents = generate1100Students().slice(0, newSyncedCount);
-    newStudents.forEach((s) => setDoc(doc(db, 'students', s.id), s).catch(() => {}));
+    newStudents.forEach((s) => safeSetDoc(doc(db, 'students', s.id), s));
     setStudents((prev) => [...newStudents, ...prev]);
 
     const updatedSettings = {
@@ -702,7 +710,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastSheetSync: new Date().toISOString(),
     };
     setSystemSettings(updatedSettings);
-    setDoc(doc(db, 'systemSettings', 'global'), updatedSettings).catch(() => {});
+    safeSetDoc(doc(db, 'systemSettings', 'global'), updatedSettings);
 
     addAuditLog('SAMS_GOOGLE_SHEET_SYNC', `Successfully synced live SAMS Google Sheet: ${sheetUrl}`);
     setIsLoading(false);
@@ -722,7 +730,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isAedp: norm.isAedp,
           updatedAt: new Date().toISOString(),
         };
-        setDoc(doc(db, 'students', s.id), correctedStudent).catch(() => {});
+        safeSetDoc(doc(db, 'students', s.id), correctedStudent);
         return correctedStudent;
       }
       return s;
@@ -731,7 +739,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (correctedCount > 0) {
       setStudents(updated);
       safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updated.slice(0, 5000)));
-      addAuditLog('CLASSIFICATION_CORRECTED', `Checked and corrected ${correctedCount} student stream & subject classifications matching Subjects & Seats matrix.`);
+      addAuditLog(
+        'CLASSIFICATION_CORRECTED',
+        `Checked and corrected ${correctedCount} student stream & subject classifications matching Subjects & Seats matrix.`
+      );
     }
     return correctedCount;
   };
@@ -745,7 +756,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: `fac_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     };
     setFaculty((prev) => [newFaculty, ...prev]);
-    setDoc(doc(db, 'faculty', newFaculty.id), newFaculty).catch(() => {});
+    safeSetDoc(doc(db, 'faculty', newFaculty.id), newFaculty);
     addAuditLog('FACULTY_ADDED', `Added faculty member: ${newFaculty.name} (${newFaculty.deptName})`);
   };
 
@@ -754,27 +765,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!target) return;
     const updatedFaculty = { ...target, ...updated };
     setFaculty((prev) => prev.map((f) => (f.id === id ? updatedFaculty : f)));
-    setDoc(doc(db, 'faculty', id), updatedFaculty).catch(() => {});
+    safeSetDoc(doc(db, 'faculty', id), updatedFaculty);
     addAuditLog('FACULTY_UPDATED', `Updated faculty member ${id}.`);
   };
 
   const deleteFaculty = (id: string) => {
     const target = faculty.find((f) => f.id === id);
     setFaculty((prev) => prev.filter((f) => f.id !== id));
-    deleteDoc(doc(db, 'faculty', id)).catch(() => {});
+    safeDeleteDoc(doc(db, 'faculty', id));
     addAuditLog('FACULTY_DELETED', `Deleted faculty member ${target?.name || id}.`);
   };
 
   const clearAllFaculty = () => {
     const count = faculty.length;
-    faculty.forEach((f) => deleteDoc(doc(db, 'faculty', f.id)).catch(() => {}));
+    faculty.forEach((f) => safeDeleteDoc(doc(db, 'faculty', f.id)));
     setFaculty([]);
     localStorage.removeItem(LS_PREFIX + 'faculty');
     addAuditLog('FACULTY_CLEARED', `Cleared all ${count} faculty records from directory.`);
   };
 
   const loadSampleFaculty = () => {
-    DEFAULT_FACULTY.forEach((f) => setDoc(doc(db, 'faculty', f.id), f).catch(() => {}));
+    DEFAULT_FACULTY.forEach((f) => safeSetDoc(doc(db, 'faculty', f.id), f));
     setFaculty(DEFAULT_FACULTY);
     addAuditLog('SAMPLE_FACULTY_LOADED', 'Restored default faculty members directory.');
   };
@@ -790,7 +801,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
     setSeatMatrix((prev) => [...prev, newItem]);
-    setDoc(doc(db, 'seatMatrix', newItem.id), newItem).catch(() => {});
+    safeSetDoc(doc(db, 'seatMatrix', newItem.id), newItem);
     addAuditLog('SEAT_MATRIX_ADD', `Added department seat matrix for ${newItem.deptName}.`);
   };
 
@@ -817,8 +828,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedAt: new Date().toISOString(),
           };
 
-          setDoc(doc(db, 'seatMatrix', item.id), updatedItem).catch(() => {});
-
+          safeSetDoc(doc(db, 'seatMatrix', item.id), updatedItem);
           return updatedItem;
         }
         return item;
@@ -829,12 +839,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteSeatMatrixItem = (id: string) => {
     setSeatMatrix((prev) => prev.filter((item) => item.id !== id));
-    deleteDoc(doc(db, 'seatMatrix', id)).catch(() => {});
+    safeDeleteDoc(doc(db, 'seatMatrix', id));
     addAuditLog('SEAT_MATRIX_DELETE', `Deleted department ${id} from seat matrix.`);
   };
 
   const resetSeatMatrixToBenchmark = () => {
-    DEFAULT_SEAT_MATRIX.forEach((item) => setDoc(doc(db, 'seatMatrix', item.id), item).catch(() => {}));
+    DEFAULT_SEAT_MATRIX.forEach((item) => safeSetDoc(doc(db, 'seatMatrix', item.id), item));
     setSeatMatrix(DEFAULT_SEAT_MATRIX);
     safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(DEFAULT_SEAT_MATRIX));
     addAuditLog('SEAT_MATRIX_RESET', 'Cleared and reset seat intake matrix to official 28 departments.');
@@ -848,7 +858,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         vacant: item.sanctioned,
         updatedAt: new Date().toISOString(),
       };
-      setDoc(doc(db, 'seatMatrix', cl.id), cl).catch(() => {});
+      safeSetDoc(doc(db, 'seatMatrix', cl.id), cl);
       return cl;
     });
     setSeatMatrix(cleared);
@@ -865,7 +875,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: `notice_${Date.now()}`,
     };
     setNotices((prev) => [newNotice, ...prev]);
-    setDoc(doc(db, 'notices', newNotice.id), newNotice).catch(() => {});
+    safeSetDoc(doc(db, 'notices', newNotice.id), newNotice);
     addAuditLog('NOTICE_POSTED', `New notice posted: "${notice.title}"`);
   };
 
@@ -874,13 +884,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!target) return;
     const updatedNotice = { ...target, ...updated };
     setNotices((prev) => prev.map((n) => (n.id === id ? updatedNotice : n)));
-    setDoc(doc(db, 'notices', id), updatedNotice).catch(() => {});
+    safeSetDoc(doc(db, 'notices', id), updatedNotice);
     addAuditLog('NOTICE_UPDATED', `Updated notice ${id}.`);
   };
 
   const deleteNotice = (noticeId: string) => {
     setNotices((prev) => prev.filter((n) => n.id !== noticeId));
-    deleteDoc(doc(db, 'notices', noticeId)).catch(() => {});
+    safeDeleteDoc(doc(db, 'notices', noticeId));
     addAuditLog('NOTICE_DELETED', `Notice ${noticeId} removed.`);
   };
 
@@ -896,7 +906,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
     setFaqs((prev) => [newFaq, ...prev]);
-    setDoc(doc(db, 'faqs', newFaq.id), newFaq).catch(() => {});
+    safeSetDoc(doc(db, 'faqs', newFaq.id), newFaq);
     addAuditLog('FAQ_ADDED', `New FAQ added: "${question}"`);
   };
 
@@ -905,13 +915,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!target) return;
     const updatedFaq = { ...target, question, answer, category, updatedAt: new Date().toISOString() };
     setFaqs((prev) => prev.map((f) => (f.id === id ? updatedFaq : f)));
-    setDoc(doc(db, 'faqs', id), updatedFaq).catch(() => {});
+    safeSetDoc(doc(db, 'faqs', id), updatedFaq);
     addAuditLog('FAQ_UPDATED', `FAQ ${id} updated.`);
   };
 
   const deleteFAQ = (id: string) => {
     setFaqs((prev) => prev.filter((f) => f.id !== id));
-    deleteDoc(doc(db, 'faqs', id)).catch(() => {});
+    safeDeleteDoc(doc(db, 'faqs', id));
     addAuditLog('FAQ_DELETED', `FAQ ${id} deleted.`);
   };
 
@@ -925,7 +935,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
     setHodAccounts((prev) => [...prev, newAcc]);
-    setDoc(doc(db, 'hodAccounts', newAcc.id), newAcc).catch(() => {});
+    safeSetDoc(doc(db, 'hodAccounts', newAcc.id), newAcc);
     addAuditLog('HOD_ACCOUNT_ADDED', `Created HOD account for Department of ${newAcc.deptName}`);
   };
 
@@ -934,13 +944,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!target) return;
     const updatedAcc = { ...target, ...updated, updatedAt: new Date().toISOString() };
     setHodAccounts((prev) => prev.map((acc) => (acc.id === id ? updatedAcc : acc)));
-    setDoc(doc(db, 'hodAccounts', id), updatedAcc).catch(() => {});
+    safeSetDoc(doc(db, 'hodAccounts', id), updatedAcc);
     addAuditLog('HOD_ACCOUNT_UPDATED', `Updated HOD account ${id}.`);
   };
 
   const deleteHodAccount = (id: string) => {
     setHodAccounts((prev) => prev.filter((acc) => acc.id !== id));
-    deleteDoc(doc(db, 'hodAccounts', id)).catch(() => {});
+    safeDeleteDoc(doc(db, 'hodAccounts', id));
     addAuditLog('HOD_ACCOUNT_DELETED', `Deleted HOD account ${id}.`);
   };
 
@@ -954,7 +964,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
     setHodAccounts((prev) => prev.map((acc) => (acc.id === deptId ? updatedAcc : acc)));
-    setDoc(doc(db, 'hodAccounts', deptId), updatedAcc).catch(() => {});
+    safeSetDoc(doc(db, 'hodAccounts', deptId), updatedAcc);
     addAuditLog('HOD_CREDENTIALS_UPDATE', `Updated security password for department ${deptId}.`);
   };
 
@@ -979,8 +989,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setSpotCandidates((prev) => [newCand, ...prev]);
-    setDoc(doc(db, 'spotCandidates', newCand.id), newCand).catch(() => {});
-    addAuditLog('SPOT_CANDIDATE_REGISTRATION', `New candidate registered for Spot Round: ${newCand.studentName} (${newCand.samsRegNo})`);
+    safeSetDoc(doc(db, 'spotCandidates', newCand.id), newCand);
+    addAuditLog(
+      'SPOT_CANDIDATE_REGISTRATION',
+      `New candidate registered for Spot Round: ${newCand.studentName} (${newCand.samsRegNo})`
+    );
   };
 
   const updateSpotCandidate = (id: string, updated: Partial<SpotCandidate>) => {
@@ -988,19 +1001,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!target) return;
     const updatedCand = { ...target, ...updated };
     setSpotCandidates((prev) => prev.map((cand) => (cand.id === id ? updatedCand : cand)));
-    setDoc(doc(db, 'spotCandidates', id), updatedCand).catch(() => {});
+    safeSetDoc(doc(db, 'spotCandidates', id), updatedCand);
     addAuditLog('SPOT_CANDIDATE_UPDATED', `Updated spot candidate ${id}.`);
   };
 
   const deleteSpotCandidate = (id: string) => {
     setSpotCandidates((prev) => prev.filter((cand) => cand.id !== id));
-    deleteDoc(doc(db, 'spotCandidates', id)).catch(() => {});
+    safeDeleteDoc(doc(db, 'spotCandidates', id));
     addAuditLog('SPOT_CANDIDATE_DELETED', `Deleted spot candidate ${id}.`);
   };
 
   const clearAllSpotCandidates = () => {
     const count = spotCandidates.length;
-    spotCandidates.forEach((c) => deleteDoc(doc(db, 'spotCandidates', c.id)).catch(() => {}));
+    spotCandidates.forEach((c) => safeDeleteDoc(doc(db, 'spotCandidates', c.id)));
     setSpotCandidates([]);
     addAuditLog('SPOT_CANDIDATES_CLEARED', `Cleared all ${count} spot candidates.`);
   };
@@ -1009,9 +1022,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const target = spotCandidates.find((c) => c.id === candidateId);
     if (!target) return;
     const updatedCand = { ...target, reportedStatus: status };
-    setSpotCandidates((prev) => prev.map((cand) => (cand.id === candidateId ? updatedCand : cand)));
-    setDoc(doc(db, 'spotCandidates', candidateId), updatedCand).catch(() => {});
-    addAuditLog('SPOT_CANDIDATE_REPORTING', `Updated candidate ${candidateId} reported status to ${status}`);
+    setSpotCandidates((prev) =>
+      prev.map((cand) => (cand.id === candidateId ? updatedCand : cand))
+    );
+    safeSetDoc(doc(db, 'spotCandidates', candidateId), updatedCand);
+    addAuditLog(
+      'SPOT_CANDIDATE_REPORTING',
+      `Updated candidate ${candidateId} reported status to ${status}`
+    );
   };
 
   const runAutomatedMeritSelection = (targetDeptId?: string) => {
@@ -1037,14 +1055,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           res = { ...cand, selectionStatus: 'Rejected' as const };
         }
-        setDoc(doc(db, 'spotCandidates', res.id), res).catch(() => {});
+        safeSetDoc(doc(db, 'spotCandidates', res.id), res);
         return res;
       });
 
       return updated;
     });
 
-    addAuditLog('AUTOMATED_MERIT_SELECTION', 'Executed automated Spot Round Merit Selection algorithm.');
+    addAuditLog(
+      'AUTOMATED_MERIT_SELECTION',
+      'Executed automated Spot Round Merit Selection algorithm.'
+    );
   };
 
   // ==========================================
@@ -1059,9 +1080,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSystemSettings(updated);
     addAuditLog('SYSTEM_SETTINGS_UPDATE', 'College profile and system configuration updated.');
 
-    try {
-      setDoc(doc(db, 'systemSettings', 'global'), updated).catch(() => {});
-    } catch (e) {}
+    safeSetDoc(doc(db, 'systemSettings', 'global'), updated);
   };
 
   const toggleSpotRound = (enabled: boolean) => {
@@ -1079,7 +1098,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (snapshotData && snapshotData.data) {
       if (Array.isArray(snapshotData.data.students)) setStudents(snapshotData.data.students);
       if (Array.isArray(snapshotData.data.seatMatrix)) setSeatMatrix(snapshotData.data.seatMatrix);
-      if (Array.isArray(snapshotData.data.spotCandidates)) setSpotCandidates(snapshotData.data.spotCandidates);
+      if (Array.isArray(snapshotData.data.spotCandidates))
+        setSpotCandidates(snapshotData.data.spotCandidates);
       if (Array.isArray(snapshotData.data.auditLogs)) setAuditLogs(snapshotData.data.auditLogs);
       if (Array.isArray(snapshotData.data.hodAccounts)) setHodAccounts(snapshotData.data.hodAccounts);
       if (snapshotData.data.systemSettings) setSystemSettings(snapshotData.data.systemSettings);
@@ -1087,15 +1107,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (Array.isArray(snapshotData.data.faculty)) setFaculty(snapshotData.data.faculty);
       if (Array.isArray(snapshotData.data.faqs)) setFaqs(snapshotData.data.faqs);
 
-      addAuditLog('SYSTEM_RESTORE', `System restored from snapshot created on ${snapshotData.timestamp || 'unknown'}`);
+      addAuditLog(
+        'SYSTEM_RESTORE',
+        `System restored from snapshot created on ${snapshotData.timestamp || 'unknown'}`
+      );
     }
   };
 
-  // Dynamically sync seat matrix admitted counts and vacancies with student database
+  // Dynamically calculate seat matrix admitted counts and vacancies with student database purely in memory
   const syncedSeatMatrix = useMemo(() => {
     return seatMatrix.map((item) => {
       const admittedCount = students.filter((s) => {
-        // Only count enrolled/admitted students (exclude Spot Applied, Rejected, Cancelled, Withdrawn)
+        // Only count enrolled/admitted students
         if (s.status && s.status !== 'Admitted' && s.status !== 'Verified') {
           return false;
         }
@@ -1113,8 +1136,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (sDept === mDept) return true;
 
         // 2. Special handling for Computer Science (Self Financing)
-        // Strictly matches students enrolled in Computer Science / CS roll prefix (CS24-xxx)
-        // Prevents matching general science students with BS prefixes (Botany, Zoology, Physics, Chem, Math, Stats)
         if (
           item.id === 'sf_computer_science' ||
           mDept.includes('computer') ||
@@ -1138,13 +1159,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (item.isAedp) {
           if (!s.isAedp && !sDept.includes('aedp')) return false;
           if (mDept.includes('econ') && sDept.includes('econ')) return true;
-          if (mDept.includes('english') && (sDept.includes('eng') || sDept.includes('translation'))) return true;
-          if (mDept.includes('history') && (sDept.includes('hist') || sDept.includes('tourism'))) return true;
-          if (mDept.includes('botany') && (sDept.includes('botan') || sDept.includes('tissue'))) return true;
-          if (mDept.includes('zoology') && (sDept.includes('zool') || sDept.includes('bioscience'))) return true;
-          if (mDept.includes('commerce') && (sDept.includes('comm') || sDept.includes('bank') || sDept.includes('bfsi'))) return true;
-          if (mDept.includes('chemistry') && (sDept.includes('chem') || sDept.includes('industrial'))) return true;
-          if (mDept.includes('math') && (sDept.includes('math') || sDept.includes('computing'))) return true;
+          if (mDept.includes('english') && (sDept.includes('eng') || sDept.includes('translation')))
+            return true;
+          if (mDept.includes('history') && (sDept.includes('hist') || sDept.includes('tourism')))
+            return true;
+          if (mDept.includes('botany') && (sDept.includes('botan') || sDept.includes('tissue')))
+            return true;
+          if (mDept.includes('zoology') && (sDept.includes('zool') || sDept.includes('bioscience')))
+            return true;
+          if (
+            mDept.includes('commerce') &&
+            (sDept.includes('comm') || sDept.includes('bank') || sDept.includes('bfsi'))
+          )
+            return true;
+          if (mDept.includes('chemistry') && (sDept.includes('chem') || sDept.includes('industrial')))
+            return true;
+          if (mDept.includes('math') && (sDept.includes('math') || sDept.includes('computing')))
+            return true;
         } else {
           if (s.isAedp || sDept.includes('aedp')) return false;
           if (mDept.includes('econ') && sDept.includes('econ')) return true;
@@ -1155,7 +1186,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (mDept.includes('history') && sDept.includes('hist')) return true;
           if (mDept.includes('odia') && sDept.includes('odi')) return true;
           if (mDept.includes('philosophy') && sDept.includes('phil')) return true;
-          if (mDept.includes('political') && (sDept.includes('pol') || sDept.includes('political'))) return true;
+          if (mDept.includes('political') && (sDept.includes('pol') || sDept.includes('political')))
+            return true;
           if (mDept.includes('psychology') && sDept.includes('psych')) return true;
           if (mDept.includes('sanskrit') && sDept.includes('sans')) return true;
           if (mDept.includes('sociology') && sDept.includes('socio')) return true;
@@ -1179,14 +1211,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [seatMatrix, students]);
 
-  // Sync recalculated seat matrix to Firestore in real time
-  useEffect(() => {
-    if (!syncedSeatMatrix || syncedSeatMatrix.length === 0) return;
-    syncedSeatMatrix.forEach((item) => {
-      setDoc(doc(db, 'seatMatrix', item.id), item).catch(() => {});
-    });
-  }, [syncedSeatMatrix]);
-
   return (
     <DataContext.Provider
       value={{
@@ -1205,6 +1229,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         themeMode,
         setThemeMode,
         t,
+        isQuotaExceeded,
         addStudent,
         updateStudent,
         deleteStudent,

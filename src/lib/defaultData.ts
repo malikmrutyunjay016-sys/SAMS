@@ -21,6 +21,38 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   addressOdia: "ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼, ଓଡ଼ିଶା - ୭୬୮୦୨୮",
   sheetSyncUrl: "https://docs.google.com/spreadsheets/d/1_SAMS_Baragada_Live_Admission_2026/edit?usp=sharing",
   lastSheetSync: new Date().toISOString(),
+  // Principal-in-Charge
+  principalName: "Prof. Amarendra Panda",
+  principalNameOdia: "ପ୍ରଫେସର ଅମରେନ୍ଦ୍ର ପଣ୍ଡା",
+  principalDesignation: "Principal-in-Charge | Reader in Physics",
+  principalPhotoUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+  principalPhone: "06646-230234",
+  principalEmail: "principal.baragada@gmail.com",
+
+  // Admission In-Charge 01 (Arts & Commerce)
+  admissionIncharge1Name: "Dr. Manoranjan Dash",
+  admissionIncharge1NameOdia: "ଡଃ ମନୋରଞ୍ଜନ ଦାଶ",
+  admissionIncharge1Designation: "Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics",
+  admissionIncharge1PhotoUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
+  admissionIncharge1Phone: "+91 94371 88201",
+  admissionIncharge1Email: "admission.arts.pcb@gmail.com",
+
+  // Admission In-Charge 02 (Science & AEDP)
+  admissionIncharge2Name: "Dr. Sasmita Panigrahi",
+  admissionIncharge2NameOdia: "ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ",
+  admissionIncharge2Designation: "Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry",
+  admissionIncharge2PhotoUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80",
+  admissionIncharge2Phone: "+91 94372 65430",
+  admissionIncharge2Email: "admission.science.pcb@gmail.com",
+
+  // Data Entry Operator (DEO)
+  deoName: "Sri Rajesh Kumar Meher",
+  deoNameOdia: "ଶ୍ରୀ ରାଜେଶ କୁମାର ମେହେର",
+  deoDesignation: "Data Entry Operator (DEO) | SAMS Helpdesk & Verification",
+  deoPhotoUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
+  deoPhone: "+91 79780 45129",
+  deoEmail: "deo.sams.pcb@gmail.com",
+
   updatedAt: new Date().toISOString(),
 };
 
@@ -243,6 +275,8 @@ export function generate1100Students(): Student[] {
       const marksPercentage = parseFloat((55 + Math.random() * 41).toFixed(1)); // 55.0% to 96.0%
       const maxMarks = 600;
       const marksSecured = Math.round(maxMarks * (marksPercentage / 100));
+      const parentName = `${firstNamesM[Math.floor(Math.random() * firstNamesM.length)]} ${lName}`;
+      const motherName = `${firstNamesF[Math.floor(Math.random() * firstNamesF.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
       const phone = `9437${Math.floor(100000 + Math.random() * 900000)}`;
 
       students.push({
@@ -250,6 +284,9 @@ export function generate1100Students(): Student[] {
         name,
         rollNo,
         samsRegNo,
+        parentName,
+        motherName,
+        mobileNumber: phone,
         department: dept.name,
         stream: dept.stream,
         isAedp: dept.isAedp,
@@ -292,11 +329,18 @@ export function generate1100Students(): Student[] {
     const maxMarks = 600;
     const marksSecured = Math.round(maxMarks * (marksPercentage / 100));
 
+    const pName = `${firstNamesM[Math.floor(Math.random() * firstNamesM.length)]} ${lName}`;
+    const mName = `${firstNamesF[Math.floor(Math.random() * firstNamesF.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+    const mPhone = `9437${Math.floor(100000 + Math.random() * 900000)}`;
+
     students.push({
       id: `stu_${studentCounter}_${Math.random().toString(36).substr(2, 5)}`,
       name,
       rollNo,
       samsRegNo,
+      parentName: pName,
+      motherName: mName,
+      mobileNumber: mPhone,
       department: dept.name,
       stream: dept.stream,
       isAedp: dept.isAedp,
@@ -305,7 +349,7 @@ export function generate1100Students(): Student[] {
       marksSecured,
       marksPercentage,
       bloodGroup: 'O+',
-      phone: `9437${Math.floor(100000 + Math.random() * 900000)}`,
+      phone: mPhone,
       gender: isFemale ? 'Female' : 'Male',
       status: 'Spot Applied',
       updatedAt: new Date().toISOString()

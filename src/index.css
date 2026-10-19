@@ -234,26 +234,90 @@ body[data-theme="light"] {
   border-color: #e2e8f0 !important;
 }
 
-/* Typography overrides for Light mode */
-.theme-light .text-white,
-.theme-light .text-slate-100 {
+/* Typography overrides for Light mode (excluding elements inside .hero-banner and explicit white text) */
+.theme-light .text-white:not(.hero-banner *):not(.hero-welcome-title):not(.text-white-always),
+.theme-light .text-slate-100:not(.hero-banner *):not(.text-white-always) {
   color: #0f172a !important;
 }
 
-.theme-light .text-slate-200 {
+.theme-light .text-slate-200:not(.hero-banner *) {
   color: #1e293b !important;
 }
 
-.theme-light .text-slate-300 {
+.theme-light .text-slate-300:not(.hero-banner *) {
   color: #334155 !important;
 }
 
-.theme-light .text-slate-400 {
+.theme-light .text-slate-400:not(.hero-banner *) {
   color: #64748b !important;
 }
 
-.theme-light .text-slate-500 {
+.theme-light .text-slate-500:not(.hero-banner *) {
   color: #64748b !important;
+}
+
+/* ========================================================
+   HERO BANNER & WELCOME TITLE RULES (HIGH CONTRAST WHITE)
+   "Welcome to SAMS Degree (+3) e-Admission Portal"
+   Shown in crisp, luminous WHITE when background is light
+   ======================================================== */
+.hero-welcome-title,
+.theme-light .hero-welcome-title,
+[data-theme="light"] .hero-welcome-title,
+.theme-maroon .hero-welcome-title,
+.theme-navy .hero-welcome-title,
+.hero-banner .hero-welcome-title,
+.theme-light .hero-banner .hero-welcome-title,
+.text-white-always,
+.theme-light .text-white-always,
+[data-theme="light"] .text-white-always {
+  color: #ffffff !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75) !important;
+}
+
+/* Hero Banner retains its prestigious Odisha Govt dark-contrast backdrop in all themes, including Light */
+.hero-banner,
+.theme-light .hero-banner,
+[data-theme="light"] .hero-banner {
+  background: linear-gradient(135deg, #3d0716 0%, #13040b 45%, #050d1a 100%) !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(245, 158, 11, 0.25) !important;
+}
+
+.theme-light .hero-banner .hero-welcome-sub {
+  color: #cbd5e1 !important;
+}
+
+.theme-light .hero-banner .text-slate-100,
+.theme-light .hero-banner .text-white {
+  color: #ffffff !important;
+}
+
+.theme-light .hero-banner .text-slate-300 {
+  color: #cbd5e1 !important;
+}
+
+.theme-light .hero-banner .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+.theme-light .hero-banner .bg-slate-950,
+.theme-light .hero-banner .bg-slate-950\/90 {
+  background-color: rgba(6, 11, 24, 0.95) !important;
+  color: #ffffff !important;
+}
+
+.theme-light .hero-banner .bg-slate-900 {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+.theme-light .hero-banner .hover\:bg-slate-800:hover {
+  background-color: #1e293b !important;
+}
+
+.theme-light .hero-banner .border-slate-800 {
+  border-color: rgba(51, 65, 85, 0.8) !important;
 }
 
 /* Buttons and colored elements text contrast */

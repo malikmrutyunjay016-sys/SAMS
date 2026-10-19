@@ -9,8 +9,9 @@ export interface Student {
   name: string;
   rollNo: string; // University Roll Number e.g. BS24-042
   samsRegNo: string; // SAMS Reg No e.g. 24D10829
-  barcode?: string;
-  parentName?: string; // Father / Mother name
+  parentName?: string; // Father Name
+  motherName?: string; // Mother Name
+  mobileNumber?: string; // Mobile Number
   dob?: string; // Date of Birth
   maxMarks?: number;
   marksSecured?: number;
@@ -92,6 +93,33 @@ export interface SystemSettings {
   addressOdia?: string;
   sheetSyncUrl?: string;
   lastSheetSync?: string;
+  // Principal & Key Authorities
+  principalName?: string;
+  principalNameOdia?: string;
+  principalDesignation?: string;
+  principalPhotoUrl?: string;
+  principalPhone?: string;
+  principalEmail?: string;
+  // 02 Admission In-Charge Officers
+  admissionIncharge1Name?: string;
+  admissionIncharge1NameOdia?: string;
+  admissionIncharge1Designation?: string;
+  admissionIncharge1PhotoUrl?: string;
+  admissionIncharge1Phone?: string;
+  admissionIncharge1Email?: string;
+  admissionIncharge2Name?: string;
+  admissionIncharge2NameOdia?: string;
+  admissionIncharge2Designation?: string;
+  admissionIncharge2PhotoUrl?: string;
+  admissionIncharge2Phone?: string;
+  admissionIncharge2Email?: string;
+  // Data Entry Operator (DEO)
+  deoName?: string;
+  deoNameOdia?: string;
+  deoDesignation?: string;
+  deoPhotoUrl?: string;
+  deoPhone?: string;
+  deoEmail?: string;
   updatedAt: string;
 }
 

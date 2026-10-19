@@ -44,7 +44,9 @@ import {
   Phone,
   ChevronLeft,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  UserCheck,
+  Award
 } from 'lucide-react';
 
 export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ onOpenAdminModal }) => {
@@ -127,8 +129,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     name: '',
     rollNo: '',
     samsRegNo: '',
-    barcode: '',
     parentName: '',
+    motherName: '',
+    mobileNumber: '',
     dob: '2005-01-01',
     category: 'GEN' as CategoryType,
     maxMarks: 600,
@@ -256,6 +259,34 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     contactEmail: systemSettings.contactEmail || 'principal.baragada@gmail.com',
     address: systemSettings.address || 'Panchayat College, Baragada, Odisha - 768028',
     addressOdia: systemSettings.addressOdia || 'ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼, ଓଡ଼ିଶା - ୭୬୮୦୨୮',
+    // Principal
+    principalName: systemSettings.principalName || 'Prof. Amarendra Panda',
+    principalNameOdia: systemSettings.principalNameOdia || 'ପ୍ରଫେସର ଅମରେନ୍ଦ୍ର ପଣ୍ଡା',
+    principalDesignation: systemSettings.principalDesignation || 'Principal-in-Charge | Reader in Physics',
+    principalPhotoUrl: systemSettings.principalPhotoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    principalPhone: systemSettings.principalPhone || '06646-230234',
+    principalEmail: systemSettings.principalEmail || 'principal.baragada@gmail.com',
+    // Admission In-Charge 1 (Arts & Commerce)
+    admissionIncharge1Name: systemSettings.admissionIncharge1Name || 'Dr. Manoranjan Dash',
+    admissionIncharge1NameOdia: systemSettings.admissionIncharge1NameOdia || 'ଡଃ ମନୋରଞ୍ଜନ ଦାଶ',
+    admissionIncharge1Designation: systemSettings.admissionIncharge1Designation || 'Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics',
+    admissionIncharge1PhotoUrl: systemSettings.admissionIncharge1PhotoUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    admissionIncharge1Phone: systemSettings.admissionIncharge1Phone || '+91 94371 88201',
+    admissionIncharge1Email: systemSettings.admissionIncharge1Email || 'admission.arts.pcb@gmail.com',
+    // Admission In-Charge 2 (Science & AEDP)
+    admissionIncharge2Name: systemSettings.admissionIncharge2Name || 'Dr. Sasmita Panigrahi',
+    admissionIncharge2NameOdia: systemSettings.admissionIncharge2NameOdia || 'ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ',
+    admissionIncharge2Designation: systemSettings.admissionIncharge2Designation || 'Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry',
+    admissionIncharge2PhotoUrl: systemSettings.admissionIncharge2PhotoUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
+    admissionIncharge2Phone: systemSettings.admissionIncharge2Phone || '+91 94372 65430',
+    admissionIncharge2Email: systemSettings.admissionIncharge2Email || 'admission.science.pcb@gmail.com',
+    // Data Entry Operator (DEO)
+    deoName: systemSettings.deoName || 'Sri Rajesh Kumar Meher',
+    deoNameOdia: systemSettings.deoNameOdia || 'ଶ୍ରୀ ରାଜେଶ କୁମାର ମେହେର',
+    deoDesignation: systemSettings.deoDesignation || 'Data Entry Operator (DEO) | SAMS Helpdesk & Verification',
+    deoPhotoUrl: systemSettings.deoPhotoUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
+    deoPhone: systemSettings.deoPhone || '+91 79780 45129',
+    deoEmail: systemSettings.deoEmail || 'deo.sams.pcb@gmail.com',
   });
   const [settingsSavedMsg, setSettingsSavedMsg] = useState('');
 
@@ -276,6 +307,30 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       contactEmail: systemSettings.contactEmail || 'principal.baragada@gmail.com',
       address: systemSettings.address || 'Panchayat College, Baragada, Odisha - 768028',
       addressOdia: systemSettings.addressOdia || 'ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼, ଓଡ଼ିଶା - ୭୬୮୦୨୮',
+      principalName: systemSettings.principalName || 'Prof. Amarendra Panda',
+      principalNameOdia: systemSettings.principalNameOdia || 'ପ୍ରଫେସର ଅମରେନ୍ଦ୍ର ପଣ୍ଡା',
+      principalDesignation: systemSettings.principalDesignation || 'Principal-in-Charge | Reader in Physics',
+      principalPhotoUrl: systemSettings.principalPhotoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      principalPhone: systemSettings.principalPhone || '06646-230234',
+      principalEmail: systemSettings.principalEmail || 'principal.baragada@gmail.com',
+      admissionIncharge1Name: systemSettings.admissionIncharge1Name || 'Dr. Manoranjan Dash',
+      admissionIncharge1NameOdia: systemSettings.admissionIncharge1NameOdia || 'ଡଃ ମନୋରଞ୍ଜନ ଦାଶ',
+      admissionIncharge1Designation: systemSettings.admissionIncharge1Designation || 'Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics',
+      admissionIncharge1PhotoUrl: systemSettings.admissionIncharge1PhotoUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+      admissionIncharge1Phone: systemSettings.admissionIncharge1Phone || '+91 94371 88201',
+      admissionIncharge1Email: systemSettings.admissionIncharge1Email || 'admission.arts.pcb@gmail.com',
+      admissionIncharge2Name: systemSettings.admissionIncharge2Name || 'Dr. Sasmita Panigrahi',
+      admissionIncharge2NameOdia: systemSettings.admissionIncharge2NameOdia || 'ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ',
+      admissionIncharge2Designation: systemSettings.admissionIncharge2Designation || 'Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry',
+      admissionIncharge2PhotoUrl: systemSettings.admissionIncharge2PhotoUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
+      admissionIncharge2Phone: systemSettings.admissionIncharge2Phone || '+91 94372 65430',
+      admissionIncharge2Email: systemSettings.admissionIncharge2Email || 'admission.science.pcb@gmail.com',
+      deoName: systemSettings.deoName || 'Sri Rajesh Kumar Meher',
+      deoNameOdia: systemSettings.deoNameOdia || 'ଶ୍ରୀ ରାଜେଶ କୁମାର ମେହେର',
+      deoDesignation: systemSettings.deoDesignation || 'Data Entry Operator (DEO) | SAMS Helpdesk & Verification',
+      deoPhotoUrl: systemSettings.deoPhotoUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
+      deoPhone: systemSettings.deoPhone || '+91 79780 45129',
+      deoEmail: systemSettings.deoEmail || 'deo.sams.pcb@gmail.com',
     });
   }, [systemSettings]);
 
@@ -338,10 +393,11 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     const nameMatch = (s.name || '').toLowerCase().includes(q);
     const rollMatch = (s.rollNo || '').toLowerCase().includes(q);
     const samsMatch = (s.samsRegNo || '').toLowerCase().includes(q);
-    const barcodeMatch = (s.barcode || '').toLowerCase().includes(q);
     const parentMatch = (s.parentName || '').toLowerCase().includes(q);
+    const motherMatch = (s.motherName || '').toLowerCase().includes(q);
+    const mobileMatch = (s.mobileNumber || s.phone || '').toLowerCase().includes(q);
     const deptMatch = (s.department || '').toLowerCase().includes(q);
-    const matchesSearch = !q || nameMatch || rollMatch || samsMatch || barcodeMatch || parentMatch || deptMatch;
+    const matchesSearch = !q || nameMatch || rollMatch || samsMatch || parentMatch || motherMatch || mobileMatch || deptMatch;
 
     const effStream = getEffectiveStream(s);
     const fStream = streamFilter.toLowerCase();
@@ -442,9 +498,10 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     const wsData = dataToExport.map((s) => ({
       'University Roll No': s.rollNo,
       'SAMS Reg No': s.samsRegNo,
-      'Barcode': s.barcode || '',
       'Student Name': s.name,
-      'Father Name / Mother Name': s.parentName || '',
+      'Father Name': s.parentName || '',
+      'Mother Name': s.motherName || '',
+      'Mobile Number': s.mobileNumber || s.phone || '',
       'Category': s.category,
       'Date of Birth': s.dob || '',
       'Maximum Marks': s.maxMarks || 600,
@@ -453,7 +510,6 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       'Department': s.department,
       'Stream': s.stream,
       'Gender': s.gender,
-      'Phone': s.phone,
       'Blood Group': s.bloodGroup,
       'Status': s.status,
     }));
@@ -473,8 +529,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       name: '',
       rollNo: `BS24-${String(students.length + 1).padStart(3, '0')}`,
       samsRegNo: `24D${15000 + students.length + 1}`,
-      barcode: `BAR-${Date.now().toString().slice(-6)}`,
       parentName: '',
+      motherName: '',
+      mobileNumber: '9437123456',
       dob: '2005-01-01',
       category: 'GEN',
       maxMarks: 600,
@@ -496,8 +553,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       name: s.name,
       rollNo: s.rollNo,
       samsRegNo: s.samsRegNo,
-      barcode: s.barcode || '',
       parentName: s.parentName || '',
+      motherName: s.motherName || '',
+      mobileNumber: s.mobileNumber || s.phone || '',
       dob: s.dob || '2005-01-01',
       category: s.category,
       maxMarks: s.maxMarks || 600,
@@ -1239,15 +1297,15 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                   <table className="w-full text-left text-xs text-slate-200">
                     <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
                       <tr>
-                        <th className="py-3 px-3">Roll / SAMS</th>
+                        <th className="py-3 px-3">University Roll / SAMS</th>
                         <th className="py-3 px-3">Student Name</th>
-                        <th className="py-3 px-3">Barcode</th>
-                        <th className="py-3 px-3">Father / Mother Name</th>
+                        <th className="py-3 px-3">Father Name</th>
+                        <th className="py-3 px-3">Mother Name</th>
+                        <th className="py-3 px-3">Mobile No</th>
                         <th className="py-3 px-3">Category</th>
                         <th className="py-3 px-3">DOB</th>
                         <th className="py-3 px-3">Department</th>
-                        <th className="py-3 px-3 text-center">Marks</th>
-                        <th className="py-3 px-3 text-center">%</th>
+                        <th className="py-3 px-3 text-center">Percentage (%)</th>
                         <th className="py-3 px-3 text-center">Actions</th>
                       </tr>
                     </thead>
@@ -1259,18 +1317,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                             <span className="text-slate-500 block text-[10px]">{stu.samsRegNo}</span>
                           </td>
                           <td className="py-2.5 px-3 font-bold text-white whitespace-nowrap">{stu.name}</td>
-                          <td className="py-2.5 px-3 font-mono text-amber-300 text-[11px] whitespace-nowrap">{stu.barcode || stu.samsRegNo}</td>
-                          <td className="py-2.5 px-3 text-slate-300">{stu.parentName || 'N/A'}</td>
+                          <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.parentName || 'N/A'}</td>
+                          <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.motherName || 'N/A'}</td>
+                          <td className="py-2.5 px-3 font-mono text-emerald-400 whitespace-nowrap">{stu.mobileNumber || stu.phone || 'N/A'}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-400">{stu.category}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-400">{stu.dob || 'N/A'}</td>
                           <td className="py-2.5 px-3">
                             <span className="text-slate-200">{stu.department}</span>
                             <span className="text-[10px] text-slate-500 block">{stu.stream}</span>
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono whitespace-nowrap">
-                            <span className="text-emerald-400 font-semibold">{stu.marksSecured !== undefined ? stu.marksSecured : 0}</span> / {stu.maxMarks || 600}
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-bold text-amber-400">{stu.marksPercentage}%</td>
+                          <td className="py-2.5 px-3 text-center font-extrabold text-amber-400 text-sm">{stu.marksPercentage}%</td>
                           <td className="py-2.5 px-3 text-center">
                             <div className="flex items-center justify-center space-x-1">
                               <button
@@ -1532,8 +1588,8 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     <tr>
                       <th className="py-2.5 px-3">Roll / SAMS</th>
                       <th className="py-2.5 px-3">Student Name</th>
-                      <th className="py-2.5 px-3">Barcode</th>
-                      <th className="py-2.5 px-3">Father / Mother Name</th>
+                      <th className="py-2.5 px-3">Mother Name</th>
+                      <th className="py-2.5 px-3">Mobile No</th>
                       <th className="py-2.5 px-3">Category</th>
                       <th className="py-2.5 px-3">DOB</th>
                       <th className="py-2.5 px-3">Department</th>
@@ -1550,8 +1606,8 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                           <span className="text-slate-500 block text-[10px]">{stu.samsRegNo}</span>
                         </td>
                         <td className="py-2 px-3 font-bold text-white whitespace-nowrap">{stu.name}</td>
-                        <td className="py-2 px-3 font-mono text-amber-300 text-[11px] whitespace-nowrap">{stu.barcode}</td>
-                        <td className="py-2 px-3 text-slate-300">{stu.parentName}</td>
+                        <td className="py-2 px-3 text-slate-300 whitespace-nowrap">{stu.motherName || 'N/A'}</td>
+                        <td className="py-2 px-3 font-mono text-emerald-400 whitespace-nowrap">{stu.mobileNumber || stu.phone || 'N/A'}</td>
                         <td className="py-2 px-3 font-mono text-slate-400">{stu.category}</td>
                         <td className="py-2 px-3 font-mono text-slate-400">{stu.dob}</td>
                         <td className="py-2 px-3">{stu.department}</td>
@@ -2597,7 +2653,298 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               </div>
             </div>
 
-            {/* Section 4: Live Preview Box */}
+            {/* Section 4: 02 Admission In-Charge Officers, DEO & Principal Administration */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-6">
+              <div className="border-b border-slate-800 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center">
+                  <UserCheck className="w-4 h-4 mr-2 text-amber-400" /> 4. Admission Committee: 02 Admission In-Charge & DEO Helpdesk
+                </h3>
+                <span className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-mono">
+                  DISPLAYS IN HERO BANNER & CONTACT DIRECTORY
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Configure official details, phone numbers, emails, and photos for the Principal, the two Admission In-Charge officers (Arts/Commerce and Science/AEDP), and the SAMS Data Entry Operator (DEO). All fields are editable by the Admin.
+              </p>
+
+              {/* Subsection A: Principal-in-Charge */}
+              <div className="bg-slate-900/90 p-4 rounded-xl border border-slate-800/90 space-y-3">
+                <div className="flex items-center space-x-2 text-amber-300 font-bold text-xs">
+                  <Award className="w-4 h-4 text-amber-400" />
+                  <span>A. Principal-in-Charge</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Principal Name (English)</label>
+                    <input
+                      type="text"
+                      value={settingsForm.principalName}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, principalName: e.target.value })}
+                      placeholder="Prof. Amarendra Panda"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Principal Name (Odia / ଓଡ଼ିଆ)</label>
+                    <input
+                      type="text"
+                      value={settingsForm.principalNameOdia}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, principalNameOdia: e.target.value })}
+                      placeholder="ପ୍ରଫେସର ଅମରେନ୍ଦ୍ର ପଣ୍ଡା"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500 font-sans"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-slate-300 block mb-1 font-semibold">Official Academic Designation</label>
+                    <input
+                      type="text"
+                      value={settingsForm.principalDesignation}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, principalDesignation: e.target.value })}
+                      placeholder="Principal-in-Charge | Reader in Physics"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Principal Office Phone</label>
+                    <input
+                      type="text"
+                      value={settingsForm.principalPhone}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, principalPhone: e.target.value })}
+                      placeholder="06646-230234"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Principal Official Email</label>
+                    <input
+                      type="email"
+                      value={settingsForm.principalEmail}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, principalEmail: e.target.value })}
+                      placeholder="principal.baragada@gmail.com"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500 font-mono"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-slate-300 block mb-1 font-semibold">Principal Photo Image URL</label>
+                    <input
+                      type="url"
+                      value={settingsForm.principalPhotoUrl}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, principalPhotoUrl: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500 font-mono text-[11px]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Subsection B: Admission In-Charge 01 (Arts & Commerce) */}
+              <div className="bg-slate-900/90 p-4 rounded-xl border border-blue-900/40 space-y-3">
+                <div className="flex items-center space-x-2 text-blue-300 font-bold text-xs">
+                  <UserCheck className="w-4 h-4 text-blue-400" />
+                  <span>B. Admission In-Charge 01 (Arts & Commerce Stream)</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Officer Name (English)</label>
+                    <input
+                      type="text"
+                      value={settingsForm.admissionIncharge1Name}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1Name: e.target.value })}
+                      placeholder="Dr. Manoranjan Dash"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Officer Name (Odia / ଓଡ଼ିଆ)</label>
+                    <input
+                      type="text"
+                      value={settingsForm.admissionIncharge1NameOdia}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1NameOdia: e.target.value })}
+                      placeholder="ଡଃ ମନୋରଞ୍ଜନ ଦାଶ"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 font-sans"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-slate-300 block mb-1 font-semibold">Designation & Department</label>
+                    <input
+                      type="text"
+                      value={settingsForm.admissionIncharge1Designation}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1Designation: e.target.value })}
+                      placeholder="Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Direct Mobile / Helpline</label>
+                    <input
+                      type="text"
+                      value={settingsForm.admissionIncharge1Phone}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1Phone: e.target.value })}
+                      placeholder="+91 94371 88201"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Official Email</label>
+                    <input
+                      type="email"
+                      value={settingsForm.admissionIncharge1Email}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1Email: e.target.value })}
+                      placeholder="admission.arts.pcb@gmail.com"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-slate-300 block mb-1 font-semibold">Photo Image URL</label>
+                    <input
+                      type="url"
+                      value={settingsForm.admissionIncharge1PhotoUrl}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1PhotoUrl: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono text-[11px]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Subsection C: Admission In-Charge 02 (Science & AEDP) */}
+              <div className="bg-slate-900/90 p-4 rounded-xl border border-purple-900/40 space-y-3">
+                <div className="flex items-center space-x-2 text-purple-300 font-bold text-xs">
+                  <UserCheck className="w-4 h-4 text-purple-400" />
+                  <span>C. Admission In-Charge 02 (Science & AEDP Specializations)</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Officer Name (English)</label>
+                    <input
+                      type="text"
+                      value={settingsForm.admissionIncharge2Name}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2Name: e.target.value })}
+                      placeholder="Dr. Sasmita Panigrahi"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Officer Name (Odia / ଓଡ଼ିଆ)</label>
+                    <input
+                      type="text"
+                      value={settingsForm.admissionIncharge2NameOdia}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2NameOdia: e.target.value })}
+                      placeholder="ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500 font-sans"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-slate-300 block mb-1 font-semibold">Designation & Department</label>
+                    <input
+                      type="text"
+                      value={settingsForm.admissionIncharge2Designation}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2Designation: e.target.value })}
+                      placeholder="Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Direct Mobile / Helpline</label>
+                    <input
+                      type="text"
+                      value={settingsForm.admissionIncharge2Phone}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2Phone: e.target.value })}
+                      placeholder="+91 94372 65430"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Official Email</label>
+                    <input
+                      type="email"
+                      value={settingsForm.admissionIncharge2Email}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2Email: e.target.value })}
+                      placeholder="admission.science.pcb@gmail.com"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500 font-mono"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-slate-300 block mb-1 font-semibold">Photo Image URL</label>
+                    <input
+                      type="url"
+                      value={settingsForm.admissionIncharge2PhotoUrl}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2PhotoUrl: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500 font-mono text-[11px]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Subsection D: Data Entry Operator (DEO) */}
+              <div className="bg-slate-900/90 p-4 rounded-xl border border-emerald-900/40 space-y-3">
+                <div className="flex items-center space-x-2 text-emerald-300 font-bold text-xs">
+                  <UserCheck className="w-4 h-4 text-emerald-400" />
+                  <span>D. Data Entry Operator (DEO - SAMS Helpdesk & Verification)</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">DEO Name (English)</label>
+                    <input
+                      type="text"
+                      value={settingsForm.deoName}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, deoName: e.target.value })}
+                      placeholder="Sri Rajesh Kumar Meher"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">DEO Name (Odia / ଓଡ଼ିଆ)</label>
+                    <input
+                      type="text"
+                      value={settingsForm.deoNameOdia}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, deoNameOdia: e.target.value })}
+                      placeholder="ଶ୍ରୀ ରାଜେଶ କୁମାର ମେହେର"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500 font-sans"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-slate-300 block mb-1 font-semibold">Designation & Role Responsibilities</label>
+                    <input
+                      type="text"
+                      value={settingsForm.deoDesignation}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, deoDesignation: e.target.value })}
+                      placeholder="Data Entry Operator (DEO) | SAMS Helpdesk & Verification"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Direct Contact / Mobile Number</label>
+                    <input
+                      type="text"
+                      value={settingsForm.deoPhone}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, deoPhone: e.target.value })}
+                      placeholder="+91 79780 45129"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">DEO Helpdesk Email</label>
+                    <input
+                      type="email"
+                      value={settingsForm.deoEmail}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, deoEmail: e.target.value })}
+                      placeholder="deo.sams.pcb@gmail.com"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-slate-300 block mb-1 font-semibold">Photo Image URL</label>
+                    <input
+                      type="url"
+                      value={settingsForm.deoPhotoUrl}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, deoPhotoUrl: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500 font-mono text-[11px]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 5: Live Preview Box */}
             <div className="bg-slate-950 p-5 rounded-2xl border border-amber-500/30 space-y-3">
               <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-800 pb-2">
                 <span className="flex items-center">
@@ -2779,11 +3126,12 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </div>
 
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">Barcode Number</label>
+                  <label className="text-slate-300 block mb-1 font-semibold">University Roll No *</label>
                   <input
                     type="text"
-                    value={studentForm.barcode}
-                    onChange={(e) => setStudentForm({ ...studentForm, barcode: e.target.value })}
+                    required
+                    value={studentForm.rollNo}
+                    onChange={(e) => setStudentForm({ ...studentForm, rollNo: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-300 font-mono focus:outline-none focus:border-amber-500"
                   />
                 </div>
@@ -2791,12 +3139,34 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">Father / Mother / Parent Name</label>
+                  <label className="text-slate-300 block mb-1 font-semibold">Father Name</label>
                   <input
                     type="text"
                     value={studentForm.parentName}
                     onChange={(e) => setStudentForm({ ...studentForm, parentName: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Mother Name</label>
+                  <input
+                    type="text"
+                    value={studentForm.motherName}
+                    onChange={(e) => setStudentForm({ ...studentForm, motherName: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Mobile Number</label>
+                  <input
+                    type="tel"
+                    value={studentForm.mobileNumber}
+                    onChange={(e) => setStudentForm({ ...studentForm, mobileNumber: e.target.value, phone: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-emerald-400 font-mono focus:outline-none focus:border-amber-500"
                   />
                 </div>
 

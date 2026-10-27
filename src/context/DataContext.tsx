@@ -254,10 +254,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          const dummyIds = new Set(['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9']);
+          return parsed.filter((f: FacultyMember) => f && f.id && !dummyIds.has(f.id));
+        }
       } catch {}
     }
-    return DEFAULT_FACULTY;
+    return [];
   });
 
   const [seatMatrix, setSeatMatrix] = useState<SeatMatrixItem[]>(() => {
@@ -424,14 +427,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       collection(db, 'faculty'),
       (snapshot) => {
         if (!snapshot.empty) {
-          const docs = snapshot.docs.map((d) => d.data() as FacultyMember);
+          const dummyIds = new Set(['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9']);
+          const docs = snapshot.docs
+            .map((d) => d.data() as FacultyMember)
+            .filter((d) => d && d.id && !dummyIds.has(d.id));
           setFaculty(docs);
         } else {
-          setFaculty(DEFAULT_FACULTY);
+          setFaculty([]);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'faculty')
     );
+
+    // Startup purge of dummy faculty documents from Firestore and LocalStorage
+    try {
+      const dummyIds = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9'];
+      dummyIds.forEach((id) => safeDeleteDoc(doc(db, 'faculty', id)));
+    } catch {}
 
     // 4. Notices
     const unsubNotices = onSnapshot(
@@ -957,11 +969,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addAuditLog('FACULTY_DELETED', `Deleted faculty member ${target?.name || id}.`);
   };
 
-  const clearAllFaculty = () => {
+  const clearAllFaculty = async () => {
     const count = faculty.length;
-    faculty.forEach((f) => safeDeleteDoc(doc(db, 'faculty', f.id)));
     setFaculty([]);
-    localStorage.removeItem(LS_PREFIX + 'faculty');
+    safeSaveLocalStorage(LS_PREFIX + 'faculty', JSON.stringify([]));
+    try {
+      const oldSnap = await getDocs(collection(db, 'faculty'));
+      oldSnap.docs.forEach((d) => safeDeleteDoc(d.ref));
+    } catch (err) {
+      console.warn('Error clearing faculty docs from Firestore:', err);
+    }
     addAuditLog('FACULTY_CLEARED', `Cleared all ${count} faculty records from directory.`);
   };
 

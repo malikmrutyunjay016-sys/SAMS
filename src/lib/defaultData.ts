@@ -131,17 +131,7 @@ export const DEFAULT_HOD_ACCOUNTS: HodAccount[] = [
   { id: 'arts_hindi', deptName: 'Hindi', username: 'hod_hindi', password: 'Hindi@baragada2026', hodName: 'Prof. Vijay Prasad Sharma', phone: '9437123416', email: 'hod.hindi@baragada.edu.in', updatedAt: new Date().toISOString() },
 ];
 
-export const DEFAULT_FACULTY: FacultyMember[] = [
-  { id: 'f1', deptId: 'physics_regular', deptName: 'Physics', name: 'Dr. Ramesh Chandra Sahoo', designation: 'Associate Professor & HOD', qualification: 'Ph.D. (IIT Kharagpur), M.Sc. (Utkal)', email: 'rc.sahoo@baragada.edu.in', phone: '9437123401', photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80', isHod: true },
-  { id: 'f2', deptId: 'physics_regular', deptName: 'Physics', name: 'Dr. Smruti Rekha Das', designation: 'Assistant Professor', qualification: 'Ph.D. (NISER), M.Sc.', email: 'sr.das@baragada.edu.in', phone: '9437198221', photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80', isHod: false },
-  { id: 'f3', deptId: 'botany_regular', deptName: 'Botany', name: 'Dr. Sunita Mohapatra', designation: 'Associate Professor & HOD', qualification: 'Ph.D. (Sambalpur Univ), M.Sc.', email: 'sunita.m@baragada.edu.in', phone: '9437123402', photoUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=200&q=80', isHod: true },
-  { id: 'f4', deptId: 'zoology_regular', deptName: 'Zoology', name: 'Dr. Bipin Bihari Behera', designation: 'Associate Professor & HOD', qualification: 'Ph.D. (Utkal Univ), M.Sc.', email: 'bb.behera@baragada.edu.in', phone: '9437123403', photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80', isHod: true },
-  { id: 'f5', deptId: 'mathematics_regular', deptName: 'Mathematics', name: 'Prof. Amarendra Panda', designation: 'Professor & HOD', qualification: 'M.Phil (Utkal), M.Sc.', email: 'a.panda@baragada.edu.in', phone: '9437123404', photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80', isHod: true },
-  { id: 'f6', deptId: 'chemistry_regular', deptName: 'Chemistry', name: 'Dr. Priyambada Dash', designation: 'Associate Professor & HOD', qualification: 'Ph.D. (IIT Madras)', email: 'p.dash@baragada.edu.in', phone: '9437123405', photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80', isHod: true },
-  { id: 'f7', deptId: 'odia', deptName: 'Odia', name: 'Prof. Manas Ranjan Tripathy', designation: 'Reader & HOD', qualification: 'M.A., M.Phil (Utkal)', email: 'mr.tripathy@baragada.edu.in', phone: '9437123406', photoUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=200&q=80', isHod: true },
-  { id: 'f8', deptId: 'political_science', deptName: 'Political Science', name: 'Dr. Lopamudra Nayak', designation: 'Assistant Professor & HOD', qualification: 'Ph.D. (JNU New Delhi)', email: 'l.nayak@baragada.edu.in', phone: '9437123407', photoUrl: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=200&q=80', isHod: true },
-  { id: 'f9', deptId: 'commerce', deptName: 'Commerce', name: 'Prof. Debabrata Singh', designation: 'Reader & HOD', qualification: 'M.Com, FCMA', email: 'd.singh@baragada.edu.in', phone: '9437123409', photoUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80', isHod: true }
-];
+export const DEFAULT_FACULTY: FacultyMember[] = [];
 
 export const DEFAULT_NOTICES: Notice[] = [
   {

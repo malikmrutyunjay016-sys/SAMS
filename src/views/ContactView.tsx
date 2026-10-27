@@ -26,13 +26,13 @@ export const ContactView: React.FC = () => {
     },
     {
       name: (lang === 'or' ? systemSettings.admissionIncharge1NameOdia : systemSettings.admissionIncharge1Name) || (lang === 'or' ? 'ଡଃ ମନୋରଞ୍ଜନ ଦାଶ' : 'Dr. Manoranjan Dash'),
-      role: t.admissionIncharge1Title || (lang === 'or' ? 'ନାମଲେଖା ପ୍ରଭାରୀ (କଳା ଓ ବାଣିଜ୍ୟ)' : 'Admission In-Charge (Arts & Commerce)'),
+      role: t.admissionIncharge1Title || (lang === 'or' ? 'ୟୁ.ଜି. ନାମଲେଖା ପ୍ରଭାରୀ' : 'UG Admission In-Charge'),
       phone: systemSettings.admissionIncharge1Phone || '+91 94371 88201',
       email: systemSettings.admissionIncharge1Email || 'admission.arts.pcb@gmail.com',
     },
     {
       name: (lang === 'or' ? systemSettings.admissionIncharge2NameOdia : systemSettings.admissionIncharge2Name) || (lang === 'or' ? 'ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ' : 'Dr. Sasmita Panigrahi'),
-      role: t.admissionIncharge2Title || (lang === 'or' ? 'ନାମଲେଖା ପ୍ରଭାରୀ (ବିଜ୍ଞାନ ଓ AEDP)' : 'Admission In-Charge (Science & AEDP)'),
+      role: t.admissionIncharge2Title || (lang === 'or' ? 'ୟୁ.ଜି. ନାମଲେଖା ପ୍ରଭାରୀ' : 'UG Admission In-Charge'),
       phone: systemSettings.admissionIncharge2Phone || '+91 94372 65430',
       email: systemSettings.admissionIncharge2Email || 'admission.science.pcb@gmail.com',
     },

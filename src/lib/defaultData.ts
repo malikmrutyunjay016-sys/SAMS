@@ -29,18 +29,18 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   principalPhone: "06646-230234",
   principalEmail: "principal.baragada@gmail.com",
 
-  // Admission In-Charge 01 (Arts & Commerce)
+  // UG Admission In-Charge
   admissionIncharge1Name: "Dr. Manoranjan Dash",
   admissionIncharge1NameOdia: "ଡଃ ମନୋରଞ୍ଜନ ଦାଶ",
-  admissionIncharge1Designation: "Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics",
+  admissionIncharge1Designation: "UG Admission In-Charge | Sr. Lecturer in Economics",
   admissionIncharge1PhotoUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
   admissionIncharge1Phone: "+91 94371 88201",
   admissionIncharge1Email: "admission.arts.pcb@gmail.com",
 
-  // Admission In-Charge 02 (Science & AEDP)
+  // UG Admission In-Charge
   admissionIncharge2Name: "Dr. Sasmita Panigrahi",
   admissionIncharge2NameOdia: "ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ",
-  admissionIncharge2Designation: "Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry",
+  admissionIncharge2Designation: "UG Admission In-Charge | Sr. Lecturer in Chemistry",
   admissionIncharge2PhotoUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80",
   admissionIncharge2Phone: "+91 94372 65430",
   admissionIncharge2Email: "admission.science.pcb@gmail.com",
@@ -58,42 +58,42 @@ export const DEFAULT_SETTINGS: SystemSettings = {
 
 export const DEPARTMENTS_LIST = [
   // Arts Stream (15 courses)
-  { id: 'arts_aedp_econ', name: 'B.A in Economics and data analytics (AEDP)', stream: 'Arts' as const, isAedp: true, sanctioned: 16, admitted: 14, spec: 'AEDP Economics and Data Analytics' },
-  { id: 'arts_aedp_english', name: 'B.A in English and Translation & digital humanities (AEDP)', stream: 'Arts' as const, isAedp: true, sanctioned: 16, admitted: 13, spec: 'AEDP English, Translation & Digital Humanities' },
-  { id: 'arts_aedp_history', name: 'B.A in History with Tourism and Hospitality Operations (AEDP)', stream: 'Arts' as const, isAedp: true, sanctioned: 16, admitted: 14, spec: 'AEDP History with Tourism and Hospitality Operations' },
-  { id: 'arts_economics', name: 'Economics', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 42, spec: 'Regular Honours' },
-  { id: 'arts_education', name: 'Education', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 58, spec: 'Regular Honours' },
-  { id: 'arts_english', name: 'English', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 43, spec: 'Regular Honours' },
-  { id: 'arts_geography', name: 'Geography', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 56, spec: 'Regular Honours' },
-  { id: 'arts_hindi', name: 'Hindi', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 55, spec: 'Regular Honours' },
-  { id: 'arts_history', name: 'History', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 41, spec: 'Regular Honours' },
-  { id: 'arts_odia', name: 'Odia', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 60, spec: 'Regular Honours' },
-  { id: 'arts_philosophy', name: 'Philosophy', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 52, spec: 'Regular Honours' },
-  { id: 'arts_political_science', name: 'Political Science', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 61, spec: 'Regular Honours' },
-  { id: 'arts_psychology', name: 'Psychology', stream: 'Arts' as const, isAedp: false, sanctioned: 32, admitted: 28, spec: 'Regular Honours' },
-  { id: 'arts_sanskrit', name: 'Sanskrit', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 54, spec: 'Regular Honours' },
-  { id: 'arts_sociology', name: 'Sociology', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 57, spec: 'Regular Honours' },
+  { id: 'arts_aedp_econ', name: 'B.A in Economics and data analytics (AEDP)', stream: 'Arts' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP Economics and Data Analytics' },
+  { id: 'arts_aedp_english', name: 'B.A in English and Translation & digital humanities (AEDP)', stream: 'Arts' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP English, Translation & Digital Humanities' },
+  { id: 'arts_aedp_history', name: 'B.A in History with Tourism and Hospitality Operations (AEDP)', stream: 'Arts' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP History with Tourism and Hospitality Operations' },
+  { id: 'arts_economics', name: 'Economics', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_education', name: 'Education', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_english', name: 'English', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_geography', name: 'Geography', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_hindi', name: 'Hindi', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_history', name: 'History', stream: 'Arts' as const, isAedp: false, sanctioned: 48, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_odia', name: 'Odia', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_philosophy', name: 'Philosophy', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_political_science', name: 'Political Science', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_psychology', name: 'Psychology', stream: 'Arts' as const, isAedp: false, sanctioned: 32, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_sanskrit', name: 'Sanskrit', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
+  { id: 'arts_sociology', name: 'Sociology', stream: 'Arts' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
 
   // Biological Science Stream (4 courses)
-  { id: 'bio_aedp_botany', name: 'B.SC in Botany with Tissue culture and vertical gardening (AEDP)', stream: 'Biological Science' as const, isAedp: true, sanctioned: 16, admitted: 15, spec: 'AEDP Tissue Culture & Vertical Gardening' },
-  { id: 'bio_aedp_zoology', name: 'B.SC in Zoology and integrative bioscience (AEDP)', stream: 'Biological Science' as const, isAedp: true, sanctioned: 16, admitted: 14, spec: 'AEDP Integrative Bioscience' },
-  { id: 'bio_botany', name: 'Botany', stream: 'Biological Science' as const, isAedp: false, sanctioned: 16, admitted: 14, spec: 'Regular Honours' },
-  { id: 'bio_zoology', name: 'Zoology', stream: 'Biological Science' as const, isAedp: false, sanctioned: 16, admitted: 15, spec: 'Regular Honours' },
+  { id: 'bio_aedp_botany', name: 'B.SC in Botany with Tissue culture and vertical gardening (AEDP)', stream: 'Biological Science' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP Tissue Culture & Vertical Gardening' },
+  { id: 'bio_aedp_zoology', name: 'B.SC in Zoology and integrative bioscience (AEDP)', stream: 'Biological Science' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP Integrative Bioscience' },
+  { id: 'bio_botany', name: 'Botany', stream: 'Biological Science' as const, isAedp: false, sanctioned: 16, admitted: 0, spec: 'Regular Honours' },
+  { id: 'bio_zoology', name: 'Zoology', stream: 'Biological Science' as const, isAedp: false, sanctioned: 16, admitted: 0, spec: 'Regular Honours' },
 
   // Commerce Stream (2 courses)
-  { id: 'comm_aedp_banking', name: 'B.Com in Banking, Financial Services and Insurance and Commerce (AEDP)', stream: 'Commerce' as const, isAedp: true, sanctioned: 64, admitted: 56, spec: 'AEDP Banking, Financial Services & Insurance (BFSI)' },
-  { id: 'comm_commerce', name: 'Commerce', stream: 'Commerce' as const, isAedp: false, sanctioned: 64, admitted: 58, spec: 'Regular Honours' },
+  { id: 'comm_aedp_banking', name: 'B.Com in Banking, Financial Services and Insurance and Commerce (AEDP)', stream: 'Commerce' as const, isAedp: true, sanctioned: 64, admitted: 0, spec: 'AEDP Banking, Financial Services & Insurance (BFSI)' },
+  { id: 'comm_commerce', name: 'Commerce', stream: 'Commerce' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Regular Honours' },
 
   // Physical Science Stream (6 courses)
-  { id: 'phy_aedp_chemistry', name: 'B.SC in Chemistry and Industrial Chemistry (AEDP)', stream: 'Physical Science' as const, isAedp: true, sanctioned: 16, admitted: 14, spec: 'AEDP Chemistry and Industrial Chemistry' },
-  { id: 'phy_aedp_math', name: 'B.Sc. in Mathematics & Computing (AEDP)', stream: 'Physical Science' as const, isAedp: true, sanctioned: 16, admitted: 15, spec: 'AEDP Mathematics & Computing' },
-  { id: 'phy_chemistry', name: 'Chemistry', stream: 'Physical Science' as const, isAedp: false, sanctioned: 16, admitted: 14, spec: 'Regular Honours' },
-  { id: 'phy_mathematics', name: 'Mathematics', stream: 'Physical Science' as const, isAedp: false, sanctioned: 32, admitted: 29, spec: 'Regular Honours' },
-  { id: 'phy_physics', name: 'Physics', stream: 'Physical Science' as const, isAedp: false, sanctioned: 32, admitted: 28, spec: 'Regular Honours' },
-  { id: 'phy_statistics', name: 'Statistics', stream: 'Physical Science' as const, isAedp: false, sanctioned: 32, admitted: 26, spec: 'Regular Honours' },
+  { id: 'phy_aedp_chemistry', name: 'B.SC in Chemistry and Industrial Chemistry (AEDP)', stream: 'Physical Science' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP Chemistry and Industrial Chemistry' },
+  { id: 'phy_aedp_math', name: 'B.Sc. in Mathematics & Computing (AEDP)', stream: 'Physical Science' as const, isAedp: true, sanctioned: 16, admitted: 0, spec: 'AEDP Mathematics & Computing' },
+  { id: 'phy_chemistry', name: 'Chemistry', stream: 'Physical Science' as const, isAedp: false, sanctioned: 16, admitted: 0, spec: 'Regular Honours' },
+  { id: 'phy_mathematics', name: 'Mathematics', stream: 'Physical Science' as const, isAedp: false, sanctioned: 32, admitted: 0, spec: 'Regular Honours' },
+  { id: 'phy_physics', name: 'Physics', stream: 'Physical Science' as const, isAedp: false, sanctioned: 32, admitted: 0, spec: 'Regular Honours' },
+  { id: 'phy_statistics', name: 'Statistics', stream: 'Physical Science' as const, isAedp: false, sanctioned: 32, admitted: 0, spec: 'Regular Honours' },
 
   // Self Financing Stream (1 course)
-  { id: 'sf_computer_science', name: 'Computer Science', stream: 'Self Financing' as const, isAedp: false, sanctioned: 64, admitted: 64, spec: 'Self Financing Honours' },
+  { id: 'sf_computer_science', name: 'Computer Science', stream: 'Self Financing' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Self Financing Honours' },
 ];
 
 export const DEFAULT_SEAT_MATRIX: SeatMatrixItem[] = DEPARTMENTS_LIST.map(dept => ({

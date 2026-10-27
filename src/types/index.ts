@@ -6,23 +6,26 @@ export type StudentStatus = 'Admitted' | 'Spot Applied' | 'Selected' | 'Verified
 
 export interface Student {
   id: string;
-  name: string;
-  rollNo: string; // University Roll Number e.g. BS24-042
-  samsRegNo: string; // SAMS Reg No e.g. 24D10829
-  parentName?: string; // Father Name
-  motherName?: string; // Mother Name
+  name: string; // Student Name (Applicant Name)
+  rollNo: string; // College Roll Number
+  samsRegNo: string; // Barcode Number
+  parentName?: string; // Father's Name
+  motherName?: string; // Mother's Name
+  aadhaarNo?: string; // Aadhaar No
+  stream: StreamType; // Stream
+  gender: 'Male' | 'Female' | 'Other'; // Gender
+  address?: string; // Address
+  category: CategoryType; // Category
   mobileNumber?: string; // Mobile Number
-  dob?: string; // Date of Birth
+  admissionDate?: string; // Admission Date
+  department: string; // Subject Name
+  isAedp: boolean;
   maxMarks?: number;
   marksSecured?: number;
-  department: string;
-  stream: StreamType;
-  isAedp: boolean;
-  category: CategoryType;
   marksPercentage: number;
-  bloodGroup: string;
-  phone: string;
-  gender: 'Male' | 'Female' | 'Other';
+  bloodGroup?: string;
+  phone?: string;
+  dob?: string;
   status: StudentStatus;
   updatedAt: string;
 }

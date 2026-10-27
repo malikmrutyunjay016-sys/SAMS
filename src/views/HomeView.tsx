@@ -47,14 +47,14 @@ export const HomeView: React.FC<{
 
     admissionIncharge1Name: systemSettings.admissionIncharge1Name || 'Dr. Manoranjan Dash',
     admissionIncharge1NameOdia: systemSettings.admissionIncharge1NameOdia || 'ଡଃ ମନୋରଞ୍ଜନ ଦାଶ',
-    admissionIncharge1Designation: systemSettings.admissionIncharge1Designation || 'Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics',
+    admissionIncharge1Designation: systemSettings.admissionIncharge1Designation || 'UG Admission In-Charge | Sr. Lecturer in Economics',
     admissionIncharge1Phone: systemSettings.admissionIncharge1Phone || '+91 94371 88201',
     admissionIncharge1Email: systemSettings.admissionIncharge1Email || 'admission.arts.pcb@gmail.com',
     admissionIncharge1PhotoUrl: systemSettings.admissionIncharge1PhotoUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
 
     admissionIncharge2Name: systemSettings.admissionIncharge2Name || 'Dr. Sasmita Panigrahi',
     admissionIncharge2NameOdia: systemSettings.admissionIncharge2NameOdia || 'ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ',
-    admissionIncharge2Designation: systemSettings.admissionIncharge2Designation || 'Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry',
+    admissionIncharge2Designation: systemSettings.admissionIncharge2Designation || 'UG Admission In-Charge | Sr. Lecturer in Chemistry',
     admissionIncharge2Phone: systemSettings.admissionIncharge2Phone || '+91 94372 65430',
     admissionIncharge2Email: systemSettings.admissionIncharge2Email || 'admission.science.pcb@gmail.com',
     admissionIncharge2PhotoUrl: systemSettings.admissionIncharge2PhotoUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
@@ -79,14 +79,14 @@ export const HomeView: React.FC<{
 
         admissionIncharge1Name: systemSettings.admissionIncharge1Name || 'Dr. Manoranjan Dash',
         admissionIncharge1NameOdia: systemSettings.admissionIncharge1NameOdia || 'ଡଃ ମନୋରଞ୍ଜନ ଦାଶ',
-        admissionIncharge1Designation: systemSettings.admissionIncharge1Designation || 'Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics',
+        admissionIncharge1Designation: systemSettings.admissionIncharge1Designation || 'UG Admission In-Charge | Sr. Lecturer in Economics',
         admissionIncharge1Phone: systemSettings.admissionIncharge1Phone || '+91 94371 88201',
         admissionIncharge1Email: systemSettings.admissionIncharge1Email || 'admission.arts.pcb@gmail.com',
         admissionIncharge1PhotoUrl: systemSettings.admissionIncharge1PhotoUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
 
         admissionIncharge2Name: systemSettings.admissionIncharge2Name || 'Dr. Sasmita Panigrahi',
         admissionIncharge2NameOdia: systemSettings.admissionIncharge2NameOdia || 'ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ',
-        admissionIncharge2Designation: systemSettings.admissionIncharge2Designation || 'Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry',
+        admissionIncharge2Designation: systemSettings.admissionIncharge2Designation || 'UG Admission In-Charge | Sr. Lecturer in Chemistry',
         admissionIncharge2Phone: systemSettings.admissionIncharge2Phone || '+91 94372 65430',
         admissionIncharge2Email: systemSettings.admissionIncharge2Email || 'admission.science.pcb@gmail.com',
         admissionIncharge2PhotoUrl: systemSettings.admissionIncharge2PhotoUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
@@ -130,27 +130,27 @@ export const HomeView: React.FC<{
     },
     {
       id: 'incharge1',
-      shortTab: lang === 'or' ? 'ପ୍ରଭାରୀ-୧' : 'In-Charge 1',
-      title: t.admissionIncharge1Title || (lang === 'or' ? 'ନାମଲେଖା ପ୍ରଭାରୀ (କଳା ଓ ବାଣିଜ୍ୟ)' : 'Admission In-Charge (Arts & Commerce)'),
+      shortTab: lang === 'or' ? 'ୟୁ.ଜି. ପ୍ରଭାରୀ' : 'UG In-Charge',
+      title: t.admissionIncharge1Title || (lang === 'or' ? 'ୟୁ.ଜି. ନାମଲେଖା ପ୍ରଭାରୀ' : 'UG Admission In-Charge'),
       name: (lang === 'or' ? systemSettings.admissionIncharge1NameOdia : systemSettings.admissionIncharge1Name) || (lang === 'or' ? 'ଡଃ ମନୋରଞ୍ଜନ ଦାଶ' : 'Dr. Manoranjan Dash'),
-      designation: systemSettings.admissionIncharge1Designation || 'Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics',
+      designation: systemSettings.admissionIncharge1Designation || 'UG Admission In-Charge | Sr. Lecturer in Economics',
       phone: systemSettings.admissionIncharge1Phone || '+91 94371 88201',
       email: systemSettings.admissionIncharge1Email || 'admission.arts.pcb@gmail.com',
       photoUrl: systemSettings.admissionIncharge1PhotoUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
       badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-      badgeText: lang === 'or' ? 'କଳା ଓ ବାଣିଜ୍ୟ' : 'Arts & Comm.',
+      badgeText: lang === 'or' ? 'ୟୁ.ଜି. ନାମଲେଖା' : 'UG Admission',
     },
     {
       id: 'incharge2',
-      shortTab: lang === 'or' ? 'ପ୍ରଭାରୀ-୨' : 'In-Charge 2',
-      title: t.admissionIncharge2Title || (lang === 'or' ? 'ନାମଲେଖା ପ୍ରଭାରୀ (ବିଜ୍ଞାନ ଓ AEDP)' : 'Admission In-Charge (Science & AEDP)'),
+      shortTab: lang === 'or' ? 'ୟୁ.ଜି. ପ୍ରଭାରୀ' : 'UG In-Charge',
+      title: t.admissionIncharge2Title || (lang === 'or' ? 'ୟୁ.ଜି. ନାମଲେଖା ପ୍ରଭାରୀ' : 'UG Admission In-Charge'),
       name: (lang === 'or' ? systemSettings.admissionIncharge2NameOdia : systemSettings.admissionIncharge2Name) || (lang === 'or' ? 'ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ' : 'Dr. Sasmita Panigrahi'),
-      designation: systemSettings.admissionIncharge2Designation || 'Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry',
+      designation: systemSettings.admissionIncharge2Designation || 'UG Admission In-Charge | Sr. Lecturer in Chemistry',
       phone: systemSettings.admissionIncharge2Phone || '+91 94372 65430',
       email: systemSettings.admissionIncharge2Email || 'admission.science.pcb@gmail.com',
       photoUrl: systemSettings.admissionIncharge2PhotoUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
       badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
-      badgeText: lang === 'or' ? 'ବିଜ୍ଞାନ ଓ AEDP' : 'Science & AEDP',
+      badgeText: lang === 'or' ? 'ୟୁ.ଜି. ନାମଲେଖା' : 'UG Admission',
     },
     {
       id: 'deo',
@@ -540,7 +540,7 @@ export const HomeView: React.FC<{
                     : 'border-transparent text-slate-400 hover:text-white'
                 }`}
               >
-                📋 {lang === 'or' ? 'ପ୍ରଭାରୀ-୧ (କଳା/ବାଣିଜ୍ୟ)' : 'In-Charge 1 (Arts/Comm)'}
+                📋 {lang === 'or' ? 'ୟୁ.ଜି. ନାମଲେଖା ପ୍ରଭାରୀ' : 'UG Admission In-Charge'}
               </button>
               <button
                 type="button"
@@ -551,7 +551,7 @@ export const HomeView: React.FC<{
                     : 'border-transparent text-slate-400 hover:text-white'
                 }`}
               >
-                📋 {lang === 'or' ? 'ପ୍ରଭାରୀ-୨ (ବିଜ୍ଞାନ/AEDP)' : 'In-Charge 2 (Science/AEDP)'}
+                📋 {lang === 'or' ? 'ୟୁ.ଜି. ନାମଲେଖା ପ୍ରଭାରୀ' : 'UG Admission In-Charge'}
               </button>
               <button
                 type="button"

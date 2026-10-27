@@ -33,7 +33,7 @@ import {
   isFirestoreQuotaExceeded,
   subscribeQuotaState,
 } from '../lib/firebase';
-import { collection, onSnapshot, doc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch, getDocs } from 'firebase/firestore';
 
 export type ThemeMode = 'maroon' | 'navy' | 'light';
 
@@ -66,6 +66,7 @@ interface DataContextType {
   loadSampleStudents: () => void;
   syncSamsGoogleSheet: (sheetUrl: string) => Promise<number>;
   correctStudentClassifications: () => number;
+  deduplicateStudentsDatabase: () => number;
 
   // Faculty Actions
   addFaculty: (facultyMember: Omit<FacultyMember, 'id'>) => void;
@@ -177,27 +178,96 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     document.body.setAttribute('data-theme', themeMode);
   }, [themeMode]);
 
+  // Deduplication helper that identifies duplicate student records and prioritizes real imported roster
+  const cleanAndDeduplicateStudents = (list: Student[]): Student[] => {
+    if (!Array.isArray(list) || list.length <= 1) return list || [];
+
+    const validList = list.filter((s) => s && s.name && s.name.trim().length > 0);
+
+    const seenSams = new Set<string>();
+    const seenRoll = new Set<string>();
+    const seenPersons = new Set<string>();
+    const uniqueStudents: Student[] = [];
+
+    // Prioritize records with real SAMS barcodes (not starting with 24D15) over generated fallbacks
+    const sorted = [...validList].sort((a, b) => {
+      const aRealSams = a.samsRegNo && !a.samsRegNo.startsWith('24D15') ? 1 : 0;
+      const bRealSams = b.samsRegNo && !b.samsRegNo.startsWith('24D15') ? 1 : 0;
+      return bRealSams - aRealSams;
+    });
+
+    for (const s of sorted) {
+      const rawSams = (s.samsRegNo || '').trim().toUpperCase();
+      const rawRoll = (s.rollNo || '').trim().toUpperCase();
+      const rawName = (s.name || '').trim().toLowerCase();
+      const rawParent = (s.parentName || s.motherName || '').trim().toLowerCase();
+      const rawMobile = (s.mobileNumber || s.phone || '').trim().toLowerCase();
+
+      const isRealSams = rawSams && rawSams !== 'NA' && !rawSams.startsWith('24D15') && rawSams.length >= 5;
+      const isRealRoll =
+        rawRoll &&
+        rawRoll !== 'NA' &&
+        !rawRoll.startsWith('BS24-') &&
+        !rawRoll.startsWith('BA24-') &&
+        !rawRoll.startsWith('BC24-') &&
+        !rawRoll.startsWith('CS24-') &&
+        rawRoll.length >= 4;
+
+      const personKey1 =
+        rawParent && rawParent !== 'parent / guardian' && rawParent !== 'mother name'
+          ? `person:${rawName}|${rawParent}`
+          : '';
+      const personKey2 = rawMobile && rawMobile.length >= 8 ? `mobile:${rawName}|${rawMobile}` : '';
+
+      let isDuplicate = false;
+
+      if (isRealSams && seenSams.has(rawSams)) {
+        isDuplicate = true;
+      }
+      if (isRealRoll && seenRoll.has(rawRoll)) {
+        isDuplicate = true;
+      }
+      if (personKey1 && seenPersons.has(personKey1)) {
+        isDuplicate = true;
+      }
+      if (personKey2 && seenPersons.has(personKey2)) {
+        isDuplicate = true;
+      }
+
+      if (!isDuplicate) {
+        if (isRealSams) seenSams.add(rawSams);
+        if (isRealRoll) seenRoll.add(rawRoll);
+        if (personKey1) seenPersons.add(personKey1);
+        if (personKey2) seenPersons.add(personKey2);
+        uniqueStudents.push(s);
+      }
+    }
+
+    return uniqueStudents;
+  };
+
   // Load students from storage or start clean
   const [students, setStudents] = useState<Student[]>(() => {
-    const isCleared = safeGetLocalStorage(LS_PREFIX + 'studentsCleared') === 'true';
-    if (isCleared) return [];
+    const clearedFlag = safeGetLocalStorage(LS_PREFIX + 'studentsCleared');
+    const isCleared = clearedFlag === 'true' || clearedFlag === null;
+    if (isCleared) {
+      safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'true');
+      safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify([]));
+      return [];
+    }
     const saved = safeGetLocalStorage(LS_PREFIX + 'students');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return cleanAndDeduplicateStudents(parsed);
+        }
       } catch (e) {
         console.error('Failed to parse saved students:', e);
       }
     }
     return [];
   });
-
-  useEffect(() => {
-    safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify([]));
-    safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'true');
-    setStudents([]);
-  }, []);
 
   const [faculty, setFaculty] = useState<FacultyMember[]>(() => {
     const saved = safeGetLocalStorage(LS_PREFIX + 'faculty');
@@ -443,13 +513,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubStudents = onSnapshot(
       collection(db, 'students'),
       (snapshot) => {
-        const isCleared = safeGetLocalStorage(LS_PREFIX + 'studentsCleared') === 'true';
+        const clearedFlag = safeGetLocalStorage(LS_PREFIX + 'studentsCleared');
+        const isCleared = clearedFlag === 'true' || clearedFlag === null;
         if (isCleared) {
           setStudents([]);
           return;
         }
         if (!snapshot.empty) {
-          const docs = snapshot.docs.map((d) => {
+          const rawDocs = snapshot.docs.map((d) => {
             const data = d.data() as Student;
             const norm = normalizeDepartmentAndStream(data.department, data.stream);
             return {
@@ -459,7 +530,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
               isAedp: norm.isAedp,
             };
           });
-          setStudents(docs);
+          const cleanList = cleanAndDeduplicateStudents(rawDocs);
+          setStudents(cleanList);
+          safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(cleanList.slice(0, 5000)));
         } else {
           setStudents([]);
         }
@@ -512,7 +585,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // STUDENT ACTIONS
   // ==========================================
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt'>) => {
-    try { localStorage.removeItem(LS_PREFIX + 'studentsCleared'); } catch {}
+    safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'false');
     const norm = normalizeDepartmentAndStream(studentData.department, studentData.stream);
     const newStudent: Student = {
       ...studentData,
@@ -557,17 +630,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addAuditLog('STUDENT_DELETED', `Student ${target?.name || id} deleted from database.`);
   };
 
-  const clearAllStudents = () => {
+  const clearAllStudents = async () => {
     const count = students.length;
     setStudents([]);
     safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify([]));
     safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'true');
-    
-    // Delete in background / try-catch to prevent quota explosion
+
+    // Wipe Firestore student documents
     try {
-      students.forEach((s) => safeDeleteDoc(doc(db, 'students', s.id)));
+      const snap = await getDocs(collection(db, 'students'));
+      if (!snap.empty) {
+        const batch = writeBatch(db);
+        snap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
     } catch (e) {
-      console.warn('Firestore bulk delete skipped due to quota limit');
+      console.warn('Firestore bulk delete caught:', e);
+      try {
+        students.forEach((s) => safeDeleteDoc(doc(db, 'students', s.id)));
+      } catch {}
     }
 
     setSeatMatrix((prev) =>
@@ -582,9 +663,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addAuditLog('STUDENTS_CLEARED', `Cleared all ${count} student records from database.`);
   };
 
-  const bulkImportStudents = (importedStudents: Student[], replace: boolean = false) => {
-    try { localStorage.removeItem(LS_PREFIX + 'studentsCleared'); } catch {}
-    const sanitized: Student[] = importedStudents.map((s, idx) => {
+  const bulkImportStudents = (importedStudents: Student[], replace: boolean = true) => {
+    safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'false');
+    const nowIso = new Date().toISOString();
+
+    // 1. Immediately deduplicate incoming records in case Excel file has duplicate rows
+    const dedupedIncoming = cleanAndDeduplicateStudents(importedStudents);
+
+    const sanitized: Student[] = dedupedIncoming.map((s, idx) => {
       const norm = normalizeDepartmentAndStream(s.department, s.stream);
       const parsedMax = Number(s.maxMarks) || 600;
       const parsedSec = Number(s.marksSecured) || 450;
@@ -601,12 +687,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ? 'BS24'
           : 'SF24';
 
+      const rollNo = s.rollNo || `${prefix}-${String(idx + 1).padStart(3, '0')}`;
+      const samsRegNo = s.samsRegNo || `24D${15000 + idx}`;
+
+      // Stable deterministic doc ID so re-saving or re-uploading updates the same doc instead of creating duplicates
+      const cleanSams = (samsRegNo || '').replace(/[^a-zA-Z0-9]/g, '');
+      const cleanRoll = (rollNo || '').replace(/[^a-zA-Z0-9]/g, '');
+      const stableId = cleanSams && !cleanSams.startsWith('24D15')
+        ? `sams_${cleanSams}`
+        : cleanRoll
+        ? `roll_${cleanRoll}`
+        : `stu_imp_${idx}`;
+
       return {
         ...s,
-        id: s.id || `stu_imp_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+        id: stableId,
         name: s.name || `Student ${idx + 1}`,
-        rollNo: s.rollNo || `${prefix}-${String(idx + 1).padStart(3, '0')}`,
-        samsRegNo: s.samsRegNo || `24D${15000 + idx}`,
+        rollNo,
+        samsRegNo,
         parentName: s.parentName || 'Parent / Guardian',
         motherName: s.motherName || 'Mother Name',
         mobileNumber: s.mobileNumber || s.phone || '9437123456',
@@ -617,43 +715,54 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         marksPercentage: pct,
         department: norm.department,
         stream: norm.stream,
-        isAedp: norm.isAedp,
-        phone: s.phone || '9437123456',
+        aadhaarNo: s.aadhaarNo || 'N/A',
+        address: s.address || 'Baragada, Odisha',
+        admissionDate: s.admissionDate || new Date().toISOString().slice(0, 10),
+        phone: s.phone || s.mobileNumber || '9437123456',
         gender: s.gender || 'Male',
         bloodGroup: s.bloodGroup || 'O+',
         status: s.status || 'Admitted',
-        updatedAt: new Date().toISOString(),
+        updatedAt: nowIso,
       };
     });
 
-    sanitized.forEach((s) => {
-      safeSetDoc(doc(db, 'students', s.id), s);
-    });
-
+    // 1. Immediately update LocalStorage and React State for instantaneous UI response
     setStudents((prev) => {
-      const updatedList = replace ? sanitized : [...sanitized, ...prev];
+      // In replace mode (default), replace with exact imported list (e.g. 1097 records).
+      // In append mode, deduplicate merged list so duplicate rows can never be created!
+      const updatedList = replace ? sanitized : cleanAndDeduplicateStudents([...sanitized, ...prev]);
       safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updatedList.slice(0, 5000)));
 
-      // Sync Seat Matrix admitted counts
+      // 2. Ultra-fast seat matrix calculation in a single O(N) pass
+      const regularCounts = new Map<string, number>();
+      const aedpCounts = new Map<string, number>();
+      for (let i = 0; i < updatedList.length; i++) {
+        const d = (updatedList[i].department || '').toLowerCase().trim();
+        if (updatedList[i].isAedp) {
+          aedpCounts.set(d, (aedpCounts.get(d) || 0) + 1);
+        } else {
+          regularCounts.set(d, (regularCounts.get(d) || 0) + 1);
+        }
+      }
+
       setSeatMatrix((prevMatrix) => {
         const synced = prevMatrix.map((item) => {
-          const admittedCount = updatedList.filter((s) => {
-            const sDept = (s.department || '').toLowerCase().trim();
-            const mDept = (item.deptName || '').toLowerCase().trim();
-            if (sDept === mDept) return true;
-            if (item.isAedp && s.isAedp && (sDept.includes(mDept) || mDept.includes(sDept)))
-              return true;
-            if (!item.isAedp && !s.isAedp && sDept.includes(mDept)) return true;
-            return false;
-          }).length;
-          const updatedItem = {
+          const mDept = (item.deptName || '').toLowerCase().trim();
+          const targetMap = item.isAedp ? aedpCounts : regularCounts;
+          let admittedCount = targetMap.get(mDept) || 0;
+          if (admittedCount === 0) {
+            for (const [sDept, count] of targetMap.entries()) {
+              if (sDept.includes(mDept) || mDept.includes(sDept)) {
+                admittedCount += count;
+              }
+            }
+          }
+          return {
             ...item,
             admitted: admittedCount,
             vacant: Math.max(0, item.sanctioned - admittedCount),
-            updatedAt: new Date().toISOString(),
+            updatedAt: nowIso,
           };
-          safeSetDoc(doc(db, 'seatMatrix', item.id), updatedItem);
-          return updatedItem;
         });
         safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(synced));
         return synced;
@@ -661,6 +770,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return updatedList;
     });
+
+    // 3. Sync to Firestore in non-blocking background batches
+    setTimeout(async () => {
+      if (isFirestoreQuotaExceeded()) return;
+      try {
+        const batchLimit = 350;
+        for (let i = 0; i < Math.min(sanitized.length, 1000); i += batchLimit) {
+          if (isFirestoreQuotaExceeded()) break;
+          const chunk = sanitized.slice(i, i + batchLimit);
+          const batch = writeBatch(db);
+          for (const s of chunk) {
+            batch.set(doc(db, 'students', s.id), s);
+          }
+          await batch.commit();
+        }
+      } catch (err: any) {
+        console.warn('Background Firestore batch sync caught:', err?.message || err);
+      }
+    }, 100);
 
     addAuditLog(
       'BULK_STUDENT_IMPORT',
@@ -688,7 +816,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loadSampleStudents = () => {
-    try { localStorage.removeItem(LS_PREFIX + 'studentsCleared'); } catch {}
+    safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'false');
     const sample = generate1100Students().slice(0, 150);
     sample.forEach((s) => safeSetDoc(doc(db, 'students', s.id), s));
     setStudents(sample);
@@ -745,6 +873,56 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
     }
     return correctedCount;
+  };
+
+  const deduplicateStudentsDatabase = (): number => {
+    let finalCount = 0;
+    setStudents((prev) => {
+      const cleanList = cleanAndDeduplicateStudents(prev);
+      finalCount = cleanList.length;
+      safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(cleanList.slice(0, 5000)));
+
+      // Recalculate seat matrix
+      const nowIso = new Date().toISOString();
+      const regularCounts = new Map<string, number>();
+      const aedpCounts = new Map<string, number>();
+      for (let i = 0; i < cleanList.length; i++) {
+        const d = (cleanList[i].department || '').toLowerCase().trim();
+        if (cleanList[i].isAedp) {
+          aedpCounts.set(d, (aedpCounts.get(d) || 0) + 1);
+        } else {
+          regularCounts.set(d, (regularCounts.get(d) || 0) + 1);
+        }
+      }
+
+      setSeatMatrix((prevMatrix) => {
+        const synced = prevMatrix.map((item) => {
+          const mDept = (item.deptName || '').toLowerCase().trim();
+          const targetMap = item.isAedp ? aedpCounts : regularCounts;
+          let admittedCount = targetMap.get(mDept) || 0;
+          if (admittedCount === 0) {
+            for (const [sDept, count] of targetMap.entries()) {
+              if (sDept.includes(mDept) || mDept.includes(sDept)) {
+                admittedCount += count;
+              }
+            }
+          }
+          return {
+            ...item,
+            admitted: admittedCount,
+            vacant: Math.max(0, item.sanctioned - admittedCount),
+            updatedAt: nowIso,
+          };
+        });
+        safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(synced));
+        return synced;
+      });
+
+      return cleanList;
+    });
+
+    addAuditLog('DEDUPLICATE_STUDENTS', `Cleaned and deduplicated student database. Total unique records: ${finalCount}`);
+    return finalCount;
   };
 
   // ==========================================
@@ -1239,6 +1417,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loadSampleStudents,
         syncSamsGoogleSheet,
         correctStudentClassifications,
+        deduplicateStudentsDatabase,
         addFaculty,
         updateFaculty,
         deleteFaculty,

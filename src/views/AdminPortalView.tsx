@@ -67,8 +67,8 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     clearAllStudents,
     bulkImportStudents,
     loadSampleStudents,
-    syncSamsGoogleSheet,
     correctStudentClassifications,
+    deduplicateStudentsDatabase,
     // Faculty Actions
     addFaculty,
     updateFaculty,
@@ -120,7 +120,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   // ==========================================
   const [studentSearch, setStudentSearch] = useState('');
   const [streamFilter, setStreamFilter] = useState('ALL');
-  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [departmentFilter, setDepartmentFilter] = useState('ALL');
 
   // Student Add / Edit Modal
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -150,13 +150,10 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   // ==========================================
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ParseResult | null>(null);
-  const [importReplaceMode, setImportReplaceMode] = useState(false);
+  const [importReplaceMode, setImportReplaceMode] = useState(true);
   const [autoCommitImport, setAutoCommitImport] = useState(true);
   const [importStatusMessage, setImportStatusMessage] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
-  const [sheetUrlInput, setSheetUrlInput] = useState(systemSettings.sheetSyncUrl || '');
-  const [isSyncingSheet, setIsSyncingSheet] = useState(false);
-  const [syncMessage, setSyncMessage] = useState('');
 
   // Toast notification state & helper (replaces browser alerts)
   const [adminToast, setAdminToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -165,6 +162,33 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     setTimeout(() => {
       setAdminToast((prev) => (prev?.message === message ? null : prev));
     }, 7000);
+  };
+
+  // Custom confirmation modal state (replaces iframe-blocked window.confirm)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    confirmVariant?: 'danger' | 'warning' | 'primary';
+    onConfirm: () => void;
+  } | null>(null);
+
+  const askConfirmation = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    confirmText: string = 'Confirm Action',
+    confirmVariant: 'danger' | 'warning' | 'primary' = 'danger'
+  ) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      confirmVariant,
+      onConfirm,
+    });
   };
 
   // Pagination for Students DB Table
@@ -266,17 +290,17 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     principalPhotoUrl: systemSettings.principalPhotoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
     principalPhone: systemSettings.principalPhone || '06646-230234',
     principalEmail: systemSettings.principalEmail || 'principal.baragada@gmail.com',
-    // Admission In-Charge 1 (Arts & Commerce)
+    // UG Admission In-Charge
     admissionIncharge1Name: systemSettings.admissionIncharge1Name || 'Dr. Manoranjan Dash',
     admissionIncharge1NameOdia: systemSettings.admissionIncharge1NameOdia || 'ଡଃ ମନୋରଞ୍ଜନ ଦାଶ',
-    admissionIncharge1Designation: systemSettings.admissionIncharge1Designation || 'Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics',
+    admissionIncharge1Designation: systemSettings.admissionIncharge1Designation || 'UG Admission In-Charge | Sr. Lecturer in Economics',
     admissionIncharge1PhotoUrl: systemSettings.admissionIncharge1PhotoUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
     admissionIncharge1Phone: systemSettings.admissionIncharge1Phone || '+91 94371 88201',
     admissionIncharge1Email: systemSettings.admissionIncharge1Email || 'admission.arts.pcb@gmail.com',
-    // Admission In-Charge 2 (Science & AEDP)
+    // UG Admission In-Charge
     admissionIncharge2Name: systemSettings.admissionIncharge2Name || 'Dr. Sasmita Panigrahi',
     admissionIncharge2NameOdia: systemSettings.admissionIncharge2NameOdia || 'ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ',
-    admissionIncharge2Designation: systemSettings.admissionIncharge2Designation || 'Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry',
+    admissionIncharge2Designation: systemSettings.admissionIncharge2Designation || 'UG Admission In-Charge | Sr. Lecturer in Chemistry',
     admissionIncharge2PhotoUrl: systemSettings.admissionIncharge2PhotoUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
     admissionIncharge2Phone: systemSettings.admissionIncharge2Phone || '+91 94372 65430',
     admissionIncharge2Email: systemSettings.admissionIncharge2Email || 'admission.science.pcb@gmail.com',
@@ -315,13 +339,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       principalEmail: systemSettings.principalEmail || 'principal.baragada@gmail.com',
       admissionIncharge1Name: systemSettings.admissionIncharge1Name || 'Dr. Manoranjan Dash',
       admissionIncharge1NameOdia: systemSettings.admissionIncharge1NameOdia || 'ଡଃ ମନୋରଞ୍ଜନ ଦାଶ',
-      admissionIncharge1Designation: systemSettings.admissionIncharge1Designation || 'Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics',
+      admissionIncharge1Designation: systemSettings.admissionIncharge1Designation || 'UG Admission In-Charge | Sr. Lecturer in Economics',
       admissionIncharge1PhotoUrl: systemSettings.admissionIncharge1PhotoUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
       admissionIncharge1Phone: systemSettings.admissionIncharge1Phone || '+91 94371 88201',
       admissionIncharge1Email: systemSettings.admissionIncharge1Email || 'admission.arts.pcb@gmail.com',
       admissionIncharge2Name: systemSettings.admissionIncharge2Name || 'Dr. Sasmita Panigrahi',
       admissionIncharge2NameOdia: systemSettings.admissionIncharge2NameOdia || 'ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ',
-      admissionIncharge2Designation: systemSettings.admissionIncharge2Designation || 'Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry',
+      admissionIncharge2Designation: systemSettings.admissionIncharge2Designation || 'UG Admission In-Charge | Sr. Lecturer in Chemistry',
       admissionIncharge2PhotoUrl: systemSettings.admissionIncharge2PhotoUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
       admissionIncharge2Phone: systemSettings.admissionIncharge2Phone || '+91 94372 65430',
       admissionIncharge2Email: systemSettings.admissionIncharge2Email || 'admission.science.pcb@gmail.com',
@@ -406,9 +430,10 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       effStream.toLowerCase() === fStream ||
       (fStream === 'science' && (effStream === 'Physical Science' || effStream === 'Biological Science'));
 
-    const normCat = normalizeCategory(s.category);
-    const matchesCat = categoryFilter === 'ALL' || normCat.toUpperCase() === categoryFilter.toUpperCase();
-    return matchesSearch && matchesStream && matchesCat;
+    const matchesDept =
+      departmentFilter === 'ALL' ||
+      (s.department || '').trim().toLowerCase() === departmentFilter.trim().toLowerCase();
+    return matchesSearch && matchesStream && matchesDept;
   });
 
   // Filtered Faculty
@@ -431,7 +456,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
 
     setUploadedFileName(file.name);
     setIsImporting(true);
-    setImportStatusMessage('');
+    setImportStatusMessage(`Reading and analyzing ${file.name}...`);
+    // Micro-tick yield to let React repaint UI with the spinner before synchronous parsing starts
+    await new Promise((resolve) => setTimeout(resolve, 20));
 
     try {
       const res = await parseExcelOrCsvFile(file);
@@ -451,7 +478,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         // Reset all search and stream filters so imported students are immediately visible in the table
         setStudentSearch('');
         setStreamFilter('ALL');
-        setCategoryFilter('ALL');
+        setDepartmentFilter('ALL');
         setActiveAdminTab('students');
         setCurrentPage(1);
       } else {
@@ -482,7 +509,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     setImportStatusMessage('');
     setStudentSearch('');
     setStreamFilter('ALL');
-    setCategoryFilter('ALL');
+    setDepartmentFilter('ALL');
     setActiveAdminTab('students');
     setCurrentPage(1);
   };
@@ -496,22 +523,19 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     }
 
     const wsData = dataToExport.map((s) => ({
-      'University Roll No': s.rollNo,
-      'SAMS Reg No': s.samsRegNo,
-      'Student Name': s.name,
-      'Father Name': s.parentName || '',
-      'Mother Name': s.motherName || '',
+      'College Roll Number': s.rollNo || '',
+      'Barcode Number': s.samsRegNo || '',
+      'Student Name': s.name || '',
+      "Father's Name": s.parentName || '',
+      "Mother's Name": s.motherName || '',
+      'Aadhaar No': s.aadhaarNo || '',
+      'Stream': s.stream || '',
+      'Gender': s.gender || '',
+      'Address': s.address || 'Baragada, Odisha',
+      'Category': s.category || 'GEN',
       'Mobile Number': s.mobileNumber || s.phone || '',
-      'Category': s.category,
-      'Date of Birth': s.dob || '',
-      'Maximum Marks': s.maxMarks || 600,
-      'Marks Secured': s.marksSecured || 0,
-      'Percentage (%)': s.marksPercentage,
-      'Department': s.department,
-      'Stream': s.stream,
-      'Gender': s.gender,
-      'Blood Group': s.bloodGroup,
-      'Status': s.status,
+      'Admission Date': s.admissionDate || '',
+      'Subject Name': s.department || ''
     }));
 
     const ws = XLSX.utils.json_to_sheet(wsData);
@@ -841,15 +865,6 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     setTimeout(() => setSettingsSavedMsg(''), 4000);
   };
 
-  // Google Sheet live sync
-  const handleGoogleSheetSync = async () => {
-    setIsSyncingSheet(true);
-    setSyncMessage('');
-    const syncedCount = await syncSamsGoogleSheet(sheetUrlInput);
-    setIsSyncingSheet(false);
-    setSyncMessage(`Successfully synced ${syncedCount} records from live SAMS Google Sheet!`);
-  };
-
   // Google Drive cloud backup
   const handleTriggerDriveBackup = async () => {
     setIsCreatingBackup(true);
@@ -1003,10 +1018,21 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         const phyCount = students.filter((s) => getEffectiveStream(s) === 'Physical Science').length;
         const sfCount = students.filter((s) => getEffectiveStream(s) === 'Self Financing').length;
 
-        const genCount = students.filter((s) => normalizeCategory(s.category) === 'GEN').length;
-        const scCount = students.filter((s) => normalizeCategory(s.category) === 'SC').length;
-        const stCount = students.filter((s) => normalizeCategory(s.category) === 'ST').length;
-        const sebcCount = students.filter((s) => normalizeCategory(s.category) === 'SEBC').length;
+        // Calculate Honours / Department Breakdown
+        const deptCountsMap: Record<string, number> = {};
+        students.forEach((s) => {
+          const dept = (s.department || 'Unassigned').trim();
+          if (dept) {
+            deptCountsMap[dept] = (deptCountsMap[dept] || 0) + 1;
+          }
+        });
+
+        const availableDepartments = Array.from(
+          new Set([
+            ...students.map((s) => (s.department || '').trim()).filter(Boolean),
+            ...seatMatrix.map((item) => (item.deptName || '').trim()).filter(Boolean)
+          ])
+        ).sort((a, b) => a.localeCompare(b));
 
         return (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
@@ -1051,6 +1077,19 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 {students.length > 0 && (
                   <button
                     onClick={() => {
+                      const count = deduplicateStudentsDatabase();
+                      showToast('success', `Database cleaned & deduplicated! Total unique records: ${count}`);
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center shadow transition"
+                    title="Remove duplicate records and keep only unique students matching SAMS/Roll No"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 mr-1 text-cyan-400" /> Deduplicate Records ({students.length})
+                  </button>
+                )}
+
+                {students.length > 0 && (
+                  <button
+                    onClick={() => {
                       const count = correctStudentClassifications();
                       if (count > 0) {
                         showToast('success', `Checked & corrected ${count} student stream & subject classifications with Subjects & Seats!`);
@@ -1068,10 +1107,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 {students.length > 0 && (
                   <button
                     onClick={() => {
-                      if (window.confirm('Are you sure you want to clear all student records?')) {
-                        clearAllStudents();
-                        showToast('info', 'All student database records cleared.');
-                      }
+                      askConfirmation(
+                        'Clear Entire Student Database?',
+                        'Are you sure you want to clear ALL student records? This action will wipe all imported student entries from local storage and database.',
+                        () => {
+                          clearAllStudents();
+                          showToast('info', 'All student database records cleared.');
+                        },
+                        'Clear Database',
+                        'danger'
+                      );
                     }}
                     className="px-3.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold flex items-center"
                   >
@@ -1093,7 +1138,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               </div>
             </div>
 
-            {/* Stream & Category Roster Breakdown Bar */}
+            {/* Stream & Honours Roster Breakdown Bar */}
             <div className="space-y-2.5 pt-1 text-xs">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-amber-400 font-mono text-[11px] font-bold mr-1">Stream Breakdown:</span>
@@ -1160,57 +1205,34 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-slate-400 font-mono text-[11px] font-semibold mr-1">Category Breakdown:</span>
+                <span className="text-amber-400 font-mono text-[11px] font-bold mr-1">Honours Breakdown:</span>
                 <button
-                  onClick={() => { setCategoryFilter('ALL'); setCurrentPage(1); }}
+                  onClick={() => { setDepartmentFilter('ALL'); setCurrentPage(1); }}
                   className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
-                    categoryFilter === 'ALL'
-                      ? 'bg-slate-800 text-amber-300 border-amber-500/40'
+                    departmentFilter === 'ALL'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                       : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                   }`}
                 >
-                  All Categories ({students.length})
+                  All Honours ({students.length})
                 </button>
-                <button
-                  onClick={() => { setCategoryFilter('GEN'); setCurrentPage(1); }}
-                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
-                    categoryFilter === 'GEN'
-                      ? 'bg-slate-800 text-amber-300 border-amber-500/40'
-                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                  }`}
-                >
-                  GEN ({genCount})
-                </button>
-                <button
-                  onClick={() => { setCategoryFilter('SC'); setCurrentPage(1); }}
-                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
-                    categoryFilter === 'SC'
-                      ? 'bg-slate-800 text-amber-300 border-amber-500/40'
-                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                  }`}
-                >
-                  SC ({scCount})
-                </button>
-                <button
-                  onClick={() => { setCategoryFilter('ST'); setCurrentPage(1); }}
-                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
-                    categoryFilter === 'ST'
-                      ? 'bg-slate-800 text-amber-300 border-amber-500/40'
-                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                  }`}
-                >
-                  ST ({stCount})
-                </button>
-                <button
-                  onClick={() => { setCategoryFilter('SEBC'); setCurrentPage(1); }}
-                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
-                    categoryFilter === 'SEBC'
-                      ? 'bg-slate-800 text-amber-300 border-amber-500/40'
-                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                  }`}
-                >
-                  SEBC ({sebcCount})
-                </button>
+                {availableDepartments.map((dept) => {
+                  const count = deptCountsMap[dept] || 0;
+                  const isSelected = departmentFilter.toLowerCase() === dept.toLowerCase();
+                  return (
+                    <button
+                      key={dept}
+                      onClick={() => { setDepartmentFilter(dept); setCurrentPage(1); }}
+                      className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition ${
+                        isSelected
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {dept} ({count})
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1242,15 +1264,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               </select>
 
               <select
-                value={categoryFilter}
-                onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
+                value={departmentFilter}
+                onChange={(e) => { setDepartmentFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500"
               >
-                <option value="ALL">All Categories</option>
-                <option value="GEN">GEN</option>
-                <option value="SC">SC</option>
-                <option value="ST">ST</option>
-                <option value="SEBC">SEBC</option>
+                <option value="ALL">All Honours / Departments</option>
+                {availableDepartments.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept} ({deptCountsMap[dept] || 0})
+                  </option>
+                ))}
               </select>
 
               <span className="text-slate-400 font-mono text-[11px] ml-auto">
@@ -1285,7 +1308,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-8 text-center space-y-2">
                 <p className="text-slate-300 text-xs">No records matched your search query or filter.</p>
                 <button
-                  onClick={() => { setStudentSearch(''); setStreamFilter('ALL'); setCategoryFilter('ALL'); }}
+                  onClick={() => { setStudentSearch(''); setStreamFilter('ALL'); setDepartmentFilter('ALL'); }}
                   className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold rounded-lg"
                 >
                   Clear Filters
@@ -1297,36 +1320,38 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                   <table className="w-full text-left text-xs text-slate-200">
                     <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
                       <tr>
-                        <th className="py-3 px-3">University Roll / SAMS</th>
-                        <th className="py-3 px-3">Student Name</th>
-                        <th className="py-3 px-3">Father Name</th>
-                        <th className="py-3 px-3">Mother Name</th>
-                        <th className="py-3 px-3">Mobile No</th>
-                        <th className="py-3 px-3">Category</th>
-                        <th className="py-3 px-3">DOB</th>
-                        <th className="py-3 px-3">Department</th>
-                        <th className="py-3 px-3 text-center">Percentage (%)</th>
-                        <th className="py-3 px-3 text-center">Actions</th>
+                        <th className="py-3 px-3 whitespace-nowrap">College Roll Number</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Barcode Number</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Student Name</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Father's Name</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Mother's Name</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Aadhaar No</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Stream</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Gender</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Address</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Category</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Mobile Number</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Admission Date</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Subject Name</th>
+                        <th className="py-3 px-3 text-center whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60">
                       {pagedStudents.map((stu) => (
                         <tr key={stu.id} className="hover:bg-slate-800/40 transition">
-                          <td className="py-2.5 px-3 font-mono text-[11px] whitespace-nowrap">
-                            <span className="text-amber-300 font-bold block">{stu.rollNo}</span>
-                            <span className="text-slate-500 block text-[10px]">{stu.samsRegNo}</span>
-                          </td>
+                          <td className="py-2.5 px-3 font-mono text-amber-300 font-bold whitespace-nowrap">{stu.rollNo || 'N/A'}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.samsRegNo || 'N/A'}</td>
                           <td className="py-2.5 px-3 font-bold text-white whitespace-nowrap">{stu.name}</td>
                           <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.parentName || 'N/A'}</td>
                           <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.motherName || 'N/A'}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.aadhaarNo || 'N/A'}</td>
+                          <td className="py-2.5 px-3 font-semibold text-purple-300 whitespace-nowrap">{stu.stream}</td>
+                          <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.gender || 'N/A'}</td>
+                          <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={stu.address || 'Baragada, Odisha'}>{stu.address || 'Baragada, Odisha'}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-400 whitespace-nowrap">{stu.category}</td>
                           <td className="py-2.5 px-3 font-mono text-emerald-400 whitespace-nowrap">{stu.mobileNumber || stu.phone || 'N/A'}</td>
-                          <td className="py-2.5 px-3 font-mono text-slate-400">{stu.category}</td>
-                          <td className="py-2.5 px-3 font-mono text-slate-400">{stu.dob || 'N/A'}</td>
-                          <td className="py-2.5 px-3">
-                            <span className="text-slate-200">{stu.department}</span>
-                            <span className="text-[10px] text-slate-500 block">{stu.stream}</span>
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-extrabold text-amber-400 text-sm">{stu.marksPercentage}%</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.admissionDate || 'N/A'}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-200 whitespace-nowrap">{stu.department}</td>
                           <td className="py-2.5 px-3 text-center">
                             <div className="flex items-center justify-center space-x-1">
                               <button
@@ -1338,10 +1363,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                               </button>
                               <button
                                 onClick={() => {
-                                  if (window.confirm(`Delete student ${stu.name} (${stu.rollNo || stu.samsRegNo})?`)) {
-                                    deleteStudent(stu.id);
-                                    showToast('success', `Removed ${stu.name} from database.`);
-                                  }
+                                  askConfirmation(
+                                    'Delete Student Record?',
+                                    `Are you sure you want to delete ${stu.name} (${stu.rollNo || stu.samsRegNo})?`,
+                                    () => {
+                                      deleteStudent(stu.id);
+                                      showToast('success', `Removed ${stu.name} from database.`);
+                                    },
+                                    'Delete Student',
+                                    'danger'
+                                  );
                                 }}
                                 className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400 text-xs transition"
                                 title="Delete Student"
@@ -1511,21 +1542,21 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     <input
                       type="radio"
                       name="importMode"
-                      checked={!importReplaceMode}
-                      onChange={() => setImportReplaceMode(false)}
+                      checked={importReplaceMode}
+                      onChange={() => setImportReplaceMode(true)}
                       className="text-amber-500 focus:ring-0"
                     />
-                    <span className="text-slate-300">Append to Existing Records</span>
+                    <span className="text-emerald-400 font-bold">Replace Entire Database (Recommended &bull; Matches exact Excel count)</span>
                   </label>
                   <label className="flex items-center space-x-2 cursor-pointer">
                     <input
                       type="radio"
                       name="importMode"
-                      checked={importReplaceMode}
-                      onChange={() => setImportReplaceMode(true)}
+                      checked={!importReplaceMode}
+                      onChange={() => setImportReplaceMode(false)}
                       className="text-amber-500 focus:ring-0"
                     />
-                    <span className="text-red-400 font-semibold">Replace Entire Database</span>
+                    <span className="text-slate-300">Merge & Append (Auto-Deduplicated)</span>
                   </label>
                 </div>
 
@@ -1586,36 +1617,37 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 <table className="w-full text-left text-xs text-slate-200">
                   <thead className="bg-slate-900 text-slate-400 uppercase font-mono text-[10px] sticky top-0">
                     <tr>
-                      <th className="py-2.5 px-3">Roll / SAMS</th>
-                      <th className="py-2.5 px-3">Student Name</th>
-                      <th className="py-2.5 px-3">Mother Name</th>
-                      <th className="py-2.5 px-3">Mobile No</th>
-                      <th className="py-2.5 px-3">Category</th>
-                      <th className="py-2.5 px-3">DOB</th>
-                      <th className="py-2.5 px-3">Department</th>
-                      <th className="py-2.5 px-3">Stream</th>
-                      <th className="py-2.5 px-3 text-center">Marks</th>
-                      <th className="py-2.5 px-3 text-center">%</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">College Roll Number</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Barcode Number</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Student Name</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Father's Name</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Mother's Name</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Aadhaar No</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Stream</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Gender</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Address</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Category</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Mobile Number</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Admission Date</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Subject Name</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
                     {importResult.students.slice(0, 10).map((stu, i) => (
                       <tr key={i} className="hover:bg-slate-800/30">
-                        <td className="py-2 px-3 font-mono text-[11px] whitespace-nowrap">
-                          <span className="text-amber-300 font-bold block">{stu.rollNo}</span>
-                          <span className="text-slate-500 block text-[10px]">{stu.samsRegNo}</span>
-                        </td>
+                        <td className="py-2 px-3 font-mono text-amber-300 font-bold whitespace-nowrap">{stu.rollNo || 'N/A'}</td>
+                        <td className="py-2 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.samsRegNo || 'N/A'}</td>
                         <td className="py-2 px-3 font-bold text-white whitespace-nowrap">{stu.name}</td>
+                        <td className="py-2 px-3 text-slate-300 whitespace-nowrap">{stu.parentName || 'N/A'}</td>
                         <td className="py-2 px-3 text-slate-300 whitespace-nowrap">{stu.motherName || 'N/A'}</td>
+                        <td className="py-2 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.aadhaarNo || 'N/A'}</td>
+                        <td className="py-2 px-3 font-semibold text-purple-300 whitespace-nowrap">{stu.stream}</td>
+                        <td className="py-2 px-3 text-slate-300 whitespace-nowrap">{stu.gender || 'N/A'}</td>
+                        <td className="py-2 px-3 text-slate-300 max-w-xs truncate" title={stu.address || 'Baragada, Odisha'}>{stu.address || 'Baragada, Odisha'}</td>
+                        <td className="py-2 px-3 font-mono text-slate-400 whitespace-nowrap">{stu.category}</td>
                         <td className="py-2 px-3 font-mono text-emerald-400 whitespace-nowrap">{stu.mobileNumber || stu.phone || 'N/A'}</td>
-                        <td className="py-2 px-3 font-mono text-slate-400">{stu.category}</td>
-                        <td className="py-2 px-3 font-mono text-slate-400">{stu.dob}</td>
-                        <td className="py-2 px-3">{stu.department}</td>
-                        <td className="py-2 px-3">{stu.stream}</td>
-                        <td className="py-2 px-3 text-center font-mono whitespace-nowrap">
-                          <span className="text-emerald-400 font-semibold">{stu.marksSecured}</span> / {stu.maxMarks}
-                        </td>
-                        <td className="py-2 px-3 text-center font-bold text-amber-400">{stu.marksPercentage}%</td>
+                        <td className="py-2 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.admissionDate || 'N/A'}</td>
+                        <td className="py-2 px-3 font-bold text-slate-200 whitespace-nowrap">{stu.department}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1628,36 +1660,6 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               )}
             </div>
           )}
-
-          {/* SAMS Live Google Sheet Sync Box */}
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-bold text-amber-400 font-mono">Live Google Sheet Sync URL</span>
-              <span className="text-slate-500 font-mono text-[10px]">
-                Last Sync: {systemSettings.lastSheetSync ? new Date(systemSettings.lastSheetSync).toLocaleString('en-IN') : 'Never'}
-              </span>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="url"
-                value={sheetUrlInput}
-                onChange={(e) => setSheetUrlInput(e.target.value)}
-                placeholder="https://docs.google.com/spreadsheets/d/..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-              />
-              <button
-                onClick={handleGoogleSheetSync}
-                disabled={isSyncingSheet}
-                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center shrink-0 shadow"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isSyncingSheet ? 'animate-spin' : ''}`} />
-                {isSyncingSheet ? 'Syncing...' : 'Sync Sheet'}
-              </button>
-            </div>
-
-            {syncMessage && <p className="text-xs text-emerald-400 font-medium">{syncMessage}</p>}
-          </div>
         </div>
       )}
 
@@ -1688,9 +1690,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               {faculty.length > 0 && (
                 <button
                   onClick={() => {
-                    if (window.confirm('Are you sure you want to clear ALL faculty records?')) {
-                      clearAllFaculty();
-                    }
+                    askConfirmation(
+                      'Clear Faculty Directory?',
+                      'Are you sure you want to clear ALL faculty members from directory?',
+                      () => {
+                        clearAllFaculty();
+                        showToast('info', 'Cleared all faculty directory records.');
+                      },
+                      'Clear Faculty',
+                      'danger'
+                    );
                   }}
                   className="px-3.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold flex items-center"
                 >
@@ -2053,10 +2062,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                             </button>
                             <button
                               onClick={() => {
-                                if (window.confirm(`Delete seat matrix for ${item.deptName}?`)) {
-                                  deleteSeatMatrixItem(item.id);
-                                  showToast('success', `Deleted department ${item.deptName}.`);
-                                }
+                                askConfirmation(
+                                  'Delete Department Seat Matrix?',
+                                  `Are you sure you want to delete seat matrix for ${item.deptName}?`,
+                                  () => {
+                                    deleteSeatMatrixItem(item.id);
+                                    showToast('success', `Deleted department ${item.deptName}.`);
+                                  },
+                                  'Delete Department',
+                                  'danger'
+                                );
                               }}
                               className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400 text-xs"
                               title="Delete Department"
@@ -2132,10 +2147,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     </button>
                     <button
                       onClick={() => {
-                        if (window.confirm('Delete this notice?')) {
-                          deleteNotice(n.id);
-                          showToast('success', 'Notice deleted successfully.');
-                        }
+                        askConfirmation(
+                          'Delete Notice?',
+                          'Are you sure you want to delete this notice?',
+                          () => {
+                            deleteNotice(n.id);
+                            showToast('success', 'Notice deleted successfully.');
+                          },
+                          'Delete Notice',
+                          'danger'
+                        );
                       }}
                       className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400"
                       title="Delete Notice"
@@ -2256,10 +2277,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     </button>
                     <button
                       onClick={() => {
-                        if (window.confirm(`Delete HOD account for ${hod.deptName}?`)) {
-                          deleteHodAccount(hod.id);
-                          showToast('success', `Deleted HOD account for ${hod.deptName}.`);
-                        }
+                        askConfirmation(
+                          'Delete HOD Account?',
+                          `Are you sure you want to delete HOD account for ${hod.deptName}?`,
+                          () => {
+                            deleteHodAccount(hod.id);
+                            showToast('success', `Deleted HOD account for ${hod.deptName}.`);
+                          },
+                          'Delete HOD Account',
+                          'danger'
+                        );
                       }}
                       className="p-1 rounded bg-slate-800 hover:bg-red-950/40 text-red-400"
                       title="Delete Account"
@@ -2337,12 +2364,18 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 {spotCandidates.length > 0 && (
                   <button
                     onClick={() => {
-                      if (window.confirm('Clear all spot candidates?')) {
-                        clearAllSpotCandidates();
-                        showToast('info', 'All spot candidates cleared.');
-                      }
+                      askConfirmation(
+                        'Clear Spot Candidates?',
+                        'Are you sure you want to clear all registered spot candidates?',
+                        () => {
+                          clearAllSpotCandidates();
+                          showToast('info', 'All spot candidates cleared.');
+                        },
+                        'Clear Candidates',
+                        'danger'
+                      );
                     }}
-                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-red-950 text-red-400 text-xs font-bold"
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-red-950 text-red-400 text-xs font-bold transition"
                   >
                     Clear Candidates
                   </button>
@@ -2410,10 +2443,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                         <td className="py-3 px-4 text-center">
                           <button
                             onClick={() => {
-                              if (window.confirm(`Delete spot candidate ${cand.studentName} (${cand.samsRegNo})?`)) {
-                                deleteSpotCandidate(cand.id);
-                                showToast('success', `Deleted spot candidate ${cand.studentName}.`);
-                              }
+                              askConfirmation(
+                                'Delete Spot Candidate?',
+                                `Are you sure you want to delete spot candidate ${cand.studentName} (${cand.samsRegNo})?`,
+                                () => {
+                                  deleteSpotCandidate(cand.id);
+                                  showToast('success', `Deleted spot candidate ${cand.studentName}.`);
+                                },
+                                'Delete Candidate',
+                                'danger'
+                              );
                             }}
                             className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400 text-xs transition"
                             title="Delete Spot Candidate"
@@ -2653,18 +2692,18 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               </div>
             </div>
 
-            {/* Section 4: 02 Admission In-Charge Officers, DEO & Principal Administration */}
+            {/* Section 4: UG Admission In-Charge Officers, DEO & Principal Administration */}
             <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-6">
               <div className="border-b border-slate-800 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center">
-                  <UserCheck className="w-4 h-4 mr-2 text-amber-400" /> 4. Admission Committee: 02 Admission In-Charge & DEO Helpdesk
+                  <UserCheck className="w-4 h-4 mr-2 text-amber-400" /> 4. Admission Committee: UG Admission In-Charge & DEO Helpdesk
                 </h3>
                 <span className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-mono">
                   DISPLAYS IN HERO BANNER & CONTACT DIRECTORY
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Configure official details, phone numbers, emails, and photos for the Principal, the two Admission In-Charge officers (Arts/Commerce and Science/AEDP), and the SAMS Data Entry Operator (DEO). All fields are editable by the Admin.
+                Configure official details, phone numbers, emails, and photos for the Principal, the UG Admission In-Charge officers, and the SAMS Data Entry Operator (DEO). All fields are editable by the Admin.
               </p>
 
               {/* Subsection A: Principal-in-Charge */}
@@ -2736,11 +2775,11 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </div>
               </div>
 
-              {/* Subsection B: Admission In-Charge 01 (Arts & Commerce) */}
+              {/* Subsection B: UG Admission In-Charge */}
               <div className="bg-slate-900/90 p-4 rounded-xl border border-blue-900/40 space-y-3">
                 <div className="flex items-center space-x-2 text-blue-300 font-bold text-xs">
                   <UserCheck className="w-4 h-4 text-blue-400" />
-                  <span>B. Admission In-Charge 01 (Arts & Commerce Stream)</span>
+                  <span>B. UG Admission In-Charge</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
@@ -2769,7 +2808,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                       type="text"
                       value={settingsForm.admissionIncharge1Designation}
                       onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1Designation: e.target.value })}
-                      placeholder="Admission In-Charge (Arts & Commerce) | Sr. Lecturer in Economics"
+                      placeholder="UG Admission In-Charge | Sr. Lecturer in Economics"
                       className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -2805,11 +2844,11 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </div>
               </div>
 
-              {/* Subsection C: Admission In-Charge 02 (Science & AEDP) */}
+              {/* Subsection C: UG Admission In-Charge */}
               <div className="bg-slate-900/90 p-4 rounded-xl border border-purple-900/40 space-y-3">
                 <div className="flex items-center space-x-2 text-purple-300 font-bold text-xs">
                   <UserCheck className="w-4 h-4 text-purple-400" />
-                  <span>C. Admission In-Charge 02 (Science & AEDP Specializations)</span>
+                  <span>C. UG Admission In-Charge</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
@@ -2838,7 +2877,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                       type="text"
                       value={settingsForm.admissionIncharge2Designation}
                       onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2Designation: e.target.value })}
-                      placeholder="Admission In-Charge (Science & AEDP) | Sr. Lecturer in Chemistry"
+                      placeholder="UG Admission In-Charge | Sr. Lecturer in Chemistry"
                       className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500"
                     />
                   </div>
@@ -3847,6 +3886,50 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Global Action Confirmation Modal (Replaces iframe-blocked window.confirm) */}
+      {confirmModal && confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center space-x-3 text-amber-400">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                <AlertTriangle className="w-6 h-6 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white font-serif">{confirmModal.title}</h3>
+                <p className="text-[11px] text-slate-400">SAMS System Operational Safeguard</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+              {confirmModal.message}
+            </p>
+
+            <div className="flex items-center justify-end space-x-2.5 pt-2 border-t border-slate-800/80">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const action = confirmModal.onConfirm;
+                  setConfirmModal(null);
+                  action();
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-slate-950 shadow transition ${
+                  confirmModal.confirmVariant === 'danger'
+                    ? 'bg-red-500 hover:bg-red-400 text-white'
+                    : 'bg-amber-500 hover:bg-amber-400'
+                }`}
+              >
+                {confirmModal.confirmText || 'Confirm'}
+              </button>
+            </div>
           </div>
         </div>
       )}

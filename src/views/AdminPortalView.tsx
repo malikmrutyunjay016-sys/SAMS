@@ -8,6 +8,7 @@ import {
   downloadStudentTemplateExcel,
   downloadStudentTemplateCSV,
   normalizeCategory,
+  compareRollNumbers,
   ParseResult
 } from '../lib/excelParser';
 import { Student, FacultyMember, Notice, FAQItem, SeatMatrixItem, HodAccount, StreamType, CategoryType, StudentStatus } from '../types';
@@ -434,7 +435,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       departmentFilter === 'ALL' ||
       (s.department || '').trim().toLowerCase() === departmentFilter.trim().toLowerCase();
     return matchesSearch && matchesStream && matchesDept;
-  });
+  }).sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
 
   // Filtered Faculty
   const filteredFaculty = faculty.filter((f) => {

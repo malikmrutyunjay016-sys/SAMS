@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Student } from '../types';
+import { compareRollNumbers } from '../lib/excelParser';
 import { Building2, Lock, Users, BookOpen, Plus, CheckCircle2, ShieldAlert, LogOut, Bell, Search, Edit2, X } from 'lucide-react';
 
 export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpenHodModal }) => {
@@ -65,13 +66,15 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
     (s.department || '').toLowerCase().includes((hodDeptName || '').toLowerCase())
   );
 
-  const filteredDeptStudents = deptStudents.filter((s) =>
-    (s.name || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
-    (s.rollNo || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
-    (s.samsRegNo || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
-    (s.parentName || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
-    (s.motherName || '').toLowerCase().includes((searchStudent || '').toLowerCase())
-  );
+  const filteredDeptStudents = deptStudents
+    .filter((s) =>
+      (s.name || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
+      (s.rollNo || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
+      (s.samsRegNo || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
+      (s.parentName || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
+      (s.motherName || '').toLowerCase().includes((searchStudent || '').toLowerCase())
+    )
+    .sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
 
   const deptSeats = seatMatrix.filter((s) =>
     s.deptName.toLowerCase().includes((hodDeptName || '').toLowerCase())

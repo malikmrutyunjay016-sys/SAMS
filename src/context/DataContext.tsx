@@ -23,7 +23,7 @@ import {
   generate1100Students,
 } from '../lib/defaultData';
 import { TRANSLATIONS, Language } from '../lib/translations';
-import { normalizeDepartmentAndStream } from '../lib/excelParser';
+import { normalizeDepartmentAndStream, compareRollNumbers } from '../lib/excelParser';
 import {
   db,
   handleFirestoreError,
@@ -186,10 +186,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const seenSams = new Set<string>();
     const seenRoll = new Set<string>();
-    const seenPersons = new Set<string>();
+    const seenIds = new Set<string>();
     const uniqueStudents: Student[] = [];
 
-    // Prioritize records with real SAMS barcodes (not starting with 24D15) over generated fallbacks
+    // Prioritize records with real SAMS barcodes over generated fallbacks
     const sorted = [...validList].sort((a, b) => {
       const aRealSams = a.samsRegNo && !a.samsRegNo.startsWith('24D15') ? 1 : 0;
       const bRealSams = b.samsRegNo && !b.samsRegNo.startsWith('24D15') ? 1 : 0;
@@ -197,11 +197,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     for (const s of sorted) {
+      const rawId = (s.id || '').trim();
       const rawSams = (s.samsRegNo || '').trim().toUpperCase();
       const rawRoll = (s.rollNo || '').trim().toUpperCase();
-      const rawName = (s.name || '').trim().toLowerCase();
-      const rawParent = (s.parentName || s.motherName || '').trim().toLowerCase();
-      const rawMobile = (s.mobileNumber || s.phone || '').trim().toLowerCase();
 
       const isRealSams = rawSams && rawSams !== 'NA' && !rawSams.startsWith('24D15') && rawSams.length >= 5;
       const isRealRoll =
@@ -213,37 +211,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         !rawRoll.startsWith('CS24-') &&
         rawRoll.length >= 4;
 
-      const personKey1 =
-        rawParent && rawParent !== 'parent / guardian' && rawParent !== 'mother name'
-          ? `person:${rawName}|${rawParent}`
-          : '';
-      const personKey2 = rawMobile && rawMobile.length >= 8 ? `mobile:${rawName}|${rawMobile}` : '';
-
       let isDuplicate = false;
-
+      if (rawId && seenIds.has(rawId)) {
+        isDuplicate = true;
+      }
       if (isRealSams && seenSams.has(rawSams)) {
         isDuplicate = true;
       }
       if (isRealRoll && seenRoll.has(rawRoll)) {
         isDuplicate = true;
       }
-      if (personKey1 && seenPersons.has(personKey1)) {
-        isDuplicate = true;
-      }
-      if (personKey2 && seenPersons.has(personKey2)) {
-        isDuplicate = true;
-      }
 
       if (!isDuplicate) {
+        if (rawId) seenIds.add(rawId);
         if (isRealSams) seenSams.add(rawSams);
         if (isRealRoll) seenRoll.add(rawRoll);
-        if (personKey1) seenPersons.add(personKey1);
-        if (personKey2) seenPersons.add(personKey2);
         uniqueStudents.push(s);
       }
     }
 
-    return uniqueStudents;
+    return uniqueStudents.sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
   };
 
   // Load students from storage or start clean
@@ -636,13 +623,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify([]));
     safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'true');
 
-    // Wipe Firestore student documents
+    // Wipe Firestore student documents in chunks of 400 (Firestore max batch limit is 500)
     try {
       const snap = await getDocs(collection(db, 'students'));
       if (!snap.empty) {
-        const batch = writeBatch(db);
-        snap.docs.forEach((d) => batch.delete(d.ref));
-        await batch.commit();
+        const docs = snap.docs;
+        const chunkSize = 400;
+        for (let i = 0; i < docs.length; i += chunkSize) {
+          const chunk = docs.slice(i, i + chunkSize);
+          const batch = writeBatch(db);
+          chunk.forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
       }
     } catch (e) {
       console.warn('Firestore bulk delete caught:', e);
@@ -667,7 +659,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'false');
     const nowIso = new Date().toISOString();
 
-    // 1. Immediately deduplicate incoming records in case Excel file has duplicate rows
+    // 1. Deduplicate incoming records by barcodes/rollNo
     const dedupedIncoming = cleanAndDeduplicateStudents(importedStudents);
 
     const sanitized: Student[] = dedupedIncoming.map((s, idx) => {
@@ -731,7 +723,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // In replace mode (default), replace with exact imported list (e.g. 1097 records).
       // In append mode, deduplicate merged list so duplicate rows can never be created!
       const updatedList = replace ? sanitized : cleanAndDeduplicateStudents([...sanitized, ...prev]);
-      safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updatedList.slice(0, 5000)));
+      safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updatedList.slice(0, 10000)));
 
       // 2. Ultra-fast seat matrix calculation in a single O(N) pass
       const regularCounts = new Map<string, number>();
@@ -771,12 +763,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return updatedList;
     });
 
-    // 3. Sync to Firestore in non-blocking background batches
+    // 3. Sync full imported list to Firestore in non-blocking background batches of 350
     setTimeout(async () => {
       if (isFirestoreQuotaExceeded()) return;
       try {
+        if (replace) {
+          // In replace mode, clean up old Firestore docs first in chunks of 400
+          const oldSnap = await getDocs(collection(db, 'students'));
+          if (!oldSnap.empty) {
+            const newIdSet = new Set(sanitized.map((s) => s.id));
+            const docsToDelete = oldSnap.docs.filter((d) => !newIdSet.has(d.id));
+            const chunkSize = 400;
+            for (let i = 0; i < docsToDelete.length; i += chunkSize) {
+              const delChunk = docsToDelete.slice(i, i + chunkSize);
+              const delBatch = writeBatch(db);
+              delChunk.forEach((d) => delBatch.delete(d.ref));
+              await delBatch.commit();
+            }
+          }
+        }
+
         const batchLimit = 350;
-        for (let i = 0; i < Math.min(sanitized.length, 1000); i += batchLimit) {
+        for (let i = 0; i < sanitized.length; i += batchLimit) {
           if (isFirestoreQuotaExceeded()) break;
           const chunk = sanitized.slice(i, i + batchLimit);
           const batch = writeBatch(db);

@@ -15,18 +15,20 @@ export interface ParseResult {
  * DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, and textual dates.
  */
 export function parseExcelDate(val: any): string {
-  if (val === null || val === undefined || val === '') return '2005-01-01';
+  if (val === null || val === undefined || val === '') return new Date().toISOString().slice(0, 10);
 
   if (typeof val === 'number') {
     // Excel serial date to JavaScript Date (base 1899-12-30)
-    const utcDays = Math.floor(val - 25569);
-    const utcValue = utcDays * 86400;
-    const dateInfo = new Date(utcValue * 1000);
-    if (!isNaN(dateInfo.getTime())) {
-      const y = dateInfo.getUTCFullYear();
-      const m = String(dateInfo.getUTCMonth() + 1).padStart(2, '0');
-      const d = String(dateInfo.getUTCDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
+    if (val >= 1000 && val <= 80000) {
+      const utcDays = Math.floor(val - 25569);
+      const utcValue = utcDays * 86400;
+      const dateInfo = new Date(utcValue * 1000);
+      if (!isNaN(dateInfo.getTime())) {
+        const y = dateInfo.getUTCFullYear();
+        const m = String(dateInfo.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(dateInfo.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
     }
   }
 
@@ -37,18 +39,38 @@ export function parseExcelDate(val: any): string {
     return `${y}-${m}-${d}`;
   }
 
-  const str = String(val).trim();
-  // Check DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  let str = String(val).trim();
+  if (!str) return new Date().toISOString().slice(0, 10);
+
+  // Strip time suffix if present e.g. "15/07/2024 10:30:00" -> "15/07/2024"
+  if (str.includes(' ')) {
+    const spaceParts = str.split(/\s+/);
+    if (spaceParts[0].includes('/') || spaceParts[0].includes('-') || spaceParts[0].includes('.')) {
+      str = spaceParts[0];
+    }
+  }
+
+  // 1. Check DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
   const dmyMatch = str.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})$/);
   if (dmyMatch) {
-    const day = dmyMatch[1].padStart(2, '0');
-    const month = dmyMatch[2].padStart(2, '0');
+    const p1 = parseInt(dmyMatch[1], 10);
+    const p2 = parseInt(dmyMatch[2], 10);
     let year = dmyMatch[3];
     if (year.length === 2) year = `20${year}`;
+
+    // If p1 > 12, p1 is definitely Day and p2 is Month (DD/MM/YYYY)
+    if (p1 > 12 && p2 <= 12) {
+      const day = String(p1).padStart(2, '0');
+      const month = String(p2).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    // Standard Indian e-Admission format is DD/MM/YYYY
+    const day = String(p1).padStart(2, '0');
+    const month = String(p2).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
 
-  // Check YYYY-MM-DD
+  // 2. Check YYYY-MM-DD
   const ymdMatch = str.match(/^(\d{4})[/.\-](\d{1,2})[/.\-](\d{1,2})$/);
   if (ymdMatch) {
     const year = ymdMatch[1];
@@ -57,14 +79,58 @@ export function parseExcelDate(val: any): string {
     return `${year}-${month}-${day}`;
   }
 
-  // Fallback try Date.parse
+  // 3. Textual month dates e.g. "15-Jul-2024" or "15 July 2024"
+  const textMonthMatch = str.match(/^(\d{1,2})[\s\-/.]([A-Za-z]{3,9})[\s\-/.Trigger]?(\d{2,4})$/);
+  if (textMonthMatch) {
+    const day = textMonthMatch[1].padStart(2, '0');
+    let year = textMonthMatch[3];
+    if (year.length === 2) year = `20${year}`;
+    const monthStr = textMonthMatch[2].toLowerCase();
+    const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const mIdx = months.findIndex((m) => monthStr.startsWith(m));
+    if (mIdx !== -1) {
+      const month = String(mIdx + 1).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  // 4. Fallback try Date.parse
   const parsed = Date.parse(str);
   if (!isNaN(parsed)) {
     const dt = new Date(parsed);
     return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
   }
 
-  return '2005-01-01';
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Robustly parses and formats 12-digit Aadhaar numbers.
+ * Handles Excel raw numbers, scientific notation (e.g. 7.84512e+11), spaces, and dashes.
+ */
+export function parseAadhaarNumber(val: any): string {
+  if (val === null || val === undefined || val === '') return 'N/A';
+
+  let rawStr = '';
+  if (typeof val === 'number') {
+    rawStr = val.toLocaleString('fullwide', { useGrouping: false });
+  } else {
+    rawStr = String(val).trim();
+    if (/^\d+(\.\d+)?e\+\d+$/i.test(rawStr)) {
+      const num = Number(rawStr);
+      if (!isNaN(num)) {
+        rawStr = num.toLocaleString('fullwide', { useGrouping: false });
+      }
+    }
+  }
+
+  const digits = rawStr.replace(/[^0-9]/g, '');
+  if (digits.length >= 12) {
+    const clean12 = digits.slice(0, 12);
+    return `${clean12.slice(0, 4)}-${clean12.slice(4, 8)}-${clean12.slice(8, 12)}`;
+  }
+
+  return rawStr || 'N/A';
 }
 
 /**
@@ -482,7 +548,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           if (colMap['phone'] === undefined) colMap['phone'] = cIdx;
         }
         // 14. Aadhaar No
-        else if (matchesField(['aadhaar', 'aadhar', 'uid', 'uidai', 'aadhaarno', 'aadharnumber', 'aadhaarcard'])) {
+        else if (matchesField(['aadhaar', 'aadhar', 'adhar', 'adhaar', 'uid', 'uidai', 'aadhaarno', 'aadharno', 'adharno', 'adhaarno', 'aadharnumber', 'aadhaarcard', 'aadharcard', 'adharcard', 'adhaarcard', 'uidnumber', 'uidno'])) {
           if (colMap['aadhaarNo'] === undefined) colMap['aadhaarNo'] = cIdx;
         }
         // 15. Address
@@ -490,7 +556,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           if (colMap['address'] === undefined) colMap['address'] = cIdx;
         }
         // 16. Admission Date
-        else if (matchesField(['admissiondate', 'dateofadmission', 'admdate', 'admissiondatet', 'doadm', 'joiningdate', 'admissiondt'])) {
+        else if (matchesField(['admissiondate', 'dateofadmission', 'admdate', 'admissiondatet', 'doadm', 'joiningdate', 'admissiondt', 'admitdate', 'admitteddate', 'doa', 'dtofadm', 'adm_date', 'admission_date', 'dateofadm'])) {
           if (colMap['admissionDate'] === undefined) colMap['admissionDate'] = cIdx;
         }
         // 17. Gender
@@ -804,20 +870,58 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         const rawBg = colMap['bloodGroup'] !== undefined ? String(row[colMap['bloodGroup']] || '').trim().toUpperCase() : 'O+';
         const bloodGroup = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].includes(rawBg) ? rawBg : 'O+';
 
-        // Aadhaar No
-        const rawAadhaar = colMap['aadhaarNo'] !== undefined ? String(row[colMap['aadhaarNo']] || '').trim() : '';
-        const cleanAadhaarDigits = rawAadhaar.replace(/[^0-9]/g, '');
-        const aadhaarNo =
-          cleanAadhaarDigits.length >= 12
-            ? `${cleanAadhaarDigits.slice(0, 4)}-${cleanAadhaarDigits.slice(4, 8)}-${cleanAadhaarDigits.slice(8, 12)}`
-            : rawAadhaar || 'N/A';
+        // Aadhaar No (with automatic 12-digit row cell scanner fallback)
+        let rawAadhaarVal = colMap['aadhaarNo'] !== undefined ? row[colMap['aadhaarNo']] : undefined;
+        if (rawAadhaarVal === undefined || rawAadhaarVal === null || rawAadhaarVal === '') {
+          // Scan row cells for any 12-digit number
+          for (let i = 0; i < row.length; i++) {
+            if (i === colMap['mobileNumber'] || i === colMap['phone'] || i === colMap['rollNo'] || i === colMap['samsRegNo']) continue;
+            const cVal = row[i];
+            if (cVal === null || cVal === undefined) continue;
+
+            let cDigits = '';
+            if (typeof cVal === 'number') {
+              cDigits = cVal.toLocaleString('fullwide', { useGrouping: false }).replace(/[^0-9]/g, '');
+            } else {
+              cDigits = String(cVal).replace(/[^0-9]/g, '');
+            }
+
+            if (cDigits.length === 12) {
+              rawAadhaarVal = cVal;
+              break;
+            }
+          }
+        }
+        const aadhaarNo = parseAadhaarNumber(rawAadhaarVal);
 
         // Address
         const address = colMap['address'] !== undefined ? String(row[colMap['address']] || '').trim() || 'Baragada, Odisha' : 'Baragada, Odisha';
 
-        // Admission Date
-        const rawAdmDate = colMap['admissionDate'] !== undefined ? row[colMap['admissionDate']] : undefined;
-        const admissionDate = rawAdmDate ? parseExcelDate(rawAdmDate) : new Date().toISOString().slice(0, 10);
+        // Admission Date (with automatic row cell date scanner fallback)
+        let rawAdmDateVal = colMap['admissionDate'] !== undefined ? row[colMap['admissionDate']] : undefined;
+        if (rawAdmDateVal === undefined || rawAdmDateVal === null || rawAdmDateVal === '') {
+          for (let i = 0; i < row.length; i++) {
+            if (i === colMap['dob'] || i === colMap['rollNo'] || i === colMap['samsRegNo'] || i === colMap['mobileNumber'] || i === colMap['phone'] || i === colMap['aadhaarNo']) continue;
+            const cVal = row[i];
+            if (cVal === null || cVal === undefined) continue;
+
+            if (typeof cVal === 'number' && cVal >= 40000 && cVal <= 80000) {
+              rawAdmDateVal = cVal;
+              break;
+            } else if (typeof cVal === 'string') {
+              const s = cVal.trim();
+              if (
+                /^\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}/.test(s) ||
+                /^\d{4}[/.\-]\d{1,2}[/.\-]\d{1,2}/.test(s) ||
+                /^\d{1,2}[\s\-/.][A-Za-z]{3,9}[\s\-/.Trigger]?\d{2,4}/.test(s)
+              ) {
+                rawAdmDateVal = s;
+                break;
+              }
+            }
+          }
+        }
+        const admissionDate = rawAdmDateVal ? parseExcelDate(rawAdmDateVal) : new Date().toISOString().slice(0, 10);
 
         // Status
         const rawStatus = colMap['status'] !== undefined ? String(row[colMap['status']] || '').trim() : 'Admitted';
@@ -872,11 +976,13 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
       };
     }
 
+    const sortedBestStudents = [...bestStudents].sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
+
     return {
       success: true,
-      students: bestStudents,
-      totalRowsFound: bestStudents.length,
-      message: `Successfully extracted ${bestStudents.length} student records from sheet "${bestSheetName}".`,
+      students: sortedBestStudents,
+      totalRowsFound: sortedBestStudents.length,
+      message: `Successfully extracted ${sortedBestStudents.length} student records from sheet "${bestSheetName}".`,
       warnings,
     };
   } catch (err: any) {
@@ -984,4 +1090,17 @@ export function downloadStudentTemplateCSV() {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+/**
+ * Dictionary (lexicographical & natural) comparison helper for college roll numbers.
+ * Sorts roll numbers like "BA24-001", "BA24-002", "BS24-001", "CS24-010" in exact dictionary order.
+ */
+export function compareRollNumbers(aRoll?: string, bRoll?: string): number {
+  const aStr = (aRoll || '').trim();
+  const bStr = (bRoll || '').trim();
+  if (!aStr && !bStr) return 0;
+  if (!aStr) return 1;
+  if (!bStr) return -1;
+  return aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: 'base' });
 }

@@ -129,9 +129,12 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   const [studentForm, setStudentForm] = useState({
     name: '',
     rollNo: '',
+    universityRollNo: '',
     samsRegNo: '',
     parentName: '',
     motherName: '',
+    aadhaarNo: '',
+    email: '',
     mobileNumber: '',
     dob: '2005-01-01',
     category: 'GEN' as CategoryType,
@@ -416,13 +419,14 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   const filteredStudents = students.filter((s) => {
     const q = (studentSearch || '').trim().toLowerCase();
     const nameMatch = (s.name || '').toLowerCase().includes(q);
-    const rollMatch = (s.rollNo || '').toLowerCase().includes(q);
+    const rollMatch = (s.rollNo || '').toLowerCase().includes(q) || (s.universityRollNo || '').toLowerCase().includes(q);
     const samsMatch = (s.samsRegNo || '').toLowerCase().includes(q);
+    const emailMatch = (s.email || '').toLowerCase().includes(q);
     const parentMatch = (s.parentName || '').toLowerCase().includes(q);
     const motherMatch = (s.motherName || '').toLowerCase().includes(q);
     const mobileMatch = (s.mobileNumber || s.phone || '').toLowerCase().includes(q);
     const deptMatch = (s.department || '').toLowerCase().includes(q);
-    const matchesSearch = !q || nameMatch || rollMatch || samsMatch || parentMatch || motherMatch || mobileMatch || deptMatch;
+    const matchesSearch = !q || nameMatch || rollMatch || samsMatch || emailMatch || parentMatch || motherMatch || mobileMatch || deptMatch;
 
     const effStream = getEffectiveStream(s);
     const fStream = streamFilter.toLowerCase();
@@ -525,11 +529,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
 
     const wsData = dataToExport.map((s) => ({
       'College Roll Number': s.rollNo || '',
+      'University Roll Number': s.universityRollNo || 'N/A',
       'Barcode Number': s.samsRegNo || '',
       'Student Name': s.name || '',
       "Father's Name": s.parentName || '',
       "Mother's Name": s.motherName || '',
       'Aadhaar No': s.aadhaarNo || '',
+      'Email ID': s.email || '',
       'Stream': s.stream || '',
       'Gender': s.gender || '',
       'Address': s.address || 'Baragada, Odisha',
@@ -553,9 +559,12 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     setStudentForm({
       name: '',
       rollNo: `BS24-${String(students.length + 1).padStart(3, '0')}`,
+      universityRollNo: '',
       samsRegNo: `24D${15000 + students.length + 1}`,
       parentName: '',
       motherName: '',
+      aadhaarNo: '',
+      email: '',
       mobileNumber: '9437123456',
       dob: '2005-01-01',
       category: 'GEN',
@@ -577,9 +586,12 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     setStudentForm({
       name: s.name,
       rollNo: s.rollNo,
+      universityRollNo: s.universityRollNo || '',
       samsRegNo: s.samsRegNo,
       parentName: s.parentName || '',
       motherName: s.motherName || '',
+      aadhaarNo: s.aadhaarNo || '',
+      email: s.email || '',
       mobileNumber: s.mobileNumber || s.phone || '',
       dob: s.dob || '2005-01-01',
       category: s.category,
@@ -1322,11 +1334,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
                       <tr>
                         <th className="py-3 px-3 whitespace-nowrap">College Roll Number</th>
+                        <th className="py-3 px-3 whitespace-nowrap">University Roll Number</th>
                         <th className="py-3 px-3 whitespace-nowrap">Barcode Number</th>
                         <th className="py-3 px-3 whitespace-nowrap">Student Name</th>
                         <th className="py-3 px-3 whitespace-nowrap">Father's Name</th>
                         <th className="py-3 px-3 whitespace-nowrap">Mother's Name</th>
                         <th className="py-3 px-3 whitespace-nowrap">Aadhaar No</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Email ID</th>
                         <th className="py-3 px-3 whitespace-nowrap">Stream</th>
                         <th className="py-3 px-3 whitespace-nowrap">Gender</th>
                         <th className="py-3 px-3 whitespace-nowrap">Address</th>
@@ -1341,11 +1355,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                       {pagedStudents.map((stu) => (
                         <tr key={stu.id} className="hover:bg-slate-800/40 transition">
                           <td className="py-2.5 px-3 font-mono text-amber-300 font-bold whitespace-nowrap">{stu.rollNo || 'N/A'}</td>
+                          <td className="py-2.5 px-3 font-mono text-cyan-300 font-semibold whitespace-nowrap">{stu.universityRollNo || 'N/A'}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.samsRegNo || 'N/A'}</td>
                           <td className="py-2.5 px-3 font-bold text-white whitespace-nowrap">{stu.name}</td>
                           <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.parentName || 'N/A'}</td>
                           <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.motherName || 'N/A'}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.aadhaarNo || 'N/A'}</td>
+                          <td className="py-2.5 px-3 font-mono text-sky-400 whitespace-nowrap">{stu.email || 'N/A'}</td>
                           <td className="py-2.5 px-3 font-semibold text-purple-300 whitespace-nowrap">{stu.stream}</td>
                           <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.gender || 'N/A'}</td>
                           <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={stu.address || 'Baragada, Odisha'}>{stu.address || 'Baragada, Odisha'}</td>
@@ -3166,13 +3182,39 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </div>
 
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">University Roll No *</label>
+                  <label className="text-slate-300 block mb-1 font-semibold">College Roll Number *</label>
                   <input
                     type="text"
                     required
                     value={studentForm.rollNo}
                     onChange={(e) => setStudentForm({ ...studentForm, rollNo: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-300 font-mono focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">
+                    University Roll Number <span className="text-amber-400 text-[10px] font-normal">(Admin / HOD Editable)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={studentForm.universityRollNo}
+                    placeholder="e.g. 240101001"
+                    onChange={(e) => setStudentForm({ ...studentForm, universityRollNo: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-cyan-300 font-mono font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Email ID</label>
+                  <input
+                    type="email"
+                    value={studentForm.email}
+                    placeholder="student@gmail.com"
+                    onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sky-300 font-mono focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -3211,12 +3253,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </div>
 
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">Date of Birth (DOB)</label>
+                  <label className="text-slate-300 block mb-1 font-semibold">Aadhaar No</label>
                   <input
-                    type="date"
-                    value={studentForm.dob}
-                    onChange={(e) => setStudentForm({ ...studentForm, dob: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    type="text"
+                    value={studentForm.aadhaarNo}
+                    placeholder="7845-1234-5678"
+                    onChange={(e) => setStudentForm({ ...studentForm, aadhaarNo: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>

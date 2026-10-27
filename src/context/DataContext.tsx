@@ -235,13 +235,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Load students from storage or start clean
   const [students, setStudents] = useState<Student[]>(() => {
-    const clearedFlag = safeGetLocalStorage(LS_PREFIX + 'studentsCleared');
-    const isCleared = clearedFlag === 'true' || clearedFlag === null;
-    if (isCleared) {
-      safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'true');
-      safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify([]));
-      return [];
-    }
     const saved = safeGetLocalStorage(LS_PREFIX + 'students');
     if (saved) {
       try {
@@ -500,12 +493,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubStudents = onSnapshot(
       collection(db, 'students'),
       (snapshot) => {
-        const clearedFlag = safeGetLocalStorage(LS_PREFIX + 'studentsCleared');
-        const isCleared = clearedFlag === 'true' || clearedFlag === null;
-        if (isCleared) {
-          setStudents([]);
-          return;
-        }
         if (!snapshot.empty) {
           const rawDocs = snapshot.docs.map((d) => {
             const data = d.data() as Student;
@@ -519,9 +506,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
           const cleanList = cleanAndDeduplicateStudents(rawDocs);
           setStudents(cleanList);
-          safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(cleanList.slice(0, 5000)));
+          safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(cleanList.slice(0, 10000)));
         } else {
           setStudents([]);
+          safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify([]));
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'students')
@@ -696,9 +684,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: stableId,
         name: s.name || `Student ${idx + 1}`,
         rollNo,
+        universityRollNo: s.universityRollNo || 'N/A',
         samsRegNo,
         parentName: s.parentName || 'Parent / Guardian',
         motherName: s.motherName || 'Mother Name',
+        aadhaarNo: s.aadhaarNo || 'N/A',
+        email: s.email || '',
         mobileNumber: s.mobileNumber || s.phone || '9437123456',
         category: s.category || 'GEN',
         dob: s.dob || '2005-01-01',
@@ -707,7 +698,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         marksPercentage: pct,
         department: norm.department,
         stream: norm.stream,
-        aadhaarNo: s.aadhaarNo || 'N/A',
         address: s.address || 'Baragada, Odisha',
         admissionDate: s.admissionDate || new Date().toISOString().slice(0, 10),
         phone: s.phone || s.mobileNumber || '9437123456',

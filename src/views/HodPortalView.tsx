@@ -21,9 +21,12 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
   const [hodStudentForm, setHodStudentForm] = useState({
     name: '',
     rollNo: '',
+    universityRollNo: '',
     samsRegNo: '',
     parentName: '',
     motherName: '',
+    aadhaarNo: '',
+    email: '',
     mobileNumber: '',
     phone: '',
     category: 'GEN' as any,
@@ -70,6 +73,8 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
     .filter((s) =>
       (s.name || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
       (s.rollNo || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
+      (s.universityRollNo || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
+      (s.email || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
       (s.samsRegNo || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
       (s.parentName || '').toLowerCase().includes((searchStudent || '').toLowerCase()) ||
       (s.motherName || '').toLowerCase().includes((searchStudent || '').toLowerCase())
@@ -108,9 +113,12 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
     setHodStudentForm({
       name: stu.name,
       rollNo: stu.rollNo,
+      universityRollNo: stu.universityRollNo || '',
       samsRegNo: stu.samsRegNo,
       parentName: stu.parentName || '',
       motherName: stu.motherName || '',
+      aadhaarNo: stu.aadhaarNo || '',
+      email: stu.email || '',
       mobileNumber: stu.mobileNumber || stu.phone || '',
       phone: stu.phone || '',
       category: stu.category,
@@ -292,10 +300,13 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
           <table className="w-full text-left text-xs text-slate-200">
             <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
               <tr>
-                <th className="py-3 px-3">University Roll / SAMS</th>
+                <th className="py-3 px-3">College Roll</th>
+                <th className="py-3 px-3">University Roll</th>
+                <th className="py-3 px-3">Barcode</th>
                 <th className="py-3 px-3">Student Name</th>
                 <th className="py-3 px-3">Father Name</th>
                 <th className="py-3 px-3">Mother Name</th>
+                <th className="py-3 px-3">Email ID</th>
                 <th className="py-3 px-3">Mobile No</th>
                 <th className="py-3 px-3">Category</th>
                 <th className="py-3 px-3 text-center">Percentage (%)</th>
@@ -305,13 +316,13 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
             <tbody className="divide-y divide-slate-800/60">
               {filteredDeptStudents.slice(0, 100).map((stu, idx) => (
                 <tr key={`${stu.id}_${idx}`} className="hover:bg-slate-800/40">
-                  <td className="py-2.5 px-3 font-mono whitespace-nowrap">
-                    <span className="font-bold text-amber-400 block">{stu.rollNo}</span>
-                    <span className="text-slate-500 text-[10px] block">{stu.samsRegNo}</span>
-                  </td>
+                  <td className="py-2.5 px-3 font-mono font-bold text-amber-300 whitespace-nowrap">{stu.rollNo || 'N/A'}</td>
+                  <td className="py-2.5 px-3 font-mono font-bold text-cyan-300 whitespace-nowrap">{stu.universityRollNo || 'N/A'}</td>
+                  <td className="py-2.5 px-3 font-mono text-slate-400 whitespace-nowrap">{stu.samsRegNo || 'N/A'}</td>
                   <td className="py-2.5 px-3 font-bold text-slate-100 whitespace-nowrap">{stu.name}</td>
                   <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.parentName || 'N/A'}</td>
                   <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.motherName || 'N/A'}</td>
+                  <td className="py-2.5 px-3 font-mono text-sky-400 whitespace-nowrap">{stu.email || 'N/A'}</td>
                   <td className="py-2.5 px-3 font-mono text-emerald-400 whitespace-nowrap">{stu.mobileNumber || stu.phone || 'N/A'}</td>
                   <td className="py-2.5 px-3 font-mono text-slate-300">{stu.category}</td>
                   <td className="py-2.5 px-3 text-center font-extrabold text-amber-400 text-sm">{stu.marksPercentage}%</td>
@@ -319,7 +330,7 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
                     <button
                       onClick={() => handleOpenEditHodStudent(stu)}
                       className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold flex items-center justify-center mx-auto transition"
-                      title="Edit University Roll No, Mother Name & Mobile No"
+                      title="Edit University Roll No, Email & Student Details"
                     >
                       <Edit2 className="w-3 h-3 mr-1" /> Edit
                     </button>
@@ -358,10 +369,9 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">University Roll No *</label>
+                  <label className="text-slate-300 block mb-1 font-semibold">College Roll Number</label>
                   <input
                     type="text"
-                    required
                     value={hodStudentForm.rollNo}
                     onChange={(e) => setHodStudentForm({ ...hodStudentForm, rollNo: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500"
@@ -369,12 +379,38 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
                 </div>
 
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">SAMS Reg No</label>
+                  <label className="text-slate-300 block mb-1 font-semibold">
+                    University Roll Number <span className="text-amber-400 text-[10px] font-normal">(Editable)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={hodStudentForm.universityRollNo}
+                    placeholder="e.g. 240101001"
+                    onChange={(e) => setHodStudentForm({ ...hodStudentForm, universityRollNo: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-cyan-300 font-mono font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Barcode / SAMS Reg No</label>
                   <input
                     type="text"
                     value={hodStudentForm.samsRegNo}
                     onChange={(e) => setHodStudentForm({ ...hodStudentForm, samsRegNo: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Email ID</label>
+                  <input
+                    type="email"
+                    value={hodStudentForm.email}
+                    placeholder="student@gmail.com"
+                    onChange={(e) => setHodStudentForm({ ...hodStudentForm, email: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sky-300 font-mono focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>

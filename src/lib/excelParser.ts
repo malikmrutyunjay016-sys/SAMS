@@ -398,7 +398,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
     const headerKeywords = [
       'name', 'student', 'applicant', 'candidate', 'fullname',
       'barcode', 'caf', 'cafno', 'appl', 'form',
-      'roll', 'rollno', 'rno', 'collegeroll', 'universityroll',
+      'roll', 'rollno', 'rno', 'collegeroll', 'universityroll', 'univroll', 'examroll',
       'reg', 'registration', 'regd', 'sams',
       'father', 'mother', 'parent', 'guardian', 'fname', 'mname',
       'category', 'cat', 'caste', 'community', 'social', 'reservation',
@@ -407,7 +407,8 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
       'percent', 'percentage', 'pct', 'career', 'weightage',
       'department', 'dept', 'honours', 'hon', 'hons', 'subject', 'core', 'major',
       'stream', 'faculty', 'discipline', 'branch',
-      'phone', 'mobile', 'contact', 'gender', 'sex', 'blood', 'status'
+      'phone', 'mobile', 'contact', 'gender', 'sex', 'blood', 'status',
+      'email', 'emailid', 'mail', 'e-mail'
     ];
 
     for (const sheetName of prioritizedSheetNames) {
@@ -490,7 +491,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         // 1. Student Name
         if (
           matchesField(['studentname', 'applicantname', 'candidatename', 'fullname', 'name']) &&
-          !matchesField(['father', 'mother', 'parent', 'guardian', 'fname', 'mname', 'dept', 'subject', 'college'])
+          !matchesField(['father', 'mother', 'parent', 'guardian', 'fname', 'mname', 'dept', 'subject', 'college', 'email'])
         ) {
           if (colMap['name'] === undefined) colMap['name'] = cIdx;
         }
@@ -498,39 +499,47 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         else if (matchesField(['barcode', 'caf', 'cafno', 'appno', 'application', 'sams', 'regno', 'registration', 'regd', 'samsreg', 'barcodeno', 'samsbarcode'])) {
           if (colMap['samsRegNo'] === undefined) colMap['samsRegNo'] = cIdx;
         }
-        // 3. Father Name
+        // 3. Email ID
+        else if (matchesField(['email', 'emailid', 'mail', 'studentemail', 'candidateemail', 'emailaddress', 'mailid', 'e-mail'])) {
+          if (colMap['email'] === undefined) colMap['email'] = cIdx;
+        }
+        // 4. University Roll Number
+        else if (matchesField(['universityroll', 'univroll', 'universityrollno', 'univrollno', 'examroll', 'universityrollnumber', 'examrollno', 'univ_roll', 'univrollnumber'])) {
+          if (colMap['universityRollNo'] === undefined) colMap['universityRollNo'] = cIdx;
+        }
+        // 5. College Roll Number
+        else if (matchesField(['collegeroll', 'classroll', 'rollno', 'roll', 'rno', 'universityroll', 'collegerollno', 'collegerollnumber'])) {
+          if (colMap['rollNo'] === undefined) colMap['rollNo'] = cIdx;
+        }
+        // 6. Father Name
         else if (matchesField(['father', 'fname', 'fathername'])) {
           if (colMap['parentName'] === undefined) colMap['parentName'] = cIdx;
         }
-        // 4. Mother Name
+        // 7. Mother Name
         else if (matchesField(['mother', 'mname', 'mothername'])) {
           if (colMap['motherName'] === undefined) colMap['motherName'] = cIdx;
         }
-        // 5. Category
+        // 8. Category
         else if (matchesField(['category', 'cat', 'caste', 'social', 'community', 'reservation'])) {
           if (colMap['category'] === undefined) colMap['category'] = cIdx;
         }
-        // 6. DOB
+        // 9. DOB
         else if (matchesField(['dob', 'birth', 'dateofbirth', 'bdate'])) {
           if (colMap['dob'] === undefined) colMap['dob'] = cIdx;
         }
-        // 7. Roll Number (University Roll Number)
-        else if (matchesField(['roll', 'rollno', 'collegeroll', 'classroll', 'rno', 'universityroll', 'examroll', 'universityrollno'])) {
-          if (colMap['rollNo'] === undefined) colMap['rollNo'] = cIdx;
-        }
-        // 8. Department / Honours Subject
+        // 10. Department / Honours Subject
         else if (matchesField(['dept', 'department', 'honours', 'hon', 'hons', 'subject', 'core', 'major', 'course', 'specialization'])) {
           if (colMap['department'] === undefined) colMap['department'] = cIdx;
         }
-        // 9. Stream
+        // 11. Stream
         else if (matchesField(['stream', 'faculty', 'discipline', 'branch'])) {
           if (colMap['stream'] === undefined) colMap['stream'] = cIdx;
         }
-        // 10. Percentage
+        // 12. Percentage
         else if (matchesField(['percent', 'percentage', 'pct', '%', 'career', 'weightage', 'merit'])) {
           if (colMap['percentage'] === undefined) colMap['percentage'] = cIdx;
         }
-        // 11. Max / Full / Total Marks
+        // 13. Max / Full / Total Marks
         else if (
           !matchesField(['secured', 'obtained', 'markssecured', 'marksobtained', 'securedmark', 'markssec', 'obtmarks', 'scoreobt', 'sec', 'obt', 'roll', 'rank', 'phone']) &&
           matchesField([
@@ -542,7 +551,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         ) {
           if (colMap['maxMarks'] === undefined) colMap['maxMarks'] = cIdx;
         }
-        // 12. Marks Secured / Obtained
+        // 14. Marks Secured / Obtained
         else if (
           matchesField([
             'secured', 'obtained', 'markssecured', 'marksobtained', 'securedmark', 'markssec',
@@ -551,32 +560,32 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         ) {
           if (colMap['marksSecured'] === undefined) colMap['marksSecured'] = cIdx;
         }
-        // 13. Mobile / Phone Number
+        // 15. Mobile / Phone Number
         else if (matchesField(['mobile', 'mob', 'cell', 'whatsapp', 'phone', 'contact', 'tel', 'mobilenumber'])) {
           if (colMap['mobileNumber'] === undefined) colMap['mobileNumber'] = cIdx;
           if (colMap['phone'] === undefined) colMap['phone'] = cIdx;
         }
-        // 14. Aadhaar No
-        else if (matchesField(['aadhaar', 'aadhar', 'adhar', 'adhaar', 'uid', 'uidai', 'aadhaarno', 'aadharno', 'adharno', 'adhaarno', 'aadharnumber', 'aadhaarcard', 'aadharcard', 'adharcard', 'adhaarcard', 'uidnumber', 'uidno'])) {
+        // 16. Aadhaar No
+        else if (matchesField(['aadhaar', 'aadhar', 'adhar', 'adhaar', 'uid', 'uidai', 'aadhaarno', 'aadharno', 'adharno', 'adhaarno', 'aadharnumber', 'aadhaarcard', 'aadharcard', 'adharcard', 'adhaarcard', 'uidnumber', 'uidno', 'aadhaarid', 'aadharid'])) {
           if (colMap['aadhaarNo'] === undefined) colMap['aadhaarNo'] = cIdx;
         }
-        // 15. Address
+        // 17. Address
         else if (matchesField(['address', 'addr', 'location', 'village', 'post', 'district', 'permanentaddress', 'presentaddress'])) {
           if (colMap['address'] === undefined) colMap['address'] = cIdx;
         }
-        // 16. Admission Date
+        // 18. Admission Date
         else if (matchesField(['admissiondate', 'dateofadmission', 'admdate', 'admissiondatet', 'doadm', 'joiningdate', 'admissiondt', 'admitdate', 'admitteddate', 'doa', 'dtofadm', 'adm_date', 'admission_date', 'dateofadm'])) {
           if (colMap['admissionDate'] === undefined) colMap['admissionDate'] = cIdx;
         }
-        // 17. Gender
+        // 19. Gender
         else if (matchesField(['gender', 'sex'])) {
           if (colMap['gender'] === undefined) colMap['gender'] = cIdx;
         }
-        // 18. Blood Group
+        // 20. Blood Group
         else if (matchesField(['blood', 'bloodgroup', 'bg'])) {
           if (colMap['bloodGroup'] === undefined) colMap['bloodGroup'] = cIdx;
         }
-        // 19. Status
+        // 21. Status
         else if (matchesField(['status', 'admissionstatus'])) {
           if (colMap['status'] === undefined) colMap['status'] = cIdx;
         }
@@ -841,7 +850,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           percentage = 75.0;
         }
 
-        // Roll Number (University Roll Number)
+        // College Roll Number & University Roll Number
         const rawRoll = colMap['rollNo'] !== undefined ? String(row[colMap['rollNo']] || '').trim() : '';
         const prefix =
           stream === 'Arts'
@@ -852,6 +861,23 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
             ? 'CS24'
             : 'BS24';
         const rollNo = rawRoll || `${prefix}-${String(rowIdx + 101).padStart(3, '0')}`;
+
+        // University Roll Number
+        const rawUnivRoll = colMap['universityRollNo'] !== undefined ? String(row[colMap['universityRollNo']] || '').trim() : '';
+        const universityRollNo = rawUnivRoll || 'N/A';
+
+        // Email ID
+        let rawEmail = colMap['email'] !== undefined ? String(row[colMap['email']] || '').trim() : '';
+        if (!rawEmail) {
+          for (const cell of row) {
+            const s = String(cell || '').trim();
+            if (s.includes('@') && s.includes('.') && !s.includes(' ')) {
+              rawEmail = s;
+              break;
+            }
+          }
+        }
+        const email = rawEmail ? rawEmail.toLowerCase() : 'N/A';
 
         // SAMS Reg No / Barcode
         let rawSams = colMap['samsRegNo'] !== undefined ? String(row[colMap['samsRegNo']] || '').trim() : '';
@@ -948,10 +974,12 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           id: `stu_imp_${Date.now()}_${rowIdx}_${Math.random().toString(36).substring(2, 6)}`,
           name,
           rollNo,
+          universityRollNo,
           samsRegNo,
           parentName,
           motherName,
           aadhaarNo,
+          email,
           address,
           admissionDate,
           mobileNumber,
@@ -1021,11 +1049,13 @@ export function downloadStudentTemplateExcel() {
   const sampleData = [
     {
       'College Roll Number': 'BA24-001',
+      'University Roll Number': '240101001',
       'Barcode Number': '24D10829',
       'Student Name': 'Rajesh Kumar Sahoo',
       "Father's Name": 'Bikash Chandra Sahoo',
       "Mother's Name": 'Sunita Sahoo',
       'Aadhaar No': '7845-1234-5678',
+      'Email ID': 'rajesh.sahoo2024@gmail.com',
       'Stream': 'Arts',
       'Gender': 'Male',
       'Address': 'Baragada Main Road, Ward 4, Baragada, Odisha - 768028',
@@ -1036,11 +1066,13 @@ export function downloadStudentTemplateExcel() {
     },
     {
       'College Roll Number': 'BS24-001',
+      'University Roll Number': '240201001',
       'Barcode Number': '24D10830',
       'Student Name': 'Priyanka Mohapatra',
       "Father's Name": 'Ranjan Mohapatra',
       "Mother's Name": 'Geetanjali Mohapatra',
       'Aadhaar No': '9812-3456-7890',
+      'Email ID': 'priyanka.m2024@gmail.com',
       'Stream': 'Biological Science',
       'Gender': 'Female',
       'Address': 'At/Po- Baragada Town, Bargarh',
@@ -1051,11 +1083,13 @@ export function downloadStudentTemplateExcel() {
     },
     {
       'College Roll Number': 'BS24-002',
+      'University Roll Number': '240201002',
       'Barcode Number': '24D10831',
       'Student Name': 'Dibakar Naik',
       "Father's Name": 'Kailash Naik',
       "Mother's Name": 'Sabita Naik',
       'Aadhaar No': '4512-8901-2345',
+      'Email ID': 'dibakar.naik2024@gmail.com',
       'Stream': 'Physical Science',
       'Gender': 'Male',
       'Address': 'Station Road, Baragada',
@@ -1078,11 +1112,13 @@ export function downloadStudentTemplateExcel() {
 export function downloadStudentTemplateCSV() {
   const headers = [
     'College Roll Number',
+    'University Roll Number',
     'Barcode Number',
     'Student Name',
     "Father's Name",
     "Mother's Name",
     'Aadhaar No',
+    'Email ID',
     'Stream',
     'Gender',
     'Address',
@@ -1093,9 +1129,9 @@ export function downloadStudentTemplateCSV() {
   ];
 
   const rows = [
-    'BA24-001,24D10829,Rajesh Kumar Sahoo,Bikash Chandra Sahoo,Sunita Sahoo,7845-1234-5678,Arts,Male,Baragada Main Road Ward 4,GEN,9437123456,2026-07-15,Economics',
-    'BS24-001,24D10830,Priyanka Mohapatra,Ranjan Mohapatra,Geetanjali Mohapatra,9812-3456-7890,Biological Science,Female,At/Po- Baragada Town,SEBC,9861234567,2026-07-16,Botany',
-    'BS24-002,24D10831,Dibakar Naik,Kailash Naik,Sabita Naik,4512-8901-2345,Physical Science,Male,Station Road Baragada,ST,9439876543,2026-07-18,Physics'
+    'BA24-001,240101001,24D10829,Rajesh Kumar Sahoo,Bikash Chandra Sahoo,Sunita Sahoo,7845-1234-5678,rajesh.sahoo2024@gmail.com,Arts,Male,Baragada Main Road Ward 4,GEN,9437123456,2026-07-15,Economics',
+    'BS24-001,240201001,24D10830,Priyanka Mohapatra,Ranjan Mohapatra,Geetanjali Mohapatra,9812-3456-7890,priyanka.m2024@gmail.com,Biological Science,Female,At/Po- Baragada Town,SEBC,9861234567,2026-07-16,Botany',
+    'BS24-002,240201002,24D10831,Dibakar Naik,Kailash Naik,Sabita Naik,4512-8901-2345,dibakar.naik2024@gmail.com,Physical Science,Male,Station Road Baragada,ST,9439876543,2026-07-18,Physics'
   ];
 
   const csvContent = [headers.join(','), ...rows].join('\n');

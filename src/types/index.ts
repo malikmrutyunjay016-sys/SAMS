@@ -8,10 +8,12 @@ export interface Student {
   id: string;
   name: string; // Student Name (Applicant Name)
   rollNo: string; // College Roll Number
+  universityRollNo?: string; // University Roll Number (Editable by Admin/HOD)
   samsRegNo: string; // Barcode Number
   parentName?: string; // Father's Name
   motherName?: string; // Mother's Name
   aadhaarNo?: string; // Aadhaar No
+  email?: string; // Student Email ID
   stream: StreamType; // Stream
   gender: 'Male' | 'Female' | 'Other'; // Gender
   address?: string; // Address

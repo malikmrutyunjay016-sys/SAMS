@@ -631,15 +631,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {}
     }
 
-    setSeatMatrix((prev) =>
-      prev.map((item) => ({
-        ...item,
-        admitted: 0,
-        vacant: item.sanctioned,
-        updatedAt: new Date().toISOString(),
-      }))
-    );
-    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(DEFAULT_SEAT_MATRIX));
+    setSeatMatrix((prev) => {
+      const resetMatrix = prev.map((item) => {
+        const updated = {
+          ...item,
+          admitted: 0,
+          vacant: item.sanctioned,
+          updatedAt: new Date().toISOString(),
+        };
+        safeSetDoc(doc(db, 'seatMatrix', item.id), updated);
+        return updated;
+      });
+      safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(resetMatrix));
+      return resetMatrix;
+    });
     addAuditLog('STUDENTS_CLEARED', `Cleared all ${count} student records from database.`);
   };
 
@@ -710,12 +715,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 1. Immediately update LocalStorage and React State for instantaneous UI response
     setStudents((prev) => {
-      // In replace mode (default), replace with exact imported list (e.g. 1097 records).
-      // In append mode, deduplicate merged list so duplicate rows can never be created!
       const updatedList = replace ? sanitized : cleanAndDeduplicateStudents([...sanitized, ...prev]);
       safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updatedList.slice(0, 10000)));
 
-      // 2. Ultra-fast seat matrix calculation in a single O(N) pass
+      // 2. Ultra-fast seat matrix calculation in a single O(N) pass and sync to Firestore
       const regularCounts = new Map<string, number>();
       const aedpCounts = new Map<string, number>();
       for (let i = 0; i < updatedList.length; i++) {
@@ -739,12 +742,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
           }
-          return {
+          const updated = {
             ...item,
             admitted: admittedCount,
             vacant: Math.max(0, item.sanctioned - admittedCount),
             updatedAt: nowIso,
           };
+          safeSetDoc(doc(db, 'seatMatrix', item.id), updated);
+          return updated;
         });
         safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(synced));
         return synced;

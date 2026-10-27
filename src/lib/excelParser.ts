@@ -113,14 +113,20 @@ export function parseAadhaarNumber(val: any): string {
 
   let rawStr = '';
   if (typeof val === 'number') {
-    rawStr = val.toLocaleString('fullwide', { useGrouping: false });
+    if (isNaN(val)) return 'N/A';
+    rawStr = BigInt(Math.round(val)).toString();
   } else {
-    rawStr = String(val).trim();
-    if (/^\d+(\.\d+)?e\+\d+$/i.test(rawStr)) {
-      const num = Number(rawStr);
+    let sVal = String(val).trim();
+    if (!sVal) return 'N/A';
+    if (/^\d+(\.\d+)?e\+\d+$/i.test(sVal)) {
+      const num = Number(sVal);
       if (!isNaN(num)) {
-        rawStr = num.toLocaleString('fullwide', { useGrouping: false });
+        rawStr = BigInt(Math.round(num)).toString();
+      } else {
+        rawStr = sVal;
       }
+    } else {
+      rawStr = sVal;
     }
   }
 
@@ -128,9 +134,12 @@ export function parseAadhaarNumber(val: any): string {
   if (digits.length >= 12) {
     const clean12 = digits.slice(0, 12);
     return `${clean12.slice(0, 4)}-${clean12.slice(4, 8)}-${clean12.slice(8, 12)}`;
+  } else if (digits.length >= 10 && digits.length < 12) {
+    const padded = digits.padStart(12, '0');
+    return `${padded.slice(0, 4)}-${padded.slice(4, 8)}-${padded.slice(8, 12)}`;
   }
 
-  return rawStr || 'N/A';
+  return rawStr && rawStr !== '0' ? rawStr : 'N/A';
 }
 
 /**
@@ -873,7 +882,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         // Aadhaar No (with automatic 12-digit row cell scanner fallback)
         let rawAadhaarVal = colMap['aadhaarNo'] !== undefined ? row[colMap['aadhaarNo']] : undefined;
         if (rawAadhaarVal === undefined || rawAadhaarVal === null || rawAadhaarVal === '') {
-          // Scan row cells for any 12-digit number
+          // Scan row cells for any 10 to 12 digit number or formatted string
           for (let i = 0; i < row.length; i++) {
             if (i === colMap['mobileNumber'] || i === colMap['phone'] || i === colMap['rollNo'] || i === colMap['samsRegNo']) continue;
             const cVal = row[i];
@@ -881,12 +890,20 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
 
             let cDigits = '';
             if (typeof cVal === 'number') {
-              cDigits = cVal.toLocaleString('fullwide', { useGrouping: false }).replace(/[^0-9]/g, '');
+              if (!isNaN(cVal) && cVal > 0) {
+                cDigits = BigInt(Math.round(cVal)).toString().replace(/[^0-9]/g, '');
+              }
             } else {
-              cDigits = String(cVal).replace(/[^0-9]/g, '');
+              const sVal = String(cVal).trim();
+              if (/^\d+(\.\d+)?e\+\d+$/i.test(sVal)) {
+                const num = Number(sVal);
+                cDigits = !isNaN(num) ? BigInt(Math.round(num)).toString() : '';
+              } else {
+                cDigits = sVal.replace(/[^0-9]/g, '');
+              }
             }
 
-            if (cDigits.length === 12) {
+            if (cDigits.length >= 10 && cDigits.length <= 12) {
               rawAadhaarVal = cVal;
               break;
             }
@@ -1102,5 +1119,5 @@ export function compareRollNumbers(aRoll?: string, bRoll?: string): number {
   if (!aStr && !bStr) return 0;
   if (!aStr) return 1;
   if (!bStr) return -1;
-  return aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: 'base' });
+  return aStr.localeCompare(bStr, 'en', { sensitivity: 'base' });
 }

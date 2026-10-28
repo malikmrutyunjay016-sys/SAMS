@@ -80,32 +80,83 @@ export const StatsView: React.FC = () => {
   const { students, seatMatrix, t, lang } = useData();
   const [expandedStream, setExpandedStream] = useState<string | null>(null);
 
-  // Totals computed directly from live Subjects & Seats Matrix
-  const totalSanctioned = seatMatrix.reduce((a, b) => a + (b.sanctioned || 0), 0);
-  const totalAdmitted = seatMatrix.reduce((a, b) => a + (b.admitted || 0), 0);
-  const totalVacant = seatMatrix.reduce((a, b) => a + (b.vacant || 0), 0);
+  const availableSessions = Array.from(
+    new Set(['2026-27', '2025-26', '2024-25', ...students.map((s) => s.academicYear || '2026-27'), ...seatMatrix.map((m) => m.academicYear || '2026-27')])
+  ).sort().reverse();
+  const [selectedSession, setSelectedSession] = useState<string>('2026-27');
+
+  const filteredStudents = selectedSession === 'ALL'
+    ? students
+    : students.filter((s) => (s.academicYear || '2026-27') === selectedSession);
+
+  const matchedSeatMatrix = selectedSession === 'ALL'
+    ? seatMatrix
+    : seatMatrix.filter((item) => (item.academicYear || '2026-27') === selectedSession);
+  const effectiveSeatMatrix = matchedSeatMatrix.length > 0
+    ? matchedSeatMatrix
+    : seatMatrix.filter((item) => !item.academicYear || item.academicYear === '2026-27').map((item) => ({
+        ...item,
+        id: item.id.startsWith('dept_') ? item.id : `dept_${selectedSession}_${item.id}`,
+        academicYear: selectedSession === 'ALL' ? '2026-27' : selectedSession,
+      }));
+
+  // Compute session-wise admitted counts for seatMatrix
+  const regularCounts = new Map<string, number>();
+  const aedpCounts = new Map<string, number>();
+  filteredStudents.forEach((s) => {
+    const d = (s.department || '').toLowerCase().trim();
+    if (s.isAedp) {
+      aedpCounts.set(d, (aedpCounts.get(d) || 0) + 1);
+    } else {
+      regularCounts.set(d, (regularCounts.get(d) || 0) + 1);
+    }
+  });
+
+  const sessionSeatMatrix = effectiveSeatMatrix.map((item) => {
+    const mDept = (item.deptName || '').toLowerCase().trim();
+    const targetMap = item.isAedp ? aedpCounts : regularCounts;
+    let admittedCount = targetMap.get(mDept) || 0;
+    if (admittedCount === 0) {
+      for (const [sDept, count] of targetMap.entries()) {
+        if (sDept.includes(mDept) || mDept.includes(sDept)) {
+          admittedCount += count;
+        }
+      }
+    }
+    const vacantCount = Math.max(0, item.sanctioned - admittedCount);
+    return {
+      ...item,
+      admitted: admittedCount,
+      vacant: vacantCount,
+    };
+  });
+
+  // Totals computed directly from live Subjects & Seats Matrix for selected session
+  const totalSanctioned = sessionSeatMatrix.reduce((a, b) => a + (b.sanctioned || 0), 0);
+  const totalAdmitted = sessionSeatMatrix.reduce((a, b) => a + (b.admitted || 0), 0);
+  const totalVacant = sessionSeatMatrix.reduce((a, b) => a + (b.vacant || 0), 0);
   const overallFillPercent = totalSanctioned > 0 ? ((totalAdmitted / totalSanctioned) * 100).toFixed(1) : '0.0';
 
   // AEDP Specializations from Subjects & Seats Matrix
-  const aedpItems = seatMatrix.filter((item) => item.isAedp);
+  const aedpItems = sessionSeatMatrix.filter((item) => item.isAedp);
   const aedpSanctioned = aedpItems.reduce((a, b) => a + (b.sanctioned || 0), 0);
   const aedpAdmitted = aedpItems.reduce((a, b) => a + (b.admitted || 0), 0);
 
-  // Student database demographics
-  const totalStudents = students.length;
-  const femaleCount = students.filter((s) => s.gender === 'Female').length;
-  const maleCount = students.filter((s) => s.gender === 'Male').length;
+  // Student database demographics for selected session
+  const totalStudents = filteredStudents.length;
+  const femaleCount = filteredStudents.filter((s) => s.gender === 'Female').length;
+  const maleCount = filteredStudents.filter((s) => s.gender === 'Male').length;
   const femalePercent = totalStudents > 0 ? ((femaleCount / totalStudents) * 100).toFixed(1) : '0.0';
 
   // Category Distribution normalized
-  const genCount = students.filter((s) => normalizeCategory(s.category) === 'GEN').length;
-  const scCount = students.filter((s) => normalizeCategory(s.category) === 'SC').length;
-  const stCount = students.filter((s) => normalizeCategory(s.category) === 'ST').length;
-  const sebcCount = students.filter((s) => normalizeCategory(s.category) === 'SEBC').length;
+  const genCount = filteredStudents.filter((s) => normalizeCategory(s.category) === 'GEN').length;
+  const scCount = filteredStudents.filter((s) => normalizeCategory(s.category) === 'SC').length;
+  const stCount = filteredStudents.filter((s) => normalizeCategory(s.category) === 'ST').length;
+  const sebcCount = filteredStudents.filter((s) => normalizeCategory(s.category) === 'SEBC').length;
 
   // Stream-wise Analytics synchronized directly with Subjects & Seats Matrix
   const streamStats = STREAM_CONFIGS.map((config) => {
-    const streamItems = seatMatrix.filter((item) => item.stream === config.name);
+    const streamItems = sessionSeatMatrix.filter((item) => item.stream === config.name);
     const sanctioned = streamItems.reduce((a, b) => a + (b.sanctioned || 0), 0);
     const admitted = streamItems.reduce((a, b) => a + (b.admitted || 0), 0);
     const vacant = streamItems.reduce((a, b) => a + (b.vacant || 0), 0);
@@ -141,7 +192,7 @@ export const StatsView: React.FC = () => {
           </h1>
           <p className="text-xs text-slate-400 mt-1">
             {lang === 'or'
-              ? `କଳା, ଜୈବ ବିଜ୍ଞାନ, ବାଣିଜ୍ୟ, ଭୌତିକ ବିଜ୍ଞାନ ଓ ସ୍ୱୟଂ ପୋଷିତ ସମସ୍ତ ୫ ଶାଖା ଏବଂ ${seatMatrix.length} ବିଭାଗର ଲାଇଭ୍ ତଥ୍ୟ।`
+              ? `କଳା, ଜୈବ ବିଜ୍ଞାନ, ବାଣିଜ୍ୟ, ଭୌତିକ ବିଜ୍ଞାନ ଓ ସ୍ୱୟଂ ପୋଷିତ ସମସ୍ତ 5 ଶାଖା ଏବଂ ${seatMatrix.length} ବିଭାଗର ଲାଇଭ୍ ତଥ୍ୟ।`
               : `Live synchronized metrics across all 5 academic streams (Arts, Biological Science, Commerce, Physical Science & Self Financing) and ${seatMatrix.length} sanctioned departments.`}
           </p>
         </div>
@@ -152,6 +203,29 @@ export const StatsView: React.FC = () => {
             {totalAdmitted} / {totalSanctioned} ({overallFillPercent}%)
           </span>
         </div>
+      </div>
+
+      {/* Academic Session Selector Bar */}
+      <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-lg">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-slate-400 font-medium font-mono uppercase text-[11px]">{lang === 'or' ? 'ଅଧିବେଶନ (Academic Session):' : 'Academic Session:'}</span>
+          {availableSessions.map((session) => (
+            <button
+              key={session}
+              onClick={() => setSelectedSession(session)}
+              className={`px-3 py-1.5 rounded-lg font-mono font-bold transition text-xs ${
+                selectedSession === session
+                  ? 'bg-amber-500 text-slate-950 shadow-lg'
+                  : 'bg-slate-950 text-slate-300 hover:bg-slate-800 border border-slate-800'
+              }`}
+            >
+              {session === 'ALL' ? (lang === 'or' ? 'ସମସ୍ତ ଅଧିବେଶନ' : 'All Sessions') : `${session} ${session === '2026-27' ? (lang === 'or' ? '(ଚଳିତ)' : '(Current)') : ''}`}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-lg">
+          {lang === 'or' ? `ଅଧିବେଶନ ${selectedSession}: ${filteredStudents.length} ଛାତ୍ରଛାତ୍ରୀ ରେକର୍ଡ` : `Session ${selectedSession}: ${filteredStudents.length} Scholars Recorded`}
+        </span>
       </div>
 
       {/* Top Metric Cards Grid */}

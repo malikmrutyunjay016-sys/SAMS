@@ -44,7 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenP
       ? 'bg-[#18050e] border-b border-red-950/80 text-pink-100 shadow-xl'
       : themeMode === 'navy'
       ? 'bg-[#061226] border-b border-blue-950/80 text-cyan-100 shadow-xl'
-      : 'bg-slate-900 border-b border-slate-800 text-slate-200 shadow-lg';
+      : 'bg-[#25442b] border-b border-[#1a311f] text-slate-100 shadow-lg';
 
   return (
     <nav className={`${navBgClass} sticky top-0 z-20 transition-colors duration-300`}>
@@ -59,24 +59,28 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenP
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center whitespace-nowrap transition-all ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center whitespace-nowrap transition-all ${
                     isActive
                       ? themeMode === 'navy'
                         ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-[0_0_12px_rgba(56,189,248,0.4)] font-bold'
-                        : 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.4)] font-bold'
+                        : themeMode === 'maroon'
+                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.4)] font-bold'
+                        : 'bg-[#d2eb4b] text-[#16291a] shadow-md font-extrabold'
                       : themeMode === 'maroon'
                       ? 'hover:bg-red-950/60 text-pink-200/80 hover:text-white'
                       : themeMode === 'navy'
                       ? 'hover:bg-blue-950/60 text-blue-200/80 hover:text-white'
-                      : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                      : 'hover:bg-[#1f3824] text-emerald-100/90 hover:text-white'
                   }`}
                 >
                   <Icon className={`w-3.5 h-3.5 mr-1.5 ${
                     isActive
-                      ? 'text-slate-950'
+                      ? 'text-[#16291a]'
                       : themeMode === 'navy'
                       ? 'text-cyan-400'
-                      : 'text-amber-400'
+                      : themeMode === 'maroon'
+                      ? 'text-amber-400'
+                      : 'text-[#d2eb4b]'
                   }`} />
                   {item.label}
                   {item.badge}
@@ -86,12 +90,6 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenP
           </div>
 
           <div className="flex items-center space-x-2 ml-4 shrink-0">
-            <button
-              onClick={onOpenProspectus}
-              className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-medium whitespace-nowrap transition"
-            >
-              {t.commonProspectus}
-            </button>
 
             {isHod && (
               <button

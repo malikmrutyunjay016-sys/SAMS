@@ -343,51 +343,61 @@ export const HomeView: React.FC<{
                   </div>
 
                   {/* Direct Contact Buttons */}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <a
-                      href={`tel:${currentOfficial.phone}`}
-                      className="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold flex items-center justify-center transition truncate"
-                      title={`Call ${currentOfficial.name} (${currentOfficial.phone})`}
-                    >
-                      <Phone className="w-3 h-3 mr-1 text-emerald-400 shrink-0" />
-                      <span className="truncate">{currentOfficial.phone}</span>
-                    </a>
-                    <a
-                      href={`mailto:${currentOfficial.email}`}
-                      className="px-2 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono flex items-center justify-center transition truncate"
-                      title={`Email ${currentOfficial.name} (${currentOfficial.email})`}
-                    >
-                      <Mail className="w-3 h-3 mr-1 text-blue-400 shrink-0" />
-                      <span className="truncate">{currentOfficial.email.split('@')[0]}</span>
-                    </a>
+                  <div className="space-y-1.5 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      <a
+                        href={`tel:${currentOfficial.phone}`}
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] sm:text-[11px] font-mono font-bold flex items-center justify-center transition truncate"
+                        title={`Call ${currentOfficial.name} (${currentOfficial.phone})`}
+                      >
+                        <Phone className="w-3 h-3 mr-1.5 text-emerald-400 shrink-0" />
+                        <span className="truncate">{currentOfficial.phone}</span>
+                      </a>
+                      <a
+                        href={`mailto:${currentOfficial.email}`}
+                        className="px-2.5 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] sm:text-[11px] font-mono flex items-center justify-center transition truncate"
+                        title={`Email ${currentOfficial.name} (${currentOfficial.email})`}
+                      >
+                        <Mail className="w-3 h-3 mr-1.5 text-blue-400 shrink-0" />
+                        <span className="truncate font-medium">{currentOfficial.email}</span>
+                      </a>
+                    </div>
                   </div>
                 </div>
               ) : (
                 /* Compact View of All 4 Officials */
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
                   {officials.map((off) => (
                     <div
                       key={off.id}
-                      className="bg-slate-950/70 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between text-xs gap-2"
+                      className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 space-y-1.5 text-xs"
                     >
-                      <div className="flex items-center space-x-2 min-w-0">
-                        <div className="w-8 h-8 rounded-full border border-amber-500/40 p-0.5 overflow-hidden shrink-0">
-                          <img src={off.photoUrl} alt={off.name} className="w-full h-full object-cover rounded-full" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-bold text-white text-[11px] truncate" style={{ color: '#ffffff' }}>
-                            {off.name}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <div className="w-8 h-8 rounded-full border border-amber-500/40 p-0.5 overflow-hidden shrink-0">
+                            <img src={off.photoUrl} alt={off.name} className="w-full h-full object-cover rounded-full" />
                           </div>
-                          <div className="text-[9px] text-amber-400 truncate">{off.title}</div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-white text-[11px] truncate" style={{ color: '#ffffff' }}>
+                              {off.name}
+                            </div>
+                            <div className="text-[9px] text-amber-400 truncate">{off.title}</div>
+                          </div>
                         </div>
+                        <a
+                          href={`tel:${off.phone}`}
+                          className="px-2 py-1 rounded bg-slate-900 hover:bg-emerald-500/20 text-emerald-300 border border-slate-700 hover:border-emerald-500/40 text-[10px] font-mono font-bold shrink-0 flex items-center"
+                          title={off.phone}
+                        >
+                          <Phone className="w-2.5 h-2.5 mr-1" /> Call
+                        </a>
                       </div>
-                      <a
-                        href={`tel:${off.phone}`}
-                        className="px-2 py-1 rounded bg-slate-900 hover:bg-emerald-500/20 text-emerald-300 border border-slate-700 hover:border-emerald-500/40 text-[10px] font-mono font-bold shrink-0 flex items-center"
-                        title={off.phone}
-                      >
-                        <Phone className="w-2.5 h-2.5 mr-1" /> Call
-                      </a>
+                      <div className="flex items-center space-x-1.5 text-[10px] font-mono text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-lg">
+                        <Mail className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+                        <a href={`mailto:${off.email}`} className="truncate hover:underline">
+                          {off.email}
+                        </a>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -413,12 +423,6 @@ export const HomeView: React.FC<{
             <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl text-center">
               <span className="text-xs text-amber-300 font-medium block">{t.vacantSeatsAvailable}</span>
               <span className="text-2xl font-black text-amber-400">{totalVacant} {lang === 'or' ? 'ସିଟ୍' : 'Seats'}</span>
-              <button
-                onClick={() => onNavigateTab('spot')}
-                className="mt-2 text-[11px] text-amber-300 hover:text-white underline font-semibold flex items-center justify-center mx-auto"
-              >
-                {t.applySpotSelection} <ChevronRight className="w-3 h-3 ml-0.5" />
-              </button>
             </div>
 
           </div>
@@ -484,11 +488,9 @@ export const HomeView: React.FC<{
                 )}
               </div>
             ))}
-          </div>
-
         </div>
-
       </div>
+    </div>
 
       {/* Admin Quick Edit Officials Modal */}
       {isEditModalOpen && (

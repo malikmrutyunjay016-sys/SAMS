@@ -1,8 +1,11 @@
 export type StreamType = 'Arts' | 'Biological Science' | 'Commerce' | 'Physical Science' | 'Self Financing' | 'Science';
 
-export type CategoryType = 'GEN' | 'SC' | 'ST' | 'SEBC';
+export type CategoryType = 'GEN' | 'SC' | 'ST' | 'SEBC' | 'OBC';
 
 export type StudentStatus = 'Admitted' | 'Spot Applied' | 'Selected' | 'Verified' | 'Pending';
+
+export const ACADEMIC_YEARS = ['2025-26', '2024-25', '2023-24'] as const;
+export type AcademicYearType = typeof ACADEMIC_YEARS[number];
 
 export interface Student {
   id: string;
@@ -20,6 +23,7 @@ export interface Student {
   category: CategoryType; // Category
   mobileNumber?: string; // Mobile Number
   admissionDate?: string; // Admission Date
+  academicYear?: string; // Academic Year / Session e.g. '2025-26', '2024-25', '2023-24'
   department: string; // Subject Name
   isAedp: boolean;
   maxMarks?: number;
@@ -41,6 +45,7 @@ export interface SeatMatrixItem {
   sanctioned: number;
   admitted: number;
   vacant: number;
+  academicYear?: string; // e.g. '2026-27', '2025-26'
   updatedAt: string;
 }
 

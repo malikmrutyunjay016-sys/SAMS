@@ -150,7 +150,8 @@ export function normalizeCategory(val: any): CategoryType {
   const c = String(val).toUpperCase().trim();
   if (c.includes('SC') || c.includes('SCHEDULED CASTE')) return 'SC';
   if (c.includes('ST') || c.includes('SCHEDULED TRIBE')) return 'ST';
-  if (c.includes('SEBC') || c.includes('OBC') || c.includes('BACKWARD')) return 'SEBC';
+  if (c === 'OBC' || c === 'OTHER BACKWARD CLASS' || c.includes('OBC')) return 'OBC';
+  if (c.includes('SEBC') || c.includes('BACKWARD')) return 'SEBC';
   return 'GEN';
 }
 
@@ -355,7 +356,10 @@ function cleanHeader(h: any): string {
  * Supports multi-sheet scans, merged header rows, smart column discovery,
  * date normalization, and value-based column heuristics.
  */
-export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
+export async function parseExcelOrCsvFile(
+  file: File,
+  defaultAcademicYear: string = '2026-27'
+): Promise<ParseResult> {
   const warnings: string[] = [];
 
   try {
@@ -588,6 +592,10 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         // 21. Status
         else if (matchesField(['status', 'admissionstatus'])) {
           if (colMap['status'] === undefined) colMap['status'] = cIdx;
+        }
+        // 22. Academic Year / Session
+        else if (matchesField(['academicyear', 'session', 'sessionyear', 'academic_year', 'year'])) {
+          if (colMap['academicYear'] === undefined) colMap['academicYear'] = cIdx;
         }
       }
 
@@ -970,6 +978,10 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
         const rawStatus = colMap['status'] !== undefined ? String(row[colMap['status']] || '').trim() : 'Admitted';
         const status: StudentStatus = (rawStatus as StudentStatus) || 'Admitted';
 
+        // Academic Year
+        const rawAy = colMap['academicYear'] !== undefined ? String(row[colMap['academicYear']] || '').trim() : '';
+        const academicYear = rawAy || defaultAcademicYear;
+
         sheetStudents.push({
           id: `stu_imp_${Date.now()}_${rowIdx}_${Math.random().toString(36).substring(2, 6)}`,
           name,
@@ -982,6 +994,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
           email,
           address,
           admissionDate,
+          academicYear,
           mobileNumber,
           dob,
           maxMarks,
@@ -1048,37 +1061,39 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParseResult> {
 export function downloadStudentTemplateExcel() {
   const sampleData = [
     {
-      'College Roll Number': 'BA24-001',
-      'University Roll Number': '240101001',
-      'Barcode Number': '24D10829',
+      'College Roll Number': 'BA26-001',
+      'University Roll Number': '260101001',
+      'Barcode Number': '26D10829',
       'Student Name': 'Rajesh Kumar Sahoo',
       "Father's Name": 'Bikash Chandra Sahoo',
       "Mother's Name": 'Sunita Sahoo',
       'Aadhaar No': '7845-1234-5678',
-      'Email ID': 'rajesh.sahoo2024@gmail.com',
+      'Email ID': 'rajesh.sahoo2026@gmail.com',
       'Stream': 'Arts',
       'Gender': 'Male',
       'Address': 'Baragada Main Road, Ward 4, Baragada, Odisha - 768028',
       'Category': 'GEN',
       'Mobile Number': '9437123456',
       'Admission Date': '2026-07-15',
+      'Academic Year': '2026-27',
       'Subject Name': 'Economics'
     },
     {
-      'College Roll Number': 'BS24-001',
-      'University Roll Number': '240201001',
-      'Barcode Number': '24D10830',
+      'College Roll Number': 'BS25-001',
+      'University Roll Number': '250201001',
+      'Barcode Number': '25D10830',
       'Student Name': 'Priyanka Mohapatra',
       "Father's Name": 'Ranjan Mohapatra',
       "Mother's Name": 'Geetanjali Mohapatra',
       'Aadhaar No': '9812-3456-7890',
-      'Email ID': 'priyanka.m2024@gmail.com',
+      'Email ID': 'priyanka.m2025@gmail.com',
       'Stream': 'Biological Science',
       'Gender': 'Female',
       'Address': 'At/Po- Baragada Town, Bargarh',
       'Category': 'SEBC',
       'Mobile Number': '9861234567',
-      'Admission Date': '2026-07-16',
+      'Admission Date': '2025-07-16',
+      'Academic Year': '2025-26',
       'Subject Name': 'Botany'
     },
     {
@@ -1095,7 +1110,8 @@ export function downloadStudentTemplateExcel() {
       'Address': 'Station Road, Baragada',
       'Category': 'ST',
       'Mobile Number': '9439876543',
-      'Admission Date': '2026-07-18',
+      'Admission Date': '2024-07-18',
+      'Academic Year': '2024-25',
       'Subject Name': 'Physics'
     }
   ];
@@ -1125,13 +1141,14 @@ export function downloadStudentTemplateCSV() {
     'Category',
     'Mobile Number',
     'Admission Date',
+    'Academic Year',
     'Subject Name'
   ];
 
   const rows = [
-    'BA24-001,240101001,24D10829,Rajesh Kumar Sahoo,Bikash Chandra Sahoo,Sunita Sahoo,7845-1234-5678,rajesh.sahoo2024@gmail.com,Arts,Male,Baragada Main Road Ward 4,GEN,9437123456,2026-07-15,Economics',
-    'BS24-001,240201001,24D10830,Priyanka Mohapatra,Ranjan Mohapatra,Geetanjali Mohapatra,9812-3456-7890,priyanka.m2024@gmail.com,Biological Science,Female,At/Po- Baragada Town,SEBC,9861234567,2026-07-16,Botany',
-    'BS24-002,240201002,24D10831,Dibakar Naik,Kailash Naik,Sabita Naik,4512-8901-2345,dibakar.naik2024@gmail.com,Physical Science,Male,Station Road Baragada,ST,9439876543,2026-07-18,Physics'
+    'BA26-001,260101001,26D10829,Rajesh Kumar Sahoo,Bikash Chandra Sahoo,Sunita Sahoo,7845-1234-5678,rajesh.sahoo2026@gmail.com,Arts,Male,Baragada Main Road Ward 4,GEN,9437123456,2026-07-15,2026-27,Economics',
+    'BS25-001,250201001,25D10830,Priyanka Mohapatra,Ranjan Mohapatra,Geetanjali Mohapatra,9812-3456-7890,priyanka.m2025@gmail.com,Biological Science,Female,At/Po- Baragada Town,SEBC,9861234567,2025-07-16,2025-26,Botany',
+    'BS24-002,240201002,24D10831,Dibakar Naik,Kailash Naik,Sabita Naik,4512-8901-2345,dibakar.naik2024@gmail.com,Physical Science,Male,Station Road Baragada,ST,9439876543,2024-07-18,2024-25,Physics'
   ];
 
   const csvContent = [headers.join(','), ...rows].join('\n');

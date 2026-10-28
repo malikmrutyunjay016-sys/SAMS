@@ -8,6 +8,7 @@ import {
   downloadStudentTemplateExcel,
   downloadStudentTemplateCSV,
   normalizeCategory,
+  normalizeDepartmentAndStream,
   compareRollNumbers,
   ParseResult
 } from '../lib/excelParser';
@@ -122,6 +123,8 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   const [studentSearch, setStudentSearch] = useState('');
   const [streamFilter, setStreamFilter] = useState('ALL');
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
+  const [academicYearFilter, setAcademicYearFilter] = useState('ALL');
+  const [targetImportAcademicYear, setTargetImportAcademicYear] = useState('2026-27');
 
   // Student Add / Edit Modal
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -143,6 +146,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     marksPercentage: 84.0,
     stream: 'Science' as StreamType,
     department: 'Physics',
+    academicYear: '2026-27',
     phone: '9437123456',
     gender: 'Male' as 'Male' | 'Female' | 'Other',
     bloodGroup: 'O+',
@@ -219,6 +223,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   // ==========================================
   // SEAT MATRIX STATE
   // ==========================================
+  const [adminSeatSession, setAdminSeatSession] = useState('2026-27');
   const [isSeatModalOpen, setIsSeatModalOpen] = useState(false);
   const [editingSeatItem, setEditingSeatItem] = useState<SeatMatrixItem | null>(null);
   const [seatForm, setSeatForm] = useState({
@@ -228,6 +233,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     specialization: 'Regular Honours',
     sanctioned: 32,
     admitted: 0,
+    academicYear: '2026-27',
   });
 
   // ==========================================
@@ -438,7 +444,12 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     const matchesDept =
       departmentFilter === 'ALL' ||
       (s.department || '').trim().toLowerCase() === departmentFilter.trim().toLowerCase();
-    return matchesSearch && matchesStream && matchesDept;
+
+    const matchesAcademicYear =
+      academicYearFilter === 'ALL' ||
+      (s.academicYear || '2025-26') === academicYearFilter;
+
+    return matchesSearch && matchesStream && matchesDept && matchesAcademicYear;
   }).sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
 
   // Filtered Faculty
@@ -466,7 +477,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     try {
-      const res = await parseExcelOrCsvFile(file);
+      const res = await parseExcelOrCsvFile(file, targetImportAcademicYear);
       setIsImporting(false);
       setImportResult(res);
 
@@ -558,9 +569,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     setEditingStudent(null);
     setStudentForm({
       name: '',
-      rollNo: `BS24-${String(students.length + 1).padStart(3, '0')}`,
+      rollNo: `BS26-${String(students.length + 1).padStart(3, '0')}`,
       universityRollNo: '',
-      samsRegNo: `24D${15000 + students.length + 1}`,
+      samsRegNo: `26D${15000 + students.length + 1}`,
       parentName: '',
       motherName: '',
       aadhaarNo: '',
@@ -573,6 +584,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       marksPercentage: 80.0,
       stream: 'Science',
       department: 'Physics',
+      academicYear: '2026-27',
       phone: '9437123456',
       gender: 'Male',
       bloodGroup: 'O+',
@@ -600,6 +612,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       marksPercentage: s.marksPercentage,
       stream: s.stream,
       department: s.department,
+      academicYear: s.academicYear || '2025-26',
       phone: s.phone || '9437123456',
       gender: s.gender,
       bloodGroup: s.bloodGroup || 'O+',
@@ -701,6 +714,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       specialization: 'Regular Honours',
       sanctioned: 32,
       admitted: 0,
+      academicYear: adminSeatSession,
     });
     setIsSeatModalOpen(true);
   };
@@ -714,6 +728,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       specialization: s.specialization || 'Regular Honours',
       sanctioned: s.sanctioned,
       admitted: s.admitted,
+      academicYear: s.academicYear || '2026-27',
     });
     setIsSeatModalOpen(true);
   };
@@ -728,8 +743,10 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         seatForm.sanctioned,
         seatForm.admitted,
         seatForm.deptName,
-        seatForm.stream
+        seatForm.stream,
+        seatForm.academicYear
       );
+      showToast('success', `Updated seat matrix for ${seatForm.deptName} (${seatForm.academicYear}).`);
     } else {
       addSeatMatrixItem({
         deptName: seatForm.deptName,
@@ -739,7 +756,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         sanctioned: seatForm.sanctioned,
         admitted: seatForm.admitted,
         vacant: Math.max(0, seatForm.sanctioned - seatForm.admitted),
+        academicYear: seatForm.academicYear,
       });
+      showToast('success', `Added department ${seatForm.deptName} for session ${seatForm.academicYear}.`);
     }
 
     setIsSeatModalOpen(false);
@@ -1025,15 +1044,30 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
           ? filteredStudents
           : filteredStudents.slice((safePage - 1) * effectivePageSize, safePage * effectivePageSize);
 
-        const artsCount = students.filter((s) => getEffectiveStream(s) === 'Arts').length;
-        const bioCount = students.filter((s) => getEffectiveStream(s) === 'Biological Science').length;
-        const commCount = students.filter((s) => getEffectiveStream(s) === 'Commerce').length;
-        const phyCount = students.filter((s) => getEffectiveStream(s) === 'Physical Science').length;
-        const sfCount = students.filter((s) => getEffectiveStream(s) === 'Self Financing').length;
+        const sessionStudentsForBreakdown = academicYearFilter === 'ALL'
+          ? students
+          : students.filter((s) => (s.academicYear || '2026-27') === academicYearFilter);
+
+        const artsCount = sessionStudentsForBreakdown.filter((s) => getEffectiveStream(s) === 'Arts').length;
+        const bioCount = sessionStudentsForBreakdown.filter((s) => getEffectiveStream(s) === 'Biological Science').length;
+        const commCount = sessionStudentsForBreakdown.filter((s) => getEffectiveStream(s) === 'Commerce').length;
+        const phyCount = sessionStudentsForBreakdown.filter((s) => getEffectiveStream(s) === 'Physical Science').length;
+        const sfCount = sessionStudentsForBreakdown.filter((s) => getEffectiveStream(s) === 'Self Financing').length;
+
+        const streamStudents = streamFilter === 'ALL'
+          ? sessionStudentsForBreakdown
+          : sessionStudentsForBreakdown.filter((s) => {
+              const effStream = getEffectiveStream(s);
+              const fStream = streamFilter.toLowerCase();
+              return (
+                effStream.toLowerCase() === fStream ||
+                (fStream === 'science' && (effStream === 'Physical Science' || effStream === 'Biological Science'))
+              );
+            });
 
         // Calculate Honours / Department Breakdown
         const deptCountsMap: Record<string, number> = {};
-        students.forEach((s) => {
+        streamStudents.forEach((s) => {
           const dept = (s.department || 'Unassigned').trim();
           if (dept) {
             deptCountsMap[dept] = (deptCountsMap[dept] || 0) + 1;
@@ -1042,10 +1076,12 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
 
         const availableDepartments = Array.from(
           new Set([
-            ...students.map((s) => (s.department || '').trim()).filter(Boolean),
-            ...seatMatrix.map((item) => (item.deptName || '').trim()).filter(Boolean)
+            ...streamStudents.map((s) => (s.department || '').trim()).filter(Boolean),
+            ...(streamFilter === 'ALL' ? seatMatrix.map((item) => (item.deptName || '').trim()).filter(Boolean) : [])
           ])
-        ).sort((a, b) => a.localeCompare(b));
+        )
+          .filter((dept) => (deptCountsMap[dept] || 0) > 0)
+          .sort((a, b) => a.localeCompare(b));
 
         return (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
@@ -1068,18 +1104,6 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                   <Plus className="w-3.5 h-3.5 mr-1" /> Add Student
                 </button>
 
-                <label className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold flex items-center shadow cursor-pointer transition">
-                  <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />
-                  {isImporting ? 'Importing Sheet...' : 'Quick Import Excel / CSV'}
-                  <input
-                    type="file"
-                    accept=".xlsx, .xls, .csv, .tsv"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    disabled={isImporting}
-                  />
-                </label>
-
                 <button
                   onClick={handleExportStudentsExcel}
                   className="px-3.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-xs font-bold flex items-center"
@@ -1087,72 +1111,51 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                   <Download className="w-3.5 h-3.5 mr-1" /> Export Excel
                 </button>
 
-                {students.length > 0 && (
-                  <button
-                    onClick={() => {
-                      const count = deduplicateStudentsDatabase();
-                      showToast('success', `Database cleaned & deduplicated! Total unique records: ${count}`);
-                    }}
-                    className="px-3.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center shadow transition"
-                    title="Remove duplicate records and keep only unique students matching SAMS/Roll No"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 mr-1 text-cyan-400" /> Deduplicate Records ({students.length})
-                  </button>
-                )}
 
-                {students.length > 0 && (
-                  <button
-                    onClick={() => {
-                      const count = correctStudentClassifications();
-                      if (count > 0) {
-                        showToast('success', `Checked & corrected ${count} student stream & subject classifications with Subjects & Seats!`);
-                      } else {
-                        showToast('info', 'All student records in database are already 100% synchronized with Subjects & Seats.');
-                      }
-                    }}
-                    className="px-3.5 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center shadow transition"
-                    title="Synchronize student stream and subject classifications with official Subjects & Seats matrix"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 mr-1 text-purple-400" /> Correct Stream & Subject Classifications
-                  </button>
-                )}
 
-                {students.length > 0 && (
-                  <button
-                    onClick={() => {
-                      askConfirmation(
-                        'Clear Entire Student Database?',
-                        'Are you sure you want to clear ALL student records? This action will wipe all imported student entries from local storage and database.',
-                        () => {
-                          clearAllStudents();
-                          showToast('info', 'All student database records cleared.');
-                        },
-                        'Clear Database',
-                        'danger'
-                      );
-                    }}
-                    className="px-3.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold flex items-center"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Clear All Students
-                  </button>
-                )}
-
-                {students.length === 0 && (
-                  <button
-                    onClick={() => {
-                      loadSampleStudents();
-                      showToast('success', 'Loaded sample student roster.');
-                    }}
-                    className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 mr-1" /> Load Sample Students
-                  </button>
-                )}
               </div>
             </div>
 
-            {/* Stream & Honours Roster Breakdown Bar */}
-            <div className="space-y-2.5 pt-1 text-xs">
+            {/* Academic Year / Session Filter & Stream Breakdown Bar */}
+            <div className="space-y-3 pt-1 text-xs">
+              <div className="flex flex-wrap items-center gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                <span className="text-amber-400 font-mono text-[11px] font-bold mr-1 flex items-center">
+                  <Sparkles className="w-3.5 h-3.5 mr-1" /> Admission Batch:
+                </span>
+                <button
+                  onClick={() => { setAcademicYearFilter('ALL'); setCurrentPage(1); }}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    academicYearFilter === 'ALL'
+                      ? 'bg-amber-500 text-slate-950 border-amber-500 shadow'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  All Academic Years ({students.length})
+                </button>
+                {['2026-27', '2025-26', '2024-25'].map((ay) => {
+                  const count = students.filter((s) => (s.academicYear || '2026-27') === ay).length;
+                  return (
+                    <button
+                      key={ay}
+                      onClick={() => { setAcademicYearFilter(ay); setCurrentPage(1); }}
+                      className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition flex items-center ${
+                        academicYearFilter === ay
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <span>{ay}</span>
+                      <span className="ml-1 text-[9px] text-slate-400 font-normal">
+                        {ay === '2026-27' ? '(Current)' : ay === '2025-26' ? '(1 Yr Ago)' : '(2 Yrs Ago)'}
+                      </span>
+                      <span className="ml-1.5 px-1.5 py-0.2 bg-slate-950 rounded text-[10px] text-amber-400 font-mono">
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-amber-400 font-mono text-[11px] font-bold mr-1">Stream Breakdown:</span>
                 <button
@@ -1163,7 +1166,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                       : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                   }`}
                 >
-                  All Streams ({students.length})
+                  All Streams ({sessionStudentsForBreakdown.length})
                 </button>
                 <button
                   onClick={() => { setStreamFilter('Arts'); setCurrentPage(1); }}
@@ -1227,7 +1230,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                       : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                   }`}
                 >
-                  All Honours ({students.length})
+                  All Honours ({streamStudents.length})
                 </button>
                 {availableDepartments.map((dept) => {
                   const count = deptCountsMap[dept] || 0;
@@ -1347,6 +1350,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                         <th className="py-3 px-3 whitespace-nowrap">Category</th>
                         <th className="py-3 px-3 whitespace-nowrap">Mobile Number</th>
                         <th className="py-3 px-3 whitespace-nowrap">Admission Date</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Academic Year</th>
                         <th className="py-3 px-3 whitespace-nowrap">Subject Name</th>
                         <th className="py-3 px-3 text-center whitespace-nowrap">Actions</th>
                       </tr>
@@ -1368,6 +1372,11 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                           <td className="py-2.5 px-3 font-mono text-slate-400 whitespace-nowrap">{stu.category}</td>
                           <td className="py-2.5 px-3 font-mono text-emerald-400 whitespace-nowrap">{stu.mobileNumber || stu.phone || 'N/A'}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.admissionDate || 'N/A'}</td>
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              {stu.academicYear || '2026-27'}
+                            </span>
+                          </td>
                           <td className="py-2.5 px-3 font-bold text-slate-200 whitespace-nowrap">{stu.department}</td>
                           <td className="py-2.5 px-3 text-center">
                             <div className="flex items-center justify-center space-x-1">
@@ -1494,9 +1503,19 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               <h3 className="font-bold text-white text-sm flex items-center">
                 <Upload className="w-4 h-4 mr-2 text-emerald-400" /> Select Spreadsheet File
               </h3>
-              <p className="text-slate-400 leading-relaxed">
-                Supports standard SAMS Odisha admission lists, College office sheets, and custom formats. Columns like <strong className="text-amber-400">Student Name</strong>, <strong className="text-amber-400">Barcode</strong>, <strong className="text-amber-400">Father/Mother Name</strong>, <strong className="text-amber-400">Category</strong>, <strong className="text-amber-400">DOB</strong>, <strong className="text-amber-400">Marks</strong>, and <strong className="text-amber-400">Department</strong> are mapped automatically.
-              </p>
+              <div className="space-y-1.5 pt-1">
+                <label className="text-slate-300 font-semibold block">Target Academic Year / Session for Import:</label>
+                <select
+                  value={targetImportAcademicYear}
+                  onChange={(e) => setTargetImportAcademicYear(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-amber-300 font-bold focus:outline-none focus:border-amber-500"
+                >
+                  <option value="2026-27">2026-27 (Current Session)</option>
+                  <option value="2025-26">2025-26 (Last Academic Year)</option>
+                  <option value="2024-25">2024-25 (2 Years Ago)</option>
+                </select>
+                <p className="text-[10px] text-slate-500">If the Excel sheet does not specify an Academic Year column, imported records will automatically be assigned to this selected session.</p>
+              </div>
 
               <label className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold shadow-lg flex items-center justify-center cursor-pointer transition">
                 <FileSpreadsheet className="w-5 h-5 mr-2" />
@@ -1825,6 +1844,80 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       {/* TAB 4: SEAT MATRIX EDITOR (ADD / EDIT / DELETE)           */}
       {/* ========================================================= */}
       {activeAdminTab === 'seats' && (() => {
+        const sessionStudents = students.filter(
+          (s) => (s.academicYear || '2026-27') === adminSeatSession
+        );
+        const sessionSeatItems = seatMatrix.filter(
+          (item) => (item.academicYear || '2026-27') === adminSeatSession
+        );
+
+        const deptMap = new Map<string, { deptName: string; stream: StreamType; isAedp: boolean; specialization: string; sanctioned: number }>();
+
+        // 1. Configured seat items for this session
+        sessionSeatItems.forEach((item) => {
+          const norm = normalizeDepartmentAndStream(item.deptName, item.stream);
+          const key = `${norm.isAedp ? 'aedp' : 'reg'}_${norm.department.toLowerCase().trim()}`;
+          deptMap.set(key, {
+            deptName: norm.department,
+            stream: norm.stream,
+            isAedp: norm.isAedp,
+            specialization: item.specialization || (norm.isAedp ? 'AEDP Specialization' : 'Regular Honours'),
+            sanctioned: item.sanctioned,
+          });
+        });
+
+        // 2. Synced from student database roster for this session
+        sessionStudents.forEach((s) => {
+          const rawDept = (s.department || '').trim();
+          if (!rawDept) return;
+          const norm = normalizeDepartmentAndStream(rawDept, s.stream);
+          const key = `${norm.isAedp ? 'aedp' : 'reg'}_${norm.department.toLowerCase().trim()}`;
+          if (!deptMap.has(key)) {
+            deptMap.set(key, {
+              deptName: norm.department,
+              stream: norm.stream,
+              isAedp: norm.isAedp,
+              specialization: norm.isAedp ? 'AEDP Specialization' : 'Regular Honours',
+              sanctioned: 32,
+            });
+          }
+        });
+
+        const effectiveSeatMatrix: SeatMatrixItem[] = Array.from(deptMap.entries()).map(([key, data], idx) => {
+          const existingItem = sessionSeatItems.find(
+            (item) => {
+              const itemNorm = normalizeDepartmentAndStream(item.deptName, item.stream);
+              const itemKey = `${itemNorm.isAedp ? 'aedp' : 'reg'}_${itemNorm.department.toLowerCase().trim()}`;
+              return itemKey === key || item.deptName.toLowerCase().trim() === data.deptName.toLowerCase().trim();
+            }
+          );
+          const sanctioned = existingItem ? existingItem.sanctioned : data.sanctioned;
+
+          const enrolled = sessionStudents.filter((s) => {
+            const sNorm = normalizeDepartmentAndStream(s.department, s.stream);
+            const matchesDept = sNorm.department.toLowerCase().trim() === data.deptName.toLowerCase().trim() ||
+              sNorm.department.toLowerCase().includes(data.deptName.toLowerCase()) ||
+              data.deptName.toLowerCase().includes(sNorm.department.toLowerCase());
+            const matchesAedp = Boolean(sNorm.isAedp) === Boolean(data.isAedp);
+            return matchesDept && matchesAedp;
+          });
+          const admitted = enrolled.length;
+          const vacant = Math.max(0, sanctioned - admitted);
+
+          return {
+            id: existingItem ? existingItem.id : `dept_${adminSeatSession}_synced_${idx}_${Date.now()}`,
+            deptName: data.deptName,
+            stream: data.stream,
+            isAedp: data.isAedp,
+            specialization: data.specialization,
+            sanctioned,
+            admitted,
+            vacant,
+            academicYear: adminSeatSession,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+
         const streamCounts = {
           Arts: { sanctioned: 0, admitted: 0, vacant: 0, depts: 0 },
           'Biological Science': { sanctioned: 0, admitted: 0, vacant: 0, depts: 0 },
@@ -1833,7 +1926,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
           'Self Financing': { sanctioned: 0, admitted: 0, vacant: 0, depts: 0 },
         };
 
-        seatMatrix.forEach((item) => {
+        effectiveSeatMatrix.forEach((item) => {
           const st = item.stream || 'Arts';
           if (streamCounts[st as keyof typeof streamCounts]) {
             streamCounts[st as keyof typeof streamCounts].sanctioned += item.sanctioned;
@@ -1843,20 +1936,46 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
           }
         });
 
-        const totalSanctionedAll = seatMatrix.reduce((a, b) => a + b.sanctioned, 0);
-        const totalAdmittedAll = seatMatrix.reduce((a, b) => a + b.admitted, 0);
-        const totalVacantAll = seatMatrix.reduce((a, b) => a + b.vacant, 0);
+        const totalSanctionedAll = effectiveSeatMatrix.reduce((a, b) => a + b.sanctioned, 0);
+        const totalAdmittedAll = effectiveSeatMatrix.reduce((a, b) => a + b.admitted, 0);
+        const totalVacantAll = effectiveSeatMatrix.reduce((a, b) => a + b.vacant, 0);
 
-        const filteredSeatMatrix = seatMatrix.filter((item) => {
+        const filteredSeatMatrix = effectiveSeatMatrix.filter((item) => {
           const matchesStream =
             streamFilter === 'ALL' ||
             item.stream === streamFilter ||
             (streamFilter === 'Science' && (item.stream === 'Physical Science' || item.stream === 'Biological Science'));
           return matchesStream;
+        }).sort((a, b) => {
+          const streamCompare = (a.stream || '').localeCompare(b.stream || '');
+          if (streamCompare !== 0) return streamCompare;
+          return (a.deptName || '').localeCompare(b.deptName || '');
         });
 
         return (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+            {/* Academic Session Selector Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-slate-400 font-mono text-xs uppercase font-semibold">Seat Matrix Session:</span>
+                {['2026-27', '2025-26', '2024-25', '2023-24'].map((yr) => (
+                  <button
+                    key={yr}
+                    onClick={() => setAdminSeatSession(yr)}
+                    className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition ${
+                      adminSeatSession === yr
+                        ? 'bg-amber-500 text-slate-950 shadow'
+                        : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
+                    }`}
+                  >
+                    {yr} {yr === '2026-27' ? '(Current)' : ''}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] font-mono text-emerald-400">
+                Session {adminSeatSession}: {effectiveSeatMatrix.length} Departments Configured
+              </span>
+            </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
               <div>
                 <h2 className="text-lg font-bold text-white font-serif flex items-center">
@@ -1976,7 +2095,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredSeatMatrix.map((item) => {
-                    const enrolled = students.filter((s) => {
+                    const enrolled = sessionStudents.filter((s) => {
                       if (s.status && s.status !== 'Admitted') return false;
                       const sDept = (s.department || '').toLowerCase().trim();
                       const mDept = (item.deptName || '').toLowerCase().trim();
@@ -1991,6 +2110,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     const genC = enrolled.filter((s) => normalizeCategory(s.category) === 'GEN').length;
                     const scC = enrolled.filter((s) => normalizeCategory(s.category) === 'SC').length;
                     const stC = enrolled.filter((s) => normalizeCategory(s.category) === 'ST').length;
+                    const obcC = enrolled.filter((s) => normalizeCategory(s.category) === 'OBC').length;
                     const sebcC = enrolled.filter((s) => normalizeCategory(s.category) === 'SEBC').length;
                     const avgPct = enrolled.length > 0
                       ? (enrolled.reduce((a, b) => a + (b.marksPercentage || 0), 0) / enrolled.length).toFixed(1)
@@ -2040,7 +2160,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                                 M: <strong className="text-blue-400">{mCount}</strong> | F: <strong className="text-pink-400">{fCount}</strong>
                               </span>
                               <span className="bg-slate-950 text-slate-300 px-1.5 py-0.5 rounded border border-slate-800">
-                                GEN:{genC} SC:{scC} ST:{stC} SEBC:{sebcC}
+                                GEN:{genC} SC:{scC} ST:{stC} OBC:{obcC} SEBC:{sebcC}
                               </span>
                               {avgPct && (
                                 <span className="bg-emerald-500/10 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
@@ -3275,6 +3395,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     <option value="GEN">GEN</option>
                     <option value="SC">SC</option>
                     <option value="ST">ST</option>
+                    <option value="OBC">OBC</option>
                     <option value="SEBC">SEBC</option>
                   </select>
                 </div>
@@ -3300,9 +3421,22 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">Department / Honours</label>
+                  <label className="text-slate-300 block mb-1 font-semibold">Academic Year / Session *</label>
+                  <select
+                    value={studentForm.academicYear || '2025-26'}
+                    onChange={(e) => setStudentForm({ ...studentForm, academicYear: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-300 font-bold focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="2025-26">2025-26 (Current)</option>
+                    <option value="2024-25">2024-25 (Last Year)</option>
+                    <option value="2023-24">2023-24 (2 Years Ago)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 block mb-1 font-semibold">Department / Honours *</label>
                   <input
                     type="text"
                     required
@@ -3313,15 +3447,17 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </div>
 
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">Stream</label>
+                  <label className="text-slate-300 block mb-1 font-semibold">Stream *</label>
                   <select
                     value={studentForm.stream}
                     onChange={(e) => setStudentForm({ ...studentForm, stream: e.target.value as StreamType })}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
                   >
-                    <option value="Science">Science</option>
+                    <option value="Physical Science">Physical Science</option>
+                    <option value="Biological Science">Biological Science</option>
                     <option value="Arts">Arts</option>
                     <option value="Commerce">Commerce</option>
+                    <option value="Self Financing">Self Financing</option>
                   </select>
                 </div>
               </div>
@@ -3592,6 +3728,20 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Academic Session / Year *</label>
+                <select
+                  value={seatForm.academicYear}
+                  onChange={(e) => setSeatForm({ ...seatForm, academicYear: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-300 font-bold focus:outline-none focus:border-amber-500"
+                >
+                  <option value="2026-27">2026-27 (Current Session)</option>
+                  <option value="2025-26">2025-26 (Last Session)</option>
+                  <option value="2024-25">2024-25 (2 Years Ago)</option>
+                  <option value="2023-24">2023-24</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

@@ -61,7 +61,11 @@ interface DataContextType {
   updateStudent: (id: string, updated: Partial<Student>) => void;
   deleteStudent: (id: string) => void;
   clearAllStudents: () => void;
-  bulkImportStudents: (importedStudents: Student[], replace?: boolean) => void;
+  bulkImportStudents: (
+    importedStudents: Student[],
+    mode?: 'replace-session' | 'append' | 'replace-all' | boolean,
+    targetAcademicYear?: string
+  ) => void;
   updateStudentRollNo: (studentId: string, newRollNo: string, newStatus?: string) => void;
   loadSampleStudents: () => void;
   syncSamsGoogleSheet: (sheetUrl: string) => Promise<number>;
@@ -82,7 +86,8 @@ interface DataContextType {
     sanctioned: number,
     admitted?: number,
     deptName?: string,
-    stream?: StreamType
+    stream?: StreamType,
+    academicYear?: string
   ) => void;
   deleteSeatMatrixItem: (id: string) => void;
   resetSeatMatrixToBenchmark: () => void;
@@ -153,7 +158,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     const saved = safeGetLocalStorage(LS_PREFIX + 'themeMode') as ThemeMode;
-    return saved === 'maroon' || saved === 'navy' || saved === 'light' ? saved : 'maroon';
+    return saved === 'maroon' || saved === 'navy' || saved === 'light' ? saved : 'light';
   });
 
   const [isQuotaExceeded, setIsQuotaExceeded] = useState<boolean>(() => isFirestoreQuotaExceeded());
@@ -200,6 +205,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const rawId = (s.id || '').trim();
       const rawSams = (s.samsRegNo || '').trim().toUpperCase();
       const rawRoll = (s.rollNo || '').trim().toUpperCase();
+      const rawSession = (s.academicYear || '2026-27').trim();
 
       const isRealSams = rawSams && rawSams !== 'NA' && !rawSams.startsWith('24D15') && rawSams.length >= 5;
       const isRealRoll =
@@ -215,17 +221,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (rawId && seenIds.has(rawId)) {
         isDuplicate = true;
       }
-      if (isRealSams && seenSams.has(rawSams)) {
+      if (isRealSams && seenSams.has(`${rawSession}_${rawSams}`)) {
         isDuplicate = true;
       }
-      if (isRealRoll && seenRoll.has(rawRoll)) {
+      if (isRealRoll && seenRoll.has(`${rawSession}_${rawRoll}`)) {
         isDuplicate = true;
       }
 
       if (!isDuplicate) {
         if (rawId) seenIds.add(rawId);
-        if (isRealSams) seenSams.add(rawSams);
-        if (isRealRoll) seenRoll.add(rawRoll);
+        if (isRealSams) seenSams.add(`${rawSession}_${rawSams}`);
+        if (isRealRoll) seenRoll.add(`${rawSession}_${rawRoll}`);
         uniqueStudents.push(s);
       }
     }
@@ -268,22 +274,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (
-          Array.isArray(parsed) &&
-          parsed.length > 0 &&
-          parsed.some(
-            (p: SeatMatrixItem) =>
-              p.stream === 'Biological Science' ||
-              p.stream === 'Physical Science' ||
-              p.stream === 'Arts'
-          )
-        ) {
+        if (Array.isArray(parsed)) {
           return parsed;
         }
       } catch {}
     }
-    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(DEFAULT_SEAT_MATRIX));
-    return DEFAULT_SEAT_MATRIX;
+    return [];
   });
 
   const [spotCandidates, setSpotCandidates] = useState<SpotCandidate[]>(() => {
@@ -316,7 +312,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [notices, setNotices] = useState<Notice[]>(() => {
     const saved = safeGetLocalStorage(LS_PREFIX + 'notices');
-    return saved ? JSON.parse(saved) : DEFAULT_NOTICES;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const dummyIds = new Set(['n1', 'n2', 'n3', 'n4']);
+          return parsed.filter((n: Notice) => n && n.id && !dummyIds.has(n.id));
+        }
+      } catch {}
+    }
+    return [];
   });
 
   const [faqs, setFaqs] = useState<FAQItem[]>(() => {
@@ -445,15 +450,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dummyIds.forEach((id) => safeDeleteDoc(doc(db, 'faculty', id)));
     } catch {}
 
+    // Startup purge of dummy notices from Firestore
+    try {
+      const dummyNoticeIds = ['n1', 'n2', 'n3', 'n4'];
+      dummyNoticeIds.forEach((id) => safeDeleteDoc(doc(db, 'notices', id)));
+    } catch {}
+
     // 4. Notices
     const unsubNotices = onSnapshot(
       collection(db, 'notices'),
       (snapshot) => {
         if (!snapshot.empty) {
-          const docs = snapshot.docs.map((d) => d.data() as Notice);
+          const dummyIds = new Set(['n1', 'n2', 'n3', 'n4']);
+          const docs = snapshot.docs
+            .map((d) => d.data() as Notice)
+            .filter((n) => n && n.id && !dummyIds.has(n.id));
           setNotices(docs);
         } else {
-          setNotices(DEFAULT_NOTICES);
+          setNotices([]);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'notices')
@@ -660,12 +674,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addAuditLog('STUDENTS_CLEARED', `Cleared all ${count} student records from database.`);
   };
 
-  const bulkImportStudents = (importedStudents: Student[], replace: boolean = true) => {
+  const bulkImportStudents = (
+    importedStudents: Student[],
+    mode: 'replace-session' | 'append' | 'replace-all' | boolean = 'replace-session',
+    targetAcademicYear?: string
+  ) => {
     safeSaveLocalStorage(LS_PREFIX + 'studentsCleared', 'false');
     const nowIso = new Date().toISOString();
 
+    const importMode: 'replace-session' | 'append' | 'replace-all' =
+      mode === 'replace-all'
+        ? 'replace-all'
+        : mode === 'append' || mode === false
+        ? 'append'
+        : 'replace-session';
+
     // 1. Deduplicate incoming records by barcodes/rollNo
     const dedupedIncoming = cleanAndDeduplicateStudents(importedStudents);
+
+    // Identify target academic session(s)
+    const targetSessions = new Set<string>();
+    if (targetAcademicYear) {
+      targetSessions.add(targetAcademicYear);
+    }
+    dedupedIncoming.forEach((s) => {
+      if (s.academicYear) targetSessions.add(s.academicYear);
+    });
+    if (targetSessions.size === 0) {
+      targetSessions.add('2026-27');
+    }
 
     const sanitized: Student[] = dedupedIncoming.map((s, idx) => {
       const norm = normalizeDepartmentAndStream(s.department, s.stream);
@@ -675,30 +712,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         s.marksPercentage ||
         (parsedMax > 0 ? parseFloat(((parsedSec / parsedMax) * 100).toFixed(2)) : 75.0);
 
+      const resolvedAcademicYear = s.academicYear || targetAcademicYear || '2026-27';
+      const sessionSuffix = resolvedAcademicYear.slice(2, 4);
+
       const prefix =
         norm.stream === 'Arts'
-          ? 'BA24'
+          ? `BA${sessionSuffix}`
           : norm.stream === 'Commerce'
-          ? 'BC24'
+          ? `BC${sessionSuffix}`
           : norm.stream === 'Physical Science' || norm.stream === 'Biological Science'
-          ? 'BS24'
-          : 'SF24';
+          ? `BS${sessionSuffix}`
+          : `SF${sessionSuffix}`;
 
       const rollNo = s.rollNo || `${prefix}-${String(idx + 1).padStart(3, '0')}`;
-      const samsRegNo = s.samsRegNo || `24D${15000 + idx}`;
+      const samsRegNo = s.samsRegNo || `${sessionSuffix}D${15000 + idx}`;
 
       // Stable deterministic doc ID so re-saving or re-uploading updates the same doc instead of creating duplicates
+      const cleanSession = resolvedAcademicYear.replace(/[^a-zA-Z0-9]/g, '');
       const cleanSams = (samsRegNo || '').replace(/[^a-zA-Z0-9]/g, '');
       const cleanRoll = (rollNo || '').replace(/[^a-zA-Z0-9]/g, '');
-      const stableId = cleanSams && !cleanSams.startsWith('24D15')
-        ? `sams_${cleanSams}`
+      const stableId = cleanSams && !cleanSams.startsWith(`${sessionSuffix}D15`)
+        ? `sams_${cleanSession}_${cleanSams}`
         : cleanRoll
-        ? `roll_${cleanRoll}`
-        : `stu_imp_${idx}`;
+        ? `roll_${cleanSession}_${cleanRoll}`
+        : `stu_${cleanSession}_${idx}`;
 
       return {
         ...s,
         id: stableId,
+        academicYear: resolvedAcademicYear,
         name: s.name || `Student ${idx + 1}`,
         rollNo,
         universityRollNo: s.universityRollNo || 'N/A',
@@ -727,15 +769,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 1. Immediately update LocalStorage and React State for instantaneous UI response
     setStudents((prev) => {
-      const updatedList = replace ? sanitized : cleanAndDeduplicateStudents([...sanitized, ...prev]);
+      let updatedList: Student[];
+      if (importMode === 'replace-all') {
+        // Clears entire database across all sessions
+        updatedList = sanitized;
+      } else if (importMode === 'replace-session') {
+        // Preserves all students belonging to other academic sessions!
+        const otherSessionsStudents = prev.filter(
+          (s) => !targetSessions.has(s.academicYear || '2026-27')
+        );
+        updatedList = [...sanitized, ...otherSessionsStudents];
+      } else {
+        // 'append' mode: merge with deduplication
+        updatedList = cleanAndDeduplicateStudents([...sanitized, ...prev]);
+      }
+
       safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updatedList.slice(0, 10000)));
 
-      // 2. Ultra-fast seat matrix calculation in a single O(N) pass and sync to Firestore
+      // 2. Seat matrix calculation for active current academic session (2026-27)
       const regularCounts = new Map<string, number>();
       const aedpCounts = new Map<string, number>();
       for (let i = 0; i < updatedList.length; i++) {
-        const d = (updatedList[i].department || '').toLowerCase().trim();
-        if (updatedList[i].isAedp) {
+        const s = updatedList[i];
+        const sYear = s.academicYear || '2026-27';
+        // Only 2026-27 admitted students count against the current year's active seat matrix!
+        if (sYear !== '2026-27') continue;
+
+        const d = (s.department || '').toLowerCase().trim();
+        if (s.isAedp) {
           aedpCounts.set(d, (aedpCounts.get(d) || 0) + 1);
         } else {
           regularCounts.set(d, (regularCounts.get(d) || 0) + 1);
@@ -774,12 +835,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTimeout(async () => {
       if (isFirestoreQuotaExceeded()) return;
       try {
-        if (replace) {
-          // In replace mode, clean up old Firestore docs first in chunks of 400
+        if (importMode === 'replace-all') {
+          // Replace all: clean up old Firestore docs
           const oldSnap = await getDocs(collection(db, 'students'));
           if (!oldSnap.empty) {
             const newIdSet = new Set(sanitized.map((s) => s.id));
             const docsToDelete = oldSnap.docs.filter((d) => !newIdSet.has(d.id));
+            const chunkSize = 400;
+            for (let i = 0; i < docsToDelete.length; i += chunkSize) {
+              const delChunk = docsToDelete.slice(i, i + chunkSize);
+              const delBatch = writeBatch(db);
+              delChunk.forEach((d) => delBatch.delete(d.ref));
+              await delBatch.commit();
+            }
+          }
+        } else if (importMode === 'replace-session') {
+          // Only delete docs belonging to targetSessions that are NOT in the incoming batch!
+          // NEVER touch docs belonging to other academic sessions!
+          const oldSnap = await getDocs(collection(db, 'students'));
+          if (!oldSnap.empty) {
+            const newIdSet = new Set(sanitized.map((s) => s.id));
+            const docsToDelete = oldSnap.docs.filter((d) => {
+              const docYear = d.data().academicYear || '2026-27';
+              return targetSessions.has(docYear) && !newIdSet.has(d.id);
+            });
             const chunkSize = 400;
             for (let i = 0; i < docsToDelete.length; i += chunkSize) {
               const delChunk = docsToDelete.slice(i, i + chunkSize);
@@ -805,10 +884,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }, 100);
 
-    addAuditLog(
-      'BULK_STUDENT_IMPORT',
-      `${replace ? 'Replaced database with' : 'Imported and reflected'} ${sanitized.length} student records from Excel/CSV file.`
-    );
+    const sessionNames = Array.from(targetSessions).join(', ');
+    const logMsg =
+      importMode === 'replace-all'
+        ? `Replaced entire database across all sessions with ${sanitized.length} records.`
+        : importMode === 'replace-session'
+        ? `Replaced ${sanitized.length} records for session (${sessionNames}) while preserving other academic sessions.`
+        : `Appended ${sanitized.length} records into session (${sessionNames}).`;
+    addAuditLog('BULK_STUDENT_IMPORT', logMsg);
   };
 
   const updateStudentRollNo = (studentId: string, newRollNo: string, newStatus?: string) => {
@@ -992,15 +1075,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // SEAT MATRIX ACTIONS
   // ==========================================
   const addSeatMatrixItem = (item: Omit<SeatMatrixItem, 'id' | 'updatedAt'>) => {
+    const session = item.academicYear || '2026-27';
     const newItem: SeatMatrixItem = {
       ...item,
-      id: `dept_${item.deptName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`,
+      academicYear: session,
+      id: `dept_${session}_${item.deptName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`,
       vacant: Math.max(0, item.sanctioned - item.admitted),
       updatedAt: new Date().toISOString(),
     };
     setSeatMatrix((prev) => [...prev, newItem]);
     safeSetDoc(doc(db, 'seatMatrix', newItem.id), newItem);
-    addAuditLog('SEAT_MATRIX_ADD', `Added department seat matrix for ${newItem.deptName}.`);
+    addAuditLog('SEAT_MATRIX_ADD', `Added department seat matrix for ${newItem.deptName} (${session}).`);
   };
 
   const updateSeatMatrixItem = (
@@ -1008,31 +1093,42 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sanctioned: number,
     admitted?: number,
     deptName?: string,
-    stream?: StreamType
+    stream?: StreamType,
+    academicYear?: string
   ) => {
-    setSeatMatrix((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const newSanctioned = sanctioned;
-          const newAdmitted = admitted !== undefined ? admitted : item.admitted;
-          const newVacant = Math.max(0, newSanctioned - newAdmitted);
-          const updatedItem = {
-            ...item,
-            deptName: deptName || item.deptName,
-            stream: stream || item.stream,
-            sanctioned: newSanctioned,
-            admitted: newAdmitted,
-            vacant: newVacant,
-            updatedAt: new Date().toISOString(),
-          };
+    const targetSession = academicYear || '2026-27';
+    const targetDeptName = deptName || 'Department';
+    const cleanName = targetDeptName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const sessionSpecificId = `dept_${targetSession}_${cleanName}`;
 
-          safeSetDoc(doc(db, 'seatMatrix', item.id), updatedItem);
-          return updatedItem;
-        }
-        return item;
-      })
-    );
-    addAuditLog('SEAT_MATRIX_UPDATE', `Updated intake seat matrix for ${id}.`);
+    setSeatMatrix((prev) => {
+      const existing = prev.find((item) => item.id === id || item.id === sessionSpecificId);
+      const newSanctioned = sanctioned;
+      const newAdmitted = admitted !== undefined ? admitted : (existing ? existing.admitted : 0);
+      const newVacant = Math.max(0, newSanctioned - newAdmitted);
+
+      const updatedItem: SeatMatrixItem = {
+        id: sessionSpecificId,
+        deptName: targetDeptName,
+        stream: stream || (existing ? existing.stream : 'Science'),
+        isAedp: targetDeptName.toLowerCase().includes('aedp'),
+        specialization: existing ? existing.specialization : (targetDeptName.toLowerCase().includes('aedp') ? 'AEDP Specialization' : 'Regular Honours'),
+        academicYear: targetSession,
+        sanctioned: newSanctioned,
+        admitted: newAdmitted,
+        vacant: newVacant,
+        updatedAt: new Date().toISOString(),
+      };
+
+      safeSetDoc(doc(db, 'seatMatrix', updatedItem.id), updatedItem);
+
+      if (existing) {
+        return prev.map((item) => (item.id === existing.id || item.id === id ? updatedItem : item));
+      } else {
+        return [...prev, updatedItem];
+      }
+    });
+    addAuditLog('SEAT_MATRIX_UPDATE', `Updated intake seat matrix for ${deptName} in session ${targetSession}.`);
   };
 
   const deleteSeatMatrixItem = (id: string) => {
@@ -1042,26 +1138,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetSeatMatrixToBenchmark = () => {
-    DEFAULT_SEAT_MATRIX.forEach((item) => safeSetDoc(doc(db, 'seatMatrix', item.id), item));
-    setSeatMatrix(DEFAULT_SEAT_MATRIX);
-    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(DEFAULT_SEAT_MATRIX));
-    addAuditLog('SEAT_MATRIX_RESET', 'Cleared and reset seat intake matrix to official 28 departments.');
+    setSeatMatrix([]);
+    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify([]));
+    addAuditLog('SEAT_MATRIX_RESET', 'Cleared seat intake matrix.');
   };
 
   const clearSeatMatrix = () => {
-    const cleared = DEFAULT_SEAT_MATRIX.map((item) => {
-      const cl = {
-        ...item,
-        admitted: 0,
-        vacant: item.sanctioned,
-        updatedAt: new Date().toISOString(),
-      };
-      safeSetDoc(doc(db, 'seatMatrix', cl.id), cl);
-      return cl;
-    });
-    setSeatMatrix(cleared);
-    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify(cleared));
-    addAuditLog('SEAT_MATRIX_CLEARED', 'Cleared seat matrix and reset intake to official 28 departments.');
+    setSeatMatrix([]);
+    safeSaveLocalStorage(LS_PREFIX + 'seatMatrix', JSON.stringify([]));
+    addAuditLog('SEAT_MATRIX_CLEARED', 'Cleared seat matrix.');
   };
 
   // ==========================================

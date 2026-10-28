@@ -96,17 +96,7 @@ export const DEPARTMENTS_LIST = [
   { id: 'sf_computer_science', name: 'Computer Science', stream: 'Self Financing' as const, isAedp: false, sanctioned: 64, admitted: 0, spec: 'Self Financing Honours' },
 ];
 
-export const DEFAULT_SEAT_MATRIX: SeatMatrixItem[] = DEPARTMENTS_LIST.map(dept => ({
-  id: dept.id,
-  deptName: dept.name,
-  stream: dept.stream,
-  isAedp: dept.isAedp,
-  specialization: dept.spec,
-  sanctioned: dept.sanctioned,
-  admitted: dept.admitted,
-  vacant: dept.sanctioned - dept.admitted,
-  updatedAt: new Date().toISOString(),
-}));
+export const DEFAULT_SEAT_MATRIX: SeatMatrixItem[] = [];
 
 export const DEFAULT_HOD_ACCOUNTS: HodAccount[] = [
   { id: 'phy_physics', deptName: 'Physics', username: 'hod_physics', password: 'Physics@baragada2026', hodName: 'Dr. Ramesh Chandra Sahoo', phone: '9437123401', email: 'hod.physics@baragada.edu.in', updatedAt: new Date().toISOString() },
@@ -133,44 +123,7 @@ export const DEFAULT_HOD_ACCOUNTS: HodAccount[] = [
 
 export const DEFAULT_FACULTY: FacultyMember[] = [];
 
-export const DEFAULT_NOTICES: Notice[] = [
-  {
-    id: 'n1',
-    title: 'SAMS Degree e-Admission 2026-27: Spot Round Live Reporting Desk Notice',
-    category: 'Spot Round',
-    date: '14-Oct-2026',
-    isImportant: true,
-    content: 'All shortlisted candidates under Spot Round merit list are directed to submit physical documents at the college e-Admission counter by 3:00 PM today.',
-    downloadUrl: '#'
-  },
-  {
-    id: 'n2',
-    title: 'Schedule for Apprenticeship Embedded Degree Programme (AEDP) Industry Apprenticeship & Induction',
-    category: 'Admission',
-    date: '12-Oct-2026',
-    isImportant: true,
-    content: 'Induction and industry orientation for AEDP scholars in Economics Data Analytics, English Digital Humanities, History Tourism, Commerce BFSI, Botany Tissue Culture, Zoology Bioscience, Chemistry Industrial, and Math Computing. Briefing on 1-year paid apprenticeship & stipend regulations.',
-    downloadUrl: '#'
-  },
-  {
-    id: 'n3',
-    title: 'Mid-Semester Examinations 2026 Time Table (+3 1st, 3rd, 5th Semesters)',
-    category: 'Examination',
-    date: '10-Oct-2026',
-    isImportant: false,
-    content: 'Semester mid-term examinations scheduled to commence from 02-Nov-2026. Hall tickets available on SAMS portal.',
-    downloadUrl: '#'
-  },
-  {
-    id: 'n4',
-    title: 'NAAC Re-Accreditation Peer Team Visit Schedule & Student Interaction',
-    category: 'General',
-    date: '05-Oct-2026',
-    isImportant: false,
-    content: 'NAAC Peer Team visiting Panchayat College Baragada on 24th October. All students and faculty members prepare departmental reports.',
-    downloadUrl: '#'
-  }
-];
+export const DEFAULT_NOTICES: Notice[] = [];
 
 export const DEFAULT_SPOT_CANDIDATES: SpotCandidate[] = [
   { id: 'spot_1', studentName: 'Prakash Chandra Pradhan', samsRegNo: '24D11801', deptId: 'physics_regular', deptName: 'Physics (Regular)', stream: 'Science', category: 'GEN', marksPercentage: 88.4, waitlistRank: 1, reportedStatus: 'Reported', selectionStatus: 'Selected', appliedAt: '2026-10-14T08:30:00Z', phone: '9861011122' },
@@ -186,7 +139,7 @@ export const DEFAULT_SPOT_CANDIDATES: SpotCandidate[] = [
 export const DEFAULT_AUDIT_LOGS: AuditLog[] = [
   { id: 'log_1', timestamp: new Date(Date.now() - 3600000 * 24).toISOString(), adminName: 'Super Admin', actionType: 'SYSTEM_BOOT', description: 'SAMS College e-Admission portal database initialized.' },
   { id: 'log_2', timestamp: new Date(Date.now() - 3600000 * 12).toISOString(), adminName: 'Super Admin', actionType: 'SPOT_ROUND_TOGGLE', description: 'Master Switch: Spot Round Seats live reporting desk ENABLED.' },
-  { id: 'log_3', timestamp: new Date(Date.now() - 3600000 * 2).toISOString(), adminName: 'Super Admin', actionType: 'SAMS_SHEET_SYNC', description: 'Synced 1,100+ student records with SAMS Live Google Sheet.' }
+  { id: 'log_3', timestamp: new Date(Date.now() - 3600000 * 2).toISOString(), adminName: 'Super Admin', actionType: 'SAMS_SHEET_SYNC', description: 'Synced student records database.' }
 ];
 
 export const DEFAULT_FAQS: FAQItem[] = [
@@ -227,126 +180,7 @@ export const DEFAULT_FAQS: FAQItem[] = [
   }
 ];
 
-// Helper to systematically generate 1,100+ Realistic Odisha Student Records
+// Helper to systematically generate Student Records (returns empty array as requested)
 export function generate1100Students(): Student[] {
-  const firstNamesM = ['Aarav', 'Abhishek', 'Amarendra', 'Anil', 'Ashok', 'Bikash', 'Bipin', 'Biswajit', 'Chandan', 'Debasish', 'Dibakar', 'Deepak', 'Ganesh', 'Gautam', 'Hari', 'Hemant', 'Jagannath', 'Jitendra', 'Kalyan', 'Lipu', 'Manas', 'Manoj', 'Nilamadhab', 'Omkar', 'Prakash', 'Prasanta', 'Pravat', 'Rajesh', 'Rakesh', 'Ranjan', 'Ramesh', 'Roshina', 'Sabyasachi', 'Sanjay', 'Santosh', 'Saroj', 'Satya', 'Satyabrata', 'Shiba', 'Soumya', 'Subhash', 'Sudhir', 'Sujan', 'Suman', 'Sunil', 'Suryakanta', 'Tapan', 'Umesh', 'Vikram'];
-  const firstNamesF = ['Alekha', 'Ananya', 'Ankita', 'Archana', 'Banita', 'Deepa', 'Gayatri', 'Geetanjali', 'Itishree', 'Jyoti', 'Kalyani', 'Lipika', 'Lopamudra', 'Mamata', 'Minati', 'Nalini', 'Padmini', 'Priyanka', 'Puspanjali', 'Rajeswari', 'Rashmi', 'Rina', 'Sabita', 'Sanghamitra', 'Saraswati', 'Sarojini', 'Sasmita', 'Shubhashree', 'Smrutirekha', 'Snigdha', 'Subhadra', 'Subhashree', 'Sujata', 'Sunita', 'Swagatika', 'Sweta', 'Tanaya', 'Trupti'];
-  const lastNames = ['Sahoo', 'Mohapatra', 'Dash', 'Nayak', 'Panda', 'Behera', 'Tripathy', 'Singh', 'Pradhan', 'Jena', 'Sethi', 'Bhoi', 'Patra', 'Swain', 'Mohanty', 'Mishra', 'Rout', 'Kar', 'Mahalik', 'Das', 'Dutta', 'Padhi', 'Bagh', 'Majhi', 'Pruseth', 'Panigrahi', 'Barik', 'Mallick'];
-  const categories: CategoryType[] = ['GEN', 'GEN', 'GEN', 'SEBC', 'SEBC', 'SC', 'ST'];
-  const bloodGroups = ['O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-'];
-
-  const students: Student[] = [];
-  let studentCounter = 1;
-
-  for (const dept of DEPARTMENTS_LIST) {
-    // Generate intake count approx equal to admitted count + spot candidates
-    const count = dept.admitted;
-    for (let i = 0; i < count; i++) {
-      const isFemale = Math.random() < 0.48;
-      const fName = isFemale
-        ? firstNamesF[Math.floor(Math.random() * firstNamesF.length)]
-        : firstNamesM[Math.floor(Math.random() * firstNamesM.length)];
-      const lName = lastNames[Math.floor(Math.random() * lastNames.length)];
-      const name = `${fName} ${lName}`;
-      
-      const samsRegNo = `24D${10800 + studentCounter}`;
-      const prefix =
-        dept.stream === 'Arts'
-          ? 'BA24'
-          : dept.stream === 'Commerce'
-          ? 'BC24'
-          : dept.stream === 'Self Financing'
-          ? 'CS24'
-          : 'BS24';
-      const rollNo = `${prefix}-${String(studentCounter).padStart(3, '0')}`;
-      
-      const category = categories[Math.floor(Math.random() * categories.length)];
-      const bloodGroup = bloodGroups[Math.floor(Math.random() * bloodGroups.length)];
-      const marksPercentage = parseFloat((55 + Math.random() * 41).toFixed(1)); // 55.0% to 96.0%
-      const maxMarks = 600;
-      const marksSecured = Math.round(maxMarks * (marksPercentage / 100));
-      const parentName = `${firstNamesM[Math.floor(Math.random() * firstNamesM.length)]} ${lName}`;
-      const motherName = `${firstNamesF[Math.floor(Math.random() * firstNamesF.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
-      const phone = `9437${Math.floor(100000 + Math.random() * 900000)}`;
-
-      students.push({
-        id: `stu_${studentCounter}_${Math.random().toString(36).substr(2, 5)}`,
-        name,
-        rollNo,
-        samsRegNo,
-        parentName,
-        motherName,
-        mobileNumber: phone,
-        department: dept.name,
-        stream: dept.stream,
-        isAedp: dept.isAedp,
-        category,
-        maxMarks,
-        marksSecured,
-        marksPercentage,
-        bloodGroup,
-        phone,
-        gender: isFemale ? 'Female' : 'Male',
-        status: 'Admitted',
-        updatedAt: new Date(Date.now() - Math.random() * 86400000 * 30).toISOString()
-      });
-
-      studentCounter++;
-    }
-  }
-
-  // Generate extra waiting/spot candidates to reach 1,100+ total records
-  while (studentCounter <= 1120) {
-    const isFemale = Math.random() < 0.5;
-    const fName = isFemale
-      ? firstNamesF[Math.floor(Math.random() * firstNamesF.length)]
-      : firstNamesM[Math.floor(Math.random() * firstNamesM.length)];
-    const lName = lastNames[Math.floor(Math.random() * lastNames.length)];
-    const name = `${fName} ${lName}`;
-    const dept = DEPARTMENTS_LIST[Math.floor(Math.random() * DEPARTMENTS_LIST.length)];
-    const samsRegNo = `24D${10800 + studentCounter}`;
-    const prefix =
-      dept.stream === 'Arts'
-        ? 'BA24'
-        : dept.stream === 'Commerce'
-        ? 'BC24'
-        : dept.stream === 'Self Financing'
-        ? 'CS24'
-        : 'BS24';
-    const rollNo = `${prefix}-${String(studentCounter).padStart(3, '0')}`;
-    const category = categories[Math.floor(Math.random() * categories.length)];
-    const marksPercentage = parseFloat((50 + Math.random() * 45).toFixed(1));
-    const maxMarks = 600;
-    const marksSecured = Math.round(maxMarks * (marksPercentage / 100));
-
-    const pName = `${firstNamesM[Math.floor(Math.random() * firstNamesM.length)]} ${lName}`;
-    const mName = `${firstNamesF[Math.floor(Math.random() * firstNamesF.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
-    const mPhone = `9437${Math.floor(100000 + Math.random() * 900000)}`;
-
-    students.push({
-      id: `stu_${studentCounter}_${Math.random().toString(36).substr(2, 5)}`,
-      name,
-      rollNo,
-      samsRegNo,
-      parentName: pName,
-      motherName: mName,
-      mobileNumber: mPhone,
-      department: dept.name,
-      stream: dept.stream,
-      isAedp: dept.isAedp,
-      category,
-      maxMarks,
-      marksSecured,
-      marksPercentage,
-      bloodGroup: 'O+',
-      phone: mPhone,
-      gender: isFemale ? 'Female' : 'Male',
-      status: 'Spot Applied',
-      updatedAt: new Date().toISOString()
-    });
-
-    studentCounter++;
-  }
-
-  return students;
+  return [];
 }

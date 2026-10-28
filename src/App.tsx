@@ -32,7 +32,7 @@ function AppContent() {
       ? 'theme-maroon bg-[#0c0307] text-[#fce7f3]'
       : themeMode === 'navy'
       ? 'theme-navy bg-[#030712] text-[#f0f9ff]'
-      : 'theme-light bg-slate-50 text-slate-900';
+      : 'theme-light bg-[#f4f6f1] text-[#131f15]';
 
   return (
     <div

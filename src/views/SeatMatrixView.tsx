@@ -8,7 +8,57 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
   const [selectedStream, setSelectedStream] = useState<string>('ALL');
   const [selectedType, setSelectedType] = useState<string>('ALL');
 
-  const filteredMatrix = seatMatrix.filter((item) => {
+  const availableSessions = Array.from(
+    new Set(['2026-27', '2025-26', '2024-25', ...students.map((s) => s.academicYear || '2026-27'), ...seatMatrix.map((m) => m.academicYear || '2026-27')])
+  ).sort().reverse();
+  const [selectedSession, setSelectedSession] = useState<string>('2026-27');
+
+  const sessionStudents = selectedSession === 'ALL'
+    ? students
+    : students.filter((s) => (s.academicYear || '2026-27') === selectedSession);
+
+  const sessionSeatMatrix = selectedSession === 'ALL'
+    ? seatMatrix
+    : seatMatrix.filter((item) => (item.academicYear || '2026-27') === selectedSession);
+  const effectiveSeatMatrix = sessionSeatMatrix.length > 0
+    ? sessionSeatMatrix
+    : seatMatrix.filter((item) => !item.academicYear || item.academicYear === '2026-27').map((item) => ({
+        ...item,
+        id: item.id.startsWith('dept_') ? item.id : `dept_${selectedSession}_${item.id}`,
+        academicYear: selectedSession === 'ALL' ? '2026-27' : selectedSession,
+      }));
+
+  const regularCounts = new Map<string, number>();
+  const aedpCounts = new Map<string, number>();
+  sessionStudents.forEach((s) => {
+    const d = (s.department || '').toLowerCase().trim();
+    if (s.isAedp) {
+      aedpCounts.set(d, (aedpCounts.get(d) || 0) + 1);
+    } else {
+      regularCounts.set(d, (regularCounts.get(d) || 0) + 1);
+    }
+  });
+
+  const sessionMatrix = effectiveSeatMatrix.map((item) => {
+    const mDept = (item.deptName || '').toLowerCase().trim();
+    const targetMap = item.isAedp ? aedpCounts : regularCounts;
+    let admittedCount = targetMap.get(mDept) || 0;
+    if (admittedCount === 0) {
+      for (const [sDept, count] of targetMap.entries()) {
+        if (sDept.includes(mDept) || mDept.includes(sDept)) {
+          admittedCount += count;
+        }
+      }
+    }
+    const vacantCount = Math.max(0, item.sanctioned - admittedCount);
+    return {
+      ...item,
+      admitted: admittedCount,
+      vacant: vacantCount,
+    };
+  });
+
+  const filteredMatrix = sessionMatrix.filter((item) => {
     const matchesStream =
       selectedStream === 'ALL' ||
       item.stream === selectedStream ||
@@ -18,6 +68,10 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
       (selectedType === 'AEDP' && item.isAedp) ||
       (selectedType === 'REGULAR' && !item.isAedp);
     return matchesStream && matchesType;
+  }).sort((a, b) => {
+    const streamCompare = (a.stream || '').localeCompare(b.stream || '');
+    if (streamCompare !== 0) return streamCompare;
+    return (a.deptName || '').localeCompare(b.deptName || '');
   });
 
   const totalSanctioned = filteredMatrix.reduce((a, b) => a + b.sanctioned, 0);
@@ -146,6 +200,29 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Academic Session Selector Bar */}
+      <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-lg">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-slate-400 font-medium font-mono uppercase text-[11px]">{lang === 'or' ? 'ଅଧିବେଶନ (Academic Session):' : 'Academic Session:'}</span>
+          {availableSessions.map((session) => (
+            <button
+              key={session}
+              onClick={() => setSelectedSession(session)}
+              className={`px-3 py-1.5 rounded-lg font-mono font-bold transition text-xs ${
+                selectedSession === session
+                  ? 'bg-amber-500 text-slate-950 shadow-lg'
+                  : 'bg-slate-950 text-slate-300 hover:bg-slate-800 border border-slate-800'
+              }`}
+            >
+              {session === 'ALL' ? (lang === 'or' ? 'ସମସ୍ତ ଅଧିବେଶନ' : 'All Sessions') : `${session} ${session === '2026-27' ? (lang === 'or' ? '(ଚଳିତ)' : '(Current)') : ''}`}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-lg">
+          {lang === 'or' ? `ଅଧିବେଶନ ${selectedSession}: ${sessionStudents.length} ଛାତ୍ରଛାତ୍ରୀ ରେକର୍ଡ` : `Session ${selectedSession}: ${sessionStudents.length} Scholars Recorded`}
+        </span>
       </div>
 
       {/* Filters & Summary Stat Cards */}

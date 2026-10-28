@@ -90,9 +90,6 @@ export const AdminLoginModal: React.FC<{ isOpen: boolean; onClose: () => void; o
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
               />
             </div>
-            <p className="text-[10px] text-slate-500 mt-1 font-mono">
-              Default Hint: <code className="text-amber-400">Sams@2026!</code>
-            </p>
           </div>
 
           <div className="flex justify-end space-x-2 pt-2">

@@ -39,14 +39,14 @@ export const Header: React.FC<{ onOpenAdminModal: () => void; onOpenHodModal: ()
       ? 'bg-gradient-to-r from-[#280612] via-[#140309] to-[#280612] border-amber-500/40 text-slate-100'
       : themeMode === 'navy'
       ? 'bg-gradient-to-r from-[#091633] via-[#040915] to-[#091633] border-cyan-500/40 text-slate-100'
-      : 'bg-gradient-to-r from-white via-amber-50/40 to-slate-50 border-slate-300 text-slate-900';
+      : 'bg-[#f4f6f1] border-b border-[#e1e7de] text-[#131f15]';
 
   const topBarBgStyle =
     themeMode === 'maroon'
       ? 'bg-[#120308] border-b border-red-900/50 text-pink-100/90'
       : themeMode === 'navy'
       ? 'bg-[#030814] border-b border-blue-900/50 text-cyan-100/90'
-      : 'bg-slate-100 border-b border-slate-300 text-slate-700';
+      : 'bg-[#e7eee5] border-b border-[#d8e0d4] text-[#283e2b]';
 
   return (
     <header className={`${headerBgStyle} border-b shadow-2xl relative z-30 transition-colors duration-300`}>
@@ -233,9 +233,9 @@ export const Header: React.FC<{ onOpenAdminModal: () => void; onOpenHodModal: ()
               <>
                 <button
                   onClick={onOpenHodModal}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-medium flex items-center transition shadow ${
+                  className={`px-4 py-2 rounded-full text-xs font-semibold flex items-center transition shadow-sm ${
                     themeMode === 'light'
-                      ? 'bg-white hover:bg-slate-100 text-slate-800 border border-slate-300'
+                      ? 'bg-[#2d4f32] hover:bg-[#213c25] text-white border border-[#213a25]'
                       : themeMode === 'navy'
                       ? 'bg-[#09152b] hover:bg-[#0f2142] text-cyan-200 border border-blue-900/60'
                       : 'bg-slate-950/80 hover:bg-slate-900 text-slate-200 border border-slate-700'
@@ -245,9 +245,11 @@ export const Header: React.FC<{ onOpenAdminModal: () => void; onOpenHodModal: ()
                 </button>
                 <button
                   onClick={onOpenAdminModal}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center transition shadow-lg ${
+                  className={`px-4 py-2 rounded-full text-xs font-extrabold flex items-center transition shadow-md ${
                     themeMode === 'navy'
                       ? 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 text-slate-950 shadow-cyan-500/20'
+                      : themeMode === 'light'
+                      ? 'bg-[#d2eb4b] hover:bg-[#c3de3a] text-[#16291a] border border-[#bad338]'
                       : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 shadow-amber-500/20'
                   }`}
                 >

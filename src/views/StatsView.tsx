@@ -152,6 +152,7 @@ export const StatsView: React.FC = () => {
   const genCount = filteredStudents.filter((s) => normalizeCategory(s.category) === 'GEN').length;
   const scCount = filteredStudents.filter((s) => normalizeCategory(s.category) === 'SC').length;
   const stCount = filteredStudents.filter((s) => normalizeCategory(s.category) === 'ST').length;
+  const obcCount = filteredStudents.filter((s) => normalizeCategory(s.category) === 'OBC').length;
   const sebcCount = filteredStudents.filter((s) => normalizeCategory(s.category) === 'SEBC').length;
 
   // Stream-wise Analytics synchronized directly with Subjects & Seats Matrix
@@ -379,7 +380,7 @@ export const StatsView: React.FC = () => {
               {lang === 'or' ? 'ସାମ୍ସ ଓଡ଼ିଶା ସରକାରୀ ସଂରକ୍ଷଣ ନିୟମ ଅନୁସାରେ ଛାତ୍ରଛାତ୍ରୀ ବଣ୍ଟନ।' : 'Demographic classification based on official Odisha SAMS reservation norms.'}
             </p>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
                 <span className="text-slate-400 text-[10px] block font-mono">{lang === 'or' ? 'ସାଧାରଣ ବର୍ଗ (GEN)' : 'GENERAL CATEGORY'}</span>
                 <span className="text-2xl font-bold text-white font-mono">{genCount}</span>
@@ -405,7 +406,15 @@ export const StatsView: React.FC = () => {
               </div>
 
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                <span className="text-slate-400 text-[10px] block font-mono">{lang === 'or' ? 'ଏସଇବିସି / ଓବିସି (SEBC)' : 'SEBC / OBC'}</span>
+                <span className="text-slate-400 text-[10px] block font-mono">{lang === 'or' ? 'ଅନ୍ୟାନ୍ୟ ପଛୁଆ ବର୍ଗ (OBC)' : 'OTHER BACKWARD CLASS (OBC)'}</span>
+                <span className="text-2xl font-bold text-purple-400 font-mono">{obcCount}</span>
+                <span className="text-[10px] text-slate-500 block font-mono">
+                  {totalStudents > 0 ? ((obcCount / totalStudents) * 100).toFixed(1) : '0.0'}% {lang === 'or' ? 'ମୋଟର' : 'of total'}
+                </span>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1 col-span-2 sm:col-span-2">
+                <span className="text-slate-400 text-[10px] block font-mono">{lang === 'or' ? 'ଏସଇବିସି (SEBC)' : 'SEBC CATEGORY'}</span>
                 <span className="text-2xl font-bold text-blue-400 font-mono">{sebcCount}</span>
                 <span className="text-[10px] text-slate-500 block font-mono">
                   {totalStudents > 0 ? ((sebcCount / totalStudents) * 100).toFixed(1) : '0.0'}% {lang === 'or' ? 'ମୋଟର' : 'of total'}

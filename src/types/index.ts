@@ -130,6 +130,10 @@ export interface SystemSettings {
   deoPhotoUrl?: string;
   deoPhone?: string;
   deoEmail?: string;
+  // Custom Redirect Link
+  customBannerLinkUrl?: string;
+  customBannerLinkLabel?: string;
+  customBannerLinkLabelOdia?: string;
   updatedAt: string;
 }
 

@@ -103,7 +103,7 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
           onClick={onNavigateSpot}
           className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs flex items-center shadow-lg shrink-0"
         >
-          {lang === 'or' ? 'ସ୍ପଟ୍ ଖାଲି ସିଟ୍ ଯାଞ୍ଚ କରନ୍ତୁ' : 'Check Spot Round Vacancies'} <ArrowRight className="w-4 h-4 ml-1.5" />
+          {lang === 'or' ? 'ନାମଲେଖା ଖାଲି ସିଟ୍ ଯାଞ୍ଚ କରନ୍ତୁ' : 'Check Admission Vacancies'} <ArrowRight className="w-4 h-4 ml-1.5" />
         </button>
       </div>
 

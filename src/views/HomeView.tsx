@@ -17,6 +17,7 @@ import {
   X,
   CheckCircle2,
   Shield,
+  ExternalLink,
 } from 'lucide-react';
 
 export const HomeView: React.FC<{
@@ -24,10 +25,17 @@ export const HomeView: React.FC<{
   onOpenProspectus: () => void;
   onOpenAdminModal: () => void;
 }> = ({ onNavigateTab, onOpenProspectus, onOpenAdminModal }) => {
-  const { notices, systemSettings, seatMatrix, t, lang, updateSystemSettings } = useData();
+  const { notices, systemSettings, seatMatrix, students, t, lang, updateSystemSettings } = useData();
   const { role } = useAuth();
   const [searchNotice, setSearchNotice] = useState('');
   const [selectedNoticeCategory, setSelectedNoticeCategory] = useState<string>('ALL');
+  // Custom Redirect Link State
+  const [isEditLinkModalOpen, setIsEditLinkModalOpen] = useState<boolean>(false);
+  const [editLinkForm, setEditLinkForm] = useState({
+    customBannerLinkUrl: systemSettings.customBannerLinkUrl || 'https://samsodisha.gov.in/',
+    customBannerLinkLabel: systemSettings.customBannerLinkLabel || 'Visit SAMS Odisha Official Portal',
+    customBannerLinkLabelOdia: systemSettings.customBannerLinkLabelOdia || 'ସାମ୍ସ ଓଡ଼ିଶା ଅଫିସିଆଲ୍ ପୋର୍ଟାଲ୍ ଯାଆନ୍ତୁ',
+  });
 
   // Officials State & Interactive Selector
   const [selectedOfficialIndex, setSelectedOfficialIndex] = useState<number>(0);
@@ -174,9 +182,43 @@ export const HomeView: React.FC<{
     return matchesSearch && matchesCat;
   });
 
-  const totalSanctioned = seatMatrix.reduce((acc, curr) => acc + curr.sanctioned, 0);
-  const totalAdmitted = seatMatrix.reduce((acc, curr) => acc + curr.admitted, 0);
-  const totalVacant = seatMatrix.reduce((acc, curr) => acc + curr.vacant, 0);
+  const activeSessionStudents = students.filter((s) => (s.academicYear || '2026-27') === '2026-27');
+  const activeSessionSeatMatrix = seatMatrix.filter((item) => (item.academicYear || '2026-27') === '2026-27');
+  const effectiveSeatMatrix = activeSessionSeatMatrix.length > 0 ? activeSessionSeatMatrix : seatMatrix;
+
+  const regularCounts = new Map<string, number>();
+  const aedpCounts = new Map<string, number>();
+  activeSessionStudents.forEach((s) => {
+    const d = (s.department || '').toLowerCase().trim();
+    if (s.isAedp) {
+      aedpCounts.set(d, (aedpCounts.get(d) || 0) + 1);
+    } else {
+      regularCounts.set(d, (regularCounts.get(d) || 0) + 1);
+    }
+  });
+
+  const computedMatrix = effectiveSeatMatrix.map((item) => {
+    const mDept = (item.deptName || '').toLowerCase().trim();
+    const targetMap = item.isAedp ? aedpCounts : regularCounts;
+    let admittedCount = targetMap.get(mDept) || 0;
+    if (admittedCount === 0) {
+      for (const [sDept, count] of targetMap.entries()) {
+        if (sDept.includes(mDept) || mDept.includes(sDept)) {
+          admittedCount += count;
+        }
+      }
+    }
+    const vacantCount = Math.max(0, item.sanctioned - admittedCount);
+    return {
+      ...item,
+      admitted: admittedCount,
+      vacant: vacantCount,
+    };
+  });
+
+  const totalSanctioned = computedMatrix.reduce((acc, curr) => acc + curr.sanctioned, 0);
+  const totalAdmitted = computedMatrix.reduce((acc, curr) => acc + curr.admitted, 0);
+  const totalVacant = computedMatrix.reduce((acc, curr) => acc + curr.vacant, 0);
 
   return (
     <div className="space-y-10 pb-12">
@@ -405,7 +447,7 @@ export const HomeView: React.FC<{
             </div>
 
             <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-800 pb-2">
-              <span>{t.enrollmentLiveMatrix}</span>
+              <span>sams enrollment live matrix(academic session 2026-27)</span>
               <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-mono">{t.liveSyncBadge}</span>
             </h3>
 
@@ -427,6 +469,68 @@ export const HomeView: React.FC<{
 
           </div>
 
+        </div>
+      </div>
+
+      {/* Custom Redirect Link Box (Admin Configurable) */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 transition-all">
+        <div className="flex items-center space-x-3 text-slate-200 text-xs sm:text-sm font-medium">
+          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+            <ExternalLink className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="font-bold text-white text-sm block">
+              {lang === 'or' ? 'ଅଫିସିଆଲ୍ ନାମଲେଖା ପୋର୍ଟାଲ୍ ଲିଙ୍କ୍' : 'Official e-Admission Redirect Portal'}
+            </span>
+            <span className="text-slate-400 text-xs font-mono truncate block max-w-md">
+              {systemSettings.customBannerLinkUrl || 'https://samsodisha.gov.in/'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <a
+            href={systemSettings.customBannerLinkUrl || 'https://samsodisha.gov.in/'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold text-xs sm:text-sm flex items-center shadow-lg transition transform hover:-translate-y-0.5"
+          >
+            <span>
+              {lang === 'or'
+                ? (systemSettings.customBannerLinkLabelOdia || 'ସାମ୍ସ ଓଡ଼ିଶା ଅଫିସିଆଲ୍ ପୋର୍ଟାଲ୍ ଯାଆନ୍ତୁ')
+                : (systemSettings.customBannerLinkLabel || 'Visit SAMS Odisha Official Portal')}
+            </span>
+            <ExternalLink className="w-4 h-4 ml-2" />
+          </a>
+
+          {role === 'SUPER_ADMIN' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setEditLinkForm({
+                  customBannerLinkUrl: systemSettings.customBannerLinkUrl || 'https://samsodisha.gov.in/',
+                  customBannerLinkLabel: systemSettings.customBannerLinkLabel || 'Visit SAMS Odisha Official Portal',
+                  customBannerLinkLabelOdia: systemSettings.customBannerLinkLabelOdia || 'ସାମ୍ସ ଓଡ଼ିଶା ଅଫିସିଆଲ୍ ପୋର୍ଟାଲ୍ ଯାଆନ୍ତୁ',
+                });
+                setIsEditLinkModalOpen(true);
+              }}
+              className="px-3 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center transition shadow"
+              title="Edit Link (Admin Only)"
+            >
+              <Edit3 className="w-3.5 h-3.5 mr-1" />
+              <span>Edit Link</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenAdminModal}
+              className="px-3 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-amber-300 border border-slate-700 text-xs font-medium flex items-center transition"
+              title="Login as Admin to edit this link"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 mr-1" />
+              <span>Admin Edit</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -839,7 +943,87 @@ export const HomeView: React.FC<{
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
 
+      {/* Admin Link Edit Modal */}
+      {isEditLinkModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl text-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-amber-400 flex items-center">
+                <Edit3 className="w-4 h-4 mr-2" /> Edit Custom Redirect Link (Admin Only)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsEditLinkModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                updateSystemSettings(editLinkForm);
+                setIsEditLinkModalOpen(false);
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Redirect Target URL</label>
+                <input
+                  type="url"
+                  required
+                  value={editLinkForm.customBannerLinkUrl}
+                  onChange={(e) => setEditLinkForm({ ...editLinkForm, customBannerLinkUrl: e.target.value })}
+                  placeholder="e.g. https://samsodisha.gov.in/"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Button Label (English)</label>
+                <input
+                  type="text"
+                  required
+                  value={editLinkForm.customBannerLinkLabel}
+                  onChange={(e) => setEditLinkForm({ ...editLinkForm, customBannerLinkLabel: e.target.value })}
+                  placeholder="e.g. Visit SAMS Odisha Official Portal"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Button Label (Odia)</label>
+                <input
+                  type="text"
+                  required
+                  value={editLinkForm.customBannerLinkLabelOdia}
+                  onChange={(e) => setEditLinkForm({ ...editLinkForm, customBannerLinkLabelOdia: e.target.value })}
+                  placeholder="e.g. ସାମ୍ସ ଓଡ଼ିଶା ଅଫିସିଆଲ୍ ପୋର୍ଟାଲ୍ ଯାଆନ୍ତୁ"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEditLinkModalOpen(false)}
+                  className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow"
+                >
+                  Save Link Settings
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -11,7 +11,7 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   collegeCode: "03071302",
   tagline: "Government of Odisha | Department of Higher Education",
   taglineOdia: "ଓଡ଼ିଶା ସରକାର | ଉଚ୍ଚଶିକ୍ଷା ବିଭାଗ",
-  naacGrade: "NAAC Accredited Grade B++ | Govt. Degree College Estd. 1960",
+  naacGrade: "NAAC Accredited Grade 'B' | Estd. 1960",
   bannerNotice: "SAMS Degree e-Admission 2026-27: Spot Selection Live Reporting Desk Open. Candidates check merit list below.",
   bannerNoticeOdia: "ସାମ୍ସ ଡିଗ୍ରୀ ଇ-ନାମଲେଖା ୨୦୨୬-୨୭: ସ୍ପଟ୍ ସିଲେକ୍ସନ୍ ସିଟ୍ ଲାଇଭ୍ ମେରିଟ୍ ତାଲିକା ନିମ୍ନରେ ପ୍ରକାଶିତ।",
   prospectusUrl: "https://samsodisha.gov.in/Degree/DegreePublicCommonProspectus.pdf",
@@ -52,6 +52,11 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   deoPhotoUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
   deoPhone: "+91 79780 45129",
   deoEmail: "deo.sams.pcb@gmail.com",
+
+  // Custom Redirect Link
+  customBannerLinkUrl: "https://samsodisha.gov.in/",
+  customBannerLinkLabel: "Visit SAMS Odisha Official Portal",
+  customBannerLinkLabelOdia: "ସାମ୍ସ ଓଡ଼ିଶା ଅଫିସିଆଲ୍ ପୋର୍ଟାଲ୍ ଯାଆନ୍ତୁ",
 
   updatedAt: new Date().toISOString(),
 };
@@ -125,16 +130,7 @@ export const DEFAULT_FACULTY: FacultyMember[] = [];
 
 export const DEFAULT_NOTICES: Notice[] = [];
 
-export const DEFAULT_SPOT_CANDIDATES: SpotCandidate[] = [
-  { id: 'spot_1', studentName: 'Prakash Chandra Pradhan', samsRegNo: '24D11801', deptId: 'physics_regular', deptName: 'Physics (Regular)', stream: 'Science', category: 'GEN', marksPercentage: 88.4, waitlistRank: 1, reportedStatus: 'Reported', selectionStatus: 'Selected', appliedAt: '2026-10-14T08:30:00Z', phone: '9861011122' },
-  { id: 'spot_2', studentName: 'Subhashree Behera', samsRegNo: '24D11802', deptId: 'physics_regular', deptName: 'Physics (Regular)', stream: 'Science', category: 'SC', marksPercentage: 84.2, waitlistRank: 2, reportedStatus: 'Reported', selectionStatus: 'Selected', appliedAt: '2026-10-14T08:45:00Z', phone: '9861022233' },
-  { id: 'spot_3', studentName: 'Anil Kumar Sahoo', samsRegNo: '24D11803', deptId: 'physics_regular', deptName: 'Physics (Regular)', stream: 'Science', category: 'SEBC', marksPercentage: 81.6, waitlistRank: 3, reportedStatus: 'Reported', selectionStatus: 'Waiting', appliedAt: '2026-10-14T09:00:00Z', phone: '9861033344' },
-  { id: 'spot_4', studentName: 'Lipika Tanaya Mohanty', samsRegNo: '24D11804', deptId: 'botany_regular', deptName: 'Botany (Regular)', stream: 'Science', category: 'GEN', marksPercentage: 86.8, waitlistRank: 1, reportedStatus: 'Reported', selectionStatus: 'Selected', appliedAt: '2026-10-14T08:15:00Z', phone: '9861044455' },
-  { id: 'spot_5', studentName: 'Jagannath Sethi', samsRegNo: '24D11805', deptId: 'botany_regular', deptName: 'Botany (Regular)', stream: 'Science', category: 'SC', marksPercentage: 79.5, waitlistRank: 2, reportedStatus: 'Reported', selectionStatus: 'Selected', appliedAt: '2026-10-14T09:10:00Z', phone: '9861055566' },
-  { id: 'spot_6', studentName: 'Dibakar Naik', samsRegNo: '24D11806', deptId: 'odia', deptName: 'Odia', stream: 'Arts', category: 'ST', marksPercentage: 74.8, waitlistRank: 1, reportedStatus: 'Reported', selectionStatus: 'Selected', appliedAt: '2026-10-14T08:20:00Z', phone: '9861066677' },
-  { id: 'spot_7', studentName: 'Sasmita Rani Panda', samsRegNo: '24D11807', deptId: 'commerce', deptName: 'Commerce', stream: 'Commerce', category: 'GEN', marksPercentage: 89.2, waitlistRank: 1, reportedStatus: 'Reported', selectionStatus: 'Selected', appliedAt: '2026-10-14T08:05:00Z', phone: '9861077788' },
-  { id: 'spot_8', studentName: 'Rakesh Roshan Dash', samsRegNo: '24D11808', deptId: 'commerce', deptName: 'Commerce', stream: 'Commerce', category: 'SEBC', marksPercentage: 85.0, waitlistRank: 2, reportedStatus: 'Reported', selectionStatus: 'Selected', appliedAt: '2026-10-14T08:50:00Z', phone: '9861088899' },
-];
+export const DEFAULT_SPOT_CANDIDATES: SpotCandidate[] = [];
 
 export const DEFAULT_AUDIT_LOGS: AuditLog[] = [
   { id: 'log_1', timestamp: new Date(Date.now() - 3600000 * 24).toISOString(), adminName: 'Super Admin', actionType: 'SYSTEM_BOOT', description: 'SAMS College e-Admission portal database initialized.' },

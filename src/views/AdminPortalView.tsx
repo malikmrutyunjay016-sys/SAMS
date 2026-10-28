@@ -321,6 +321,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     deoPhotoUrl: systemSettings.deoPhotoUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
     deoPhone: systemSettings.deoPhone || '+91 79780 45129',
     deoEmail: systemSettings.deoEmail || 'deo.sams.pcb@gmail.com',
+    customBannerLinkUrl: systemSettings.customBannerLinkUrl || 'https://samsodisha.gov.in/',
+    customBannerLinkLabel: systemSettings.customBannerLinkLabel || 'Visit SAMS Odisha Official Portal',
+    customBannerLinkLabelOdia: systemSettings.customBannerLinkLabelOdia || 'ସାମ୍ସ ଓଡ଼ିଶା ଅଫିସିଆଲ୍ ପୋର୍ଟାଲ୍ ଯାଆନ୍ତୁ',
   });
   const [settingsSavedMsg, setSettingsSavedMsg] = useState('');
 
@@ -365,6 +368,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       deoPhotoUrl: systemSettings.deoPhotoUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
       deoPhone: systemSettings.deoPhone || '+91 79780 45129',
       deoEmail: systemSettings.deoEmail || 'deo.sams.pcb@gmail.com',
+      customBannerLinkUrl: systemSettings.customBannerLinkUrl || 'https://samsodisha.gov.in/',
+      customBannerLinkLabel: systemSettings.customBannerLinkLabel || 'Visit SAMS Odisha Official Portal',
+      customBannerLinkLabelOdia: systemSettings.customBannerLinkLabelOdia || 'ସାମ୍ସ ଓଡ଼ିଶା ଅଫିସିଆଲ୍ ପୋର୍ଟାଲ୍ ଯାଆନ୍ତୁ',
     });
   }, [systemSettings]);
 
@@ -1075,10 +1081,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         });
 
         const availableDepartments = Array.from(
-          new Set([
-            ...streamStudents.map((s) => (s.department || '').trim()).filter(Boolean),
-            ...(streamFilter === 'ALL' ? seatMatrix.map((item) => (item.deptName || '').trim()).filter(Boolean) : [])
-          ])
+          new Set(streamStudents.map((s) => (s.department || '').trim()).filter(Boolean))
         )
           .filter((dept) => (deptCountsMap[dept] || 0) > 0)
           .sort((a, b) => a.localeCompare(b));
@@ -1850,11 +1853,18 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         const sessionSeatItems = seatMatrix.filter(
           (item) => (item.academicYear || '2026-27') === adminSeatSession
         );
+        const effectiveSeatItems = sessionSeatItems.length > 0
+          ? sessionSeatItems
+          : seatMatrix.filter((item) => !item.academicYear || item.academicYear === '2026-27').map((item) => ({
+              ...item,
+              id: item.id.startsWith('dept_') ? item.id : `dept_${adminSeatSession}_${item.id}`,
+              academicYear: adminSeatSession,
+            }));
 
         const deptMap = new Map<string, { deptName: string; stream: StreamType; isAedp: boolean; specialization: string; sanctioned: number }>();
 
         // 1. Configured seat items for this session
-        sessionSeatItems.forEach((item) => {
+        effectiveSeatItems.forEach((item) => {
           const norm = normalizeDepartmentAndStream(item.deptName, item.stream);
           const key = `${norm.isAedp ? 'aedp' : 'reg'}_${norm.department.toLowerCase().trim()}`;
           deptMap.set(key, {
@@ -2770,6 +2780,47 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     onChange={(e) => setSettingsForm({ ...settingsForm, prospectusUrl: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
                   />
+                </div>
+              </div>
+
+              {/* Custom Redirect Link Settings */}
+              <div className="pt-2 border-t border-slate-800 space-y-3">
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                  Custom Home Redirect Link Box
+                </span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Redirect Target URL</label>
+                    <input
+                      type="url"
+                      value={settingsForm.customBannerLinkUrl}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, customBannerLinkUrl: e.target.value })}
+                      placeholder="https://samsodisha.gov.in/"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Button Label (English)</label>
+                    <input
+                      type="text"
+                      value={settingsForm.customBannerLinkLabel}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, customBannerLinkLabel: e.target.value })}
+                      placeholder="Visit SAMS Odisha Official Portal"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 block mb-1 font-semibold">Button Label (Odia)</label>
+                    <input
+                      type="text"
+                      value={settingsForm.customBannerLinkLabelOdia}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, customBannerLinkLabelOdia: e.target.value })}
+                      placeholder="ସାମ୍ସ ଓଡ଼ିଶା ଅଫିସିଆଲ୍ ପୋର୍ଟାଲ୍ ଯାଆନ୍ତୁ"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

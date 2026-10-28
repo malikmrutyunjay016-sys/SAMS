@@ -6,14 +6,14 @@ export const TRANSLATIONS = {
     deptDhe: "Department of Higher Education",
     collegeName: "SAMS Panchayat College, Baragada",
     collegeTagline: "A Premier Odisha Government Degree College & e-Admission Center",
-    naacBadge: "NAAC Accredited Grade B++ | Estd. 1960",
+    naacBadge: "NAAC Accredited Grade 'B' | Estd. 1960",
     samsCode: "SAMS College Code: 03071302",
     helpline: "SAMS Helpline: 155335 / 1800-345-6770",
     
     // Navigation
     home: "Home Portal",
     subjectsSeats: "Subjects & Seats",
-    spotRound: "Spot Round Seats",
+    spotRound: "UG e-Admission",
     facultyDir: "Faculty Directory",
     faqs: "FAQs & Helpdesk",
     samsStats: "SAMS Statistics",
@@ -163,14 +163,14 @@ export const TRANSLATIONS = {
     deptDhe: "ଉଚ୍ଚଶିକ୍ଷା ବିଭାଗ, ଓଡ଼ିଶା",
     collegeName: "ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼",
     collegeTagline: "ଓଡ଼ିଶା ସରକାରଙ୍କ ଏକ ଅଗ୍ରଣୀ ଡିଗ୍ରୀ ମହାବିଦ୍ୟାଳୟ ଓ ଇ-ନାମଲେଖା କେନ୍ଦ୍ର",
-    naacBadge: "ନୈକ୍ (NAAC) ଦ୍ୱାରା 'B++' ଗ୍ରେଡ୍ ପ୍ରାପ୍ତ | ସ୍ଥାପିତ: ୧୯୬୦",
+    naacBadge: "ନୈକ୍ (NAAC) ଦ୍ୱାରା 'B' ଗ୍ରେଡ୍ ପ୍ରାପ୍ତ | ସ୍ଥାପିତ: ୧୯୬୦",
     samsCode: "ସାମ୍ସ କଲେଜ କୋଡ୍: ୦୩୦୭୧୩୦୨",
     helpline: "ସାମ୍ସ ହେଲ୍ପଲାଇନ୍: ୧୫୫୩୩୫ / ୧୮୦୦-୩୪୫-୬୭୭୦",
     
     // Navigation
     home: "ମୁଖ୍ୟ ପୋର୍ଟାଲ",
     subjectsSeats: "ବିଷୟ ଓ ସିଟ୍ ମ୍ୟାଟ୍ରିକ୍ସ",
-    spotRound: "ସ୍ପଟ୍ ସିଲେକ୍ସନ୍ ସିଟ୍",
+    spotRound: "UG e-Admission",
     facultyDir: "ଅଧ୍ୟାପକ ସୂଚୀ",
     faqs: "ପ୍ରଶ୍ନୋତ୍ତର (FAQs)",
     samsStats: "ସାମ୍ସ ପରିସଂଖ୍ୟାନ",

@@ -1,407 +1,68 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useData } from '../context/DataContext';
-import { useAuth } from '../context/AuthContext';
-import { generateSpotSelectionPDF, generateWordSelectionListDoc } from '../lib/pdfGenerator';
-import { translateDepartment, translateCategory, translateStatus } from '../lib/translations';
-import { UserCheck, Radio, Download, FileText, CheckCircle2, XCircle, Search, Filter, Sparkles, AlertTriangle, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Building2, CheckCircle, Award, Sparkles } from 'lucide-react';
 
 export const SpotRoundView: React.FC = () => {
-  const {
-    spotCandidates,
-    seatMatrix,
-    systemSettings,
-    reportSpotCandidate,
-    registerSpotCandidate,
-    runAutomatedMeritSelection,
-    t,
-    lang,
-  } = useData();
-  const { role } = useAuth();
-
-  const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
-  const [selectedReportedFilter, setSelectedReportedFilter] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showRegisterModal, setShowRegisterModal] = useState(false);
-
-  // New Candidate Registration Form State
-  const [newCandName, setNewCandName] = useState('');
-  const [newCandSamsReg, setNewCandSamsReg] = useState('');
-  const [newCandDept, setNewCandDept] = useState('physics_regular');
-  const [newCandCategory, setNewCandCategory] = useState<'GEN' | 'SC' | 'ST' | 'SEBC'>('GEN');
-  const [newCandMarks, setNewCandMarks] = useState('84.5');
-  const [newCandPhone, setNewCandPhone] = useState('');
-
-  const filteredCandidates = spotCandidates.filter((c) => {
-    const matchesDept = selectedDeptFilter === 'ALL' || c.deptId === selectedDeptFilter;
-    const matchesReported = selectedReportedFilter === 'ALL' || c.reportedStatus === selectedReportedFilter;
-    const matchesSearch =
-      c.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.samsRegNo.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesDept && matchesReported && matchesSearch;
-  });
-
-  const handleRegisterSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCandName || !newCandSamsReg) return;
-
-    const selectedDeptObj = seatMatrix.find((s) => s.id === newCandDept);
-
-    registerSpotCandidate({
-      studentName: newCandName,
-      samsRegNo: newCandSamsReg,
-      deptId: newCandDept,
-      deptName: selectedDeptObj?.deptName || 'Physics',
-      stream: selectedDeptObj?.stream || 'Science',
-      category: newCandCategory,
-      marksPercentage: parseFloat(newCandMarks) || 80.0,
-      phone: newCandPhone || '9861000000',
-    });
-
-    setShowRegisterModal(false);
-    setNewCandName('');
-    setNewCandSamsReg('');
-  };
-
-  const selectedCandidatesOnly = filteredCandidates.filter((c) => c.selectionStatus === 'Selected');
-
-  if (!systemSettings.spotRoundEnabled && role === 'PUBLIC') {
-    return (
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center max-w-2xl mx-auto my-12 shadow-2xl space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
-          <AlertTriangle className="w-8 h-8" />
-        </div>
-        <h2 className="text-2xl font-bold text-white font-serif">
-          {lang === 'or' ? 'ସ୍ପଟ୍ ରାଉଣ୍ଡ ସିଟ୍ ପୋର୍ଟାଲ୍ ବର୍ତ୍ତମାନ ବନ୍ଦ ରହିଛି' : 'Spot Round Seats Portal Currently Offline / Disabled'}
-        </h2>
-        <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-          {lang === 'or'
-            ? 'କଲେଜ ଇ-ନାମଲେଖା କମିଟି ଦ୍ୱାରା ସାମ୍ସ ସ୍ପଟ୍ ରାଉଣ୍ଡ ଲାଇଭ୍ ରିପୋର୍ଟିଂ ଡେସ୍କ ବର୍ତ୍ତମାନ ବନ୍ଦ କରାଯାଇଛି। ଆଗାମୀ ସ୍ପଟ୍ ପର୍ଯ୍ୟାୟ ତାରିଖ ପାଇଁ ଅଫିସିଆଲ୍ ନୋଟିସ୍ ବୋର୍ଡ ଦେଖନ୍ତୁ।'
-            : 'The SAMS Spot Round Selection Live Reporting Desk is currently turned OFF by the College e-Admission Committee. Please check the official Notice Board for upcoming Spot Phase publication dates.'}
-        </p>
-        <div className="pt-2 text-xs font-mono text-amber-400">
-          {t.samsCode} &bull; {t.govtOdisha}
-        </div>
-      </div>
-    );
-  }
+  const { systemSettings, t, lang } = useData();
 
   return (
-    <div className="space-y-8 pb-12">
-      
+    <div className="space-y-8 pb-12 max-w-4xl mx-auto">
       {/* Title Banner */}
-      <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-6 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2 text-emerald-400 text-xs font-mono mb-1">
-            <Radio className="w-4 h-4 animate-pulse" />
-            <span>{lang === 'or' ? 'ସାମ୍ସ ଡିଗ୍ରୀ ଇ-ନାମଲେଖା ୨୦୨୬-୨୭ • ଲାଇଭ୍ ସ୍ପଟ୍ ରିପୋର୍ଟିଂ ଡେସ୍କ' : 'SAMS DEGREE e-ADMISSION 2026-27 • LIVE SPOT REPORTING DESK'}</span>
-          </div>
-          <h1 className="text-2xl font-extrabold text-white font-serif">
-            {t.spotTitle}
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            {t.spotSub}
-          </p>
+      <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-8 shadow-2xl text-center space-y-4">
+        <div className="inline-flex items-center space-x-2 bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold px-3.5 py-1 rounded-full">
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span>{lang === 'or' ? 'ସାମ୍ସ ଡିଗ୍ରୀ ଇ-ନାମଲେଖା କେନ୍ଦ୍ର' : 'SAMS UG e-Admission Center'}</span>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => runAutomatedMeritSelection()}
-            className="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center shadow"
-          >
-            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> {t.runSelection}
-          </button>
-
-          <button
-            onClick={() => setShowRegisterModal(true)}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs font-bold flex items-center shadow-lg"
-          >
-            <Plus className="w-4 h-4 mr-1.5" /> {t.registerCandidate}
-          </button>
-        </div>
-      </div>
-
-      {/* Export Options Banner */}
-      <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center space-x-3 text-xs text-slate-300">
-          <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
-          <span>
-            {lang === 'or' ? (
-              <><strong>{filteredCandidates.length} ଆବେଦନକାରୀଙ୍କ</strong> ଅଫିସିଆଲ୍ ତାଲିକା (<span className="text-amber-400 font-bold">{selectedCandidatesOnly.length} ମନୋନୀତ</span>)</>
-            ) : (
-              <>Official Formatted Selection Lists for <strong>{filteredCandidates.length} Candidates</strong> (<span className="text-amber-400 font-bold">{selectedCandidatesOnly.length} Provisionally Selected</span>)</>
-            )}
-          </span>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => generateSpotSelectionPDF(filteredCandidates, seatMatrix)}
-            className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold flex items-center transition"
-          >
-            <Download className="w-3.5 h-3.5 mr-1.5" /> {t.downloadPdf}
-          </button>
-
-          <button
-            onClick={() => generateWordSelectionListDoc(filteredCandidates)}
-            className="px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-xs font-bold flex items-center transition"
-          >
-            <FileText className="w-3.5 h-3.5 mr-1.5" /> {t.downloadWord}
-          </button>
-        </div>
-      </div>
-
-      {/* Filters Bar */}
-      <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
         
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <div className="relative w-full sm:w-60">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              placeholder={t.searchCandidate}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-            />
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-serif tracking-tight">
+          {lang === 'or' ? 'ୟୁ.ଜି. ଇ-ନାମଲେଖା ଓ ପ୍ରବେଶ କେନ୍ଦ୍ର' : 'UG e-Admission Portal'}
+        </h1>
+        
+        <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
+          {lang === 'or'
+            ? 'ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼ (ଓଡ଼ିଶା ସରକାର)ଙ୍କ ଅଫିସିଆଲ୍ ୟୁ.ଜି. ଇ-ନାମଲେଖା ଓ ପ୍ରମାଣପତ୍ର ଯାଞ୍ଚ ପୋର୍ଟାଲ୍। ସମସ୍ତ ନାମଲେଖା ସାମ୍ସ ଓଡ଼ିଶା ମେରିଟ୍ ଏବଂ ସରକାରୀ ସଂରକ୍ଷଣ ନିୟମ ଅନୁସାରେ କରାଯାଏ।'
+            : 'Official UG e-Admission and Certificate Verification Portal for Panchayat College, Baragada (Govt. of Odisha). All undergraduate admissions are conducted strictly as per SAMS Odisha merit rankings and government reservation guidelines.'}
+        </p>
+
+        <div className="pt-4 flex flex-wrap justify-center gap-4 text-xs font-mono">
+          <div className="bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-amber-400 flex items-center shadow">
+            <Building2 className="w-4 h-4 mr-2" />
+            <span>{t.samsCode}</span>
           </div>
-
-          <select
-            value={selectedDeptFilter}
-            onChange={(e) => setSelectedDeptFilter(e.target.value)}
-            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-          >
-            <option value="ALL">{t.filterDepartment}: {lang === 'or' ? 'ସମସ୍ତ' : 'All'}</option>
-            {seatMatrix.map((s) => (
-              <option key={s.id} value={s.id}>
-                {translateDepartment(s.deptName, lang)} ({s.vacant} {lang === 'or' ? 'ଖାଲି' : 'vacant'})
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedReportedFilter}
-            onChange={(e) => setSelectedReportedFilter(e.target.value)}
-            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-          >
-            <option value="ALL">{t.filterReporting}: {lang === 'or' ? 'ସମସ୍ତ' : 'All'}</option>
-            <option value="Reported">{t.reported}</option>
-            <option value="Not Reported">{t.notReported}</option>
-          </select>
-        </div>
-
-        <div className="text-slate-400 font-mono text-[11px]">
-          {lang === 'or' ? (
-            <>ମୋଟ <strong>{filteredCandidates.length}</strong> ପ୍ରାର୍ଥୀ ପ୍ରଦର୍ଶିତ</>
-          ) : (
-            <>Showing <strong>{filteredCandidates.length}</strong> applicants</>
-          )}
-        </div>
-
-      </div>
-
-      {/* Main Candidate Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-200">
-            <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
-              <tr>
-                <th className="py-3.5 px-4 font-mono">{t.samsRegNo}</th>
-                <th className="py-3.5 px-4">{t.meritRank}</th>
-                <th className="py-3.5 px-4">{t.studentName}</th>
-                <th className="py-3.5 px-4">{t.subject}</th>
-                <th className="py-3.5 px-4">{lang === 'or' ? 'ବର୍ଗ (Category)' : 'Category'}</th>
-                <th className="py-3.5 px-4 text-center">{t.marksPercentage}</th>
-                <th className="py-3.5 px-4 text-center">{lang === 'or' ? 'ରିପୋର୍ଟିଂ ସ୍ଥିତି' : 'Live Reported Status'}</th>
-                <th className="py-3.5 px-4 text-center">{lang === 'or' ? 'ମନୋନୟନ ସ୍ଥିତି' : 'Provisional Selection'}</th>
-                <th className="py-3.5 px-4 text-center">{t.action}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {filteredCandidates.map((cand, idx) => (
-                <tr key={cand.id} className="hover:bg-slate-800/40 transition">
-                  <td className="py-3.5 px-4 font-mono font-bold text-amber-400">{cand.samsRegNo}</td>
-                  <td className="py-3.5 px-4 font-mono text-slate-300">
-                    #{cand.waitlistRank || idx + 1}
-                  </td>
-                  <td className="py-3.5 px-4 font-bold text-slate-100">{cand.studentName}</td>
-                  <td className="py-3.5 px-4 text-slate-300">{translateDepartment(cand.deptName, lang)}</td>
-                  <td className="py-3.5 px-4 font-mono text-slate-400">{translateCategory(cand.category, lang)}</td>
-                  <td className="py-3.5 px-4 text-center font-bold text-slate-100">
-                    {cand.marksPercentage.toFixed(1)}%
-                  </td>
-                  <td className="py-3.5 px-4 text-center">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] inline-flex items-center ${
-                        cand.reportedStatus === 'Reported'
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                          : 'bg-red-500/20 text-red-300 border border-red-500/40'
-                      }`}
-                    >
-                      {cand.reportedStatus === 'Reported' ? (
-                        <>
-                          <CheckCircle2 className="w-3 h-3 mr-1" /> {t.reported}
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="w-3 h-3 mr-1" /> {t.notReported}
-                        </>
-                      )}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-center">
-                    <span
-                      className={`px-2.5 py-0.5 rounded font-bold text-xs ${
-                        cand.selectionStatus === 'Selected'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                          : cand.selectionStatus === 'Waiting'
-                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                          : 'bg-slate-800 text-slate-500'
-                      }`}
-                    >
-                      {translateStatus(cand.selectionStatus, lang)}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-center">
-                    <div className="flex items-center justify-center space-x-1">
-                      <button
-                        onClick={() => reportSpotCandidate(cand.id, 'Reported')}
-                        className={`px-2 py-1 rounded text-[10px] font-bold ${
-                          cand.reportedStatus === 'Reported'
-                            ? 'bg-emerald-500 text-slate-950'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                        }`}
-                      >
-                        {lang === 'or' ? 'ଉପସ୍ଥିତ' : 'Reported'}
-                      </button>
-                      <button
-                        onClick={() => reportSpotCandidate(cand.id, 'Not Reported')}
-                        className={`px-2 py-1 rounded text-[10px] font-bold ${
-                          cand.reportedStatus === 'Not Reported'
-                            ? 'bg-red-500 text-white'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                        }`}
-                      >
-                        {lang === 'or' ? 'ଅନୁପସ୍ଥିତ' : 'Absent'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-emerald-400 flex items-center shadow">
+            <CheckCircle className="w-4 h-4 mr-2" />
+            <span>{t.naacBadge}</span>
+          </div>
         </div>
       </div>
 
-      {/* Candidate Registration Modal */}
-      {showRegisterModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl text-slate-100 space-y-4">
-            <h3 className="text-lg font-bold text-amber-400 flex items-center">
-              <Plus className="w-5 h-5 mr-2" /> Register Candidate for Spot Round
-            </h3>
+      {/* Guidelines & Counter Info */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+        <h3 className="text-lg font-bold text-white font-serif flex items-center">
+          <Award className="w-5 h-5 mr-2 text-amber-400" />
+          {lang === 'or' ? 'ଇ-ନାମଲେଖା ନିୟମାବଳୀ ଓ କାଉଣ୍ଟର ସମୟ' : 'e-Admission Guidelines & Verification Counters'}
+        </h3>
 
-            <form onSubmit={handleRegisterSubmit} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Student Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={newCandName}
-                  onChange={(e) => setNewCandName(e.target.value)}
-                  placeholder="e.g. Subrata Kumar Behera"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                />
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-slate-300 leading-relaxed">
+          <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800 space-y-2">
+            <h4 className="font-bold text-amber-300 text-sm">1. SAMS CAF & Merit Admissions</h4>
+            <p>
+              Candidates selected through SAMS Odisha Common Application Form (CAF) must report to the college e-Admission verification counters with original certificates, CLC, conduct certificate, and fee payment receipts.
+            </p>
+          </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">SAMS Registration Number</label>
-                <input
-                  type="text"
-                  required
-                  value={newCandSamsReg}
-                  onChange={(e) => setNewCandSamsReg(e.target.value)}
-                  placeholder="e.g. 24D11950"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Target Department</label>
-                  <select
-                    value={newCandDept}
-                    onChange={(e) => setNewCandDept(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                  >
-                    {seatMatrix.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.deptName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Category Quota</label>
-                  <select
-                    value={newCandCategory}
-                    onChange={(e) => setNewCandCategory(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="GEN">GEN</option>
-                    <option value="SC">SC</option>
-                    <option value="ST">ST</option>
-                    <option value="SEBC">SEBC</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">+2 Board Marks %</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    max="100"
-                    required
-                    value={newCandMarks}
-                    onChange={(e) => setNewCandMarks(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Phone Number</label>
-                  <input
-                    type="tel"
-                    value={newCandPhone}
-                    onChange={(e) => setNewCandPhone(e.target.value)}
-                    placeholder="9437XXXXXX"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowRegisterModal(false)}
-                  className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow"
-                >
-                  Submit Spot Application
-                </button>
-              </div>
-            </form>
+          <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800 space-y-2">
+            <h4 className="font-bold text-amber-300 text-sm">2. Counter Working Hours</h4>
+            <p>
+              {t.counterHoursText}
+            </p>
           </div>
         </div>
-      )}
 
+        <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl text-center text-xs text-amber-300 font-medium">
+          {t.helpline}
+        </div>
+      </div>
     </div>
   );
 };

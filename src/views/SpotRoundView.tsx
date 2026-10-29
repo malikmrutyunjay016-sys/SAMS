@@ -1,12 +1,35 @@
 import React from 'react';
 import { useData } from '../context/DataContext';
-import { Building2, CheckCircle, Award, Sparkles } from 'lucide-react';
+import { Building2, CheckCircle, Award, Sparkles, ExternalLink, Radio } from 'lucide-react';
 
 export const SpotRoundView: React.FC = () => {
   const { systemSettings, t, lang } = useData();
 
   return (
     <div className="space-y-8 pb-12 max-w-4xl mx-auto">
+      {/* Live Notice Banner if Portal is Live */}
+      {systemSettings.spotRoundEnabled && (
+        <div className="bg-gradient-to-r from-emerald-950/90 via-slate-900 to-emerald-950/90 border border-emerald-500/50 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-center space-x-3 text-xs sm:text-sm text-emerald-200 font-semibold">
+            <Radio className="w-4 h-4 text-emerald-400 animate-pulse shrink-0" />
+            <span>
+              {lang === 'or'
+                ? 'ୟୁ.ଜି. ଇ-ନାମଲେଖା ପୋର୍ଟାଲ୍ ବର୍ତ୍ତମାନ ଲାଇଭ୍ ଅଛି:'
+                : 'UG e-Admission Portal is currently LIVE. Direct portal link:'}
+            </span>
+          </div>
+          <a
+            href="https://ug-admission-pcb.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-xs flex items-center shadow-lg transition transform hover:-translate-y-0.5 shrink-0"
+          >
+            <span>{lang === 'or' ? 'ଅଫିସିଆଲ୍ ନାମଲେଖା ପୋର୍ଟାଲ୍ ଯାଆନ୍ତୁ' : 'Go to Live Admission Portal'}</span>
+            <ExternalLink className="w-4 h-4 ml-2" />
+          </a>
+        </div>
+      )}
+
       {/* Title Banner */}
       <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-8 shadow-2xl text-center space-y-4">
         <div className="inline-flex items-center space-x-2 bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold px-3.5 py-1 rounded-full">

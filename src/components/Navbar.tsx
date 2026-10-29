@@ -55,10 +55,29 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenP
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
+              const isSpotLive = item.id === 'spot' && systemSettings.spotRoundEnabled;
+
+              const handleNavClick = (e: React.MouseEvent) => {
+                if (isSpotLive) {
+                  e.preventDefault();
+                  const targetUrl = 'https://ug-admission-pcb.vercel.app/';
+                  const link = document.createElement('a');
+                  link.href = targetUrl;
+                  link.target = '_blank';
+                  link.rel = 'noopener noreferrer';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  return;
+                }
+                setActiveTab(item.id);
+              };
+
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={handleNavClick}
+                  title={isSpotLive ? 'Redirect to https://ug-admission-pcb.vercel.app/' : undefined}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center whitespace-nowrap transition-all ${
                     isActive
                       ? themeMode === 'navy'

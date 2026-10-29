@@ -266,7 +266,19 @@ export const HomeView: React.FC<{
 
             <div className="flex flex-wrap gap-3 pt-2">
               <button
-                onClick={() => onNavigateTab('spot')}
+                onClick={() => {
+                  if (systemSettings.spotRoundEnabled) {
+                    const link = document.createElement('a');
+                    link.href = 'https://ug-admission-pcb.vercel.app/';
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  } else {
+                    onNavigateTab('spot');
+                  }
+                }}
                 className="px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs sm:text-sm flex items-center shadow-xl transition transform hover:-translate-y-0.5"
               >
                 <UserCheck className="w-4 h-4 mr-2" />

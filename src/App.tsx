@@ -18,6 +18,8 @@ import { ContactView } from './views/ContactView';
 import { HodPortalView } from './views/HodPortalView';
 import { AdminPortalView } from './views/AdminPortalView';
 import { FaqView } from './views/FaqView';
+import { CounsellingView } from './views/CounsellingView';
+import { PaperAccessView } from './views/PaperAccessView';
 
 function AppContent() {
   const { themeMode, isQuotaExceeded } = useData();
@@ -87,6 +89,10 @@ function AppContent() {
         {activeTab === 'seats' && (
           <SeatMatrixView onNavigateSpot={() => setActiveTab('spot')} />
         )}
+
+        {activeTab === 'counselling' && <CounsellingView />}
+
+        {activeTab === 'paper_access' && <PaperAccessView />}
 
         {activeTab === 'spot' && <SpotRoundView />}
 

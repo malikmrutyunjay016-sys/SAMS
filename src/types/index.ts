@@ -179,3 +179,140 @@ export interface FAQItem {
   updatedAt: string;
 }
 
+// Subject Counselling Types (NEP 2020 Framework)
+export interface Semester1Regular {
+  major: string;
+  minor: string;
+  mdc: string;
+  aec: string;
+  vac: string;
+}
+
+export interface Semester2Regular {
+  major: string;
+  minor: string;
+  mdc: string;
+  aec: string;
+  vac: string;
+}
+
+export interface Semester3Regular {
+  major: string;
+  minor: string;
+  mdc: string;
+  vac: string;
+}
+
+export interface Semester4Regular {
+  major: string;
+  minor: string;
+  activity: string;
+}
+
+export interface Semester5Regular {
+  major: string;
+  minor: string;
+  sec: string;
+  vac: string;
+}
+
+export interface Semester6Regular {
+  major: string;
+  minor: string;
+  sec: string;
+  vac: string;
+}
+
+export interface RegularHonoursCounselling {
+  major: string;
+  minor1: string;
+  minor2: string;
+  mdc1: string;
+  mdc2: string;
+  mdc3: string;
+  sec1: string;
+  sec2: string;
+  sec3: string;
+  aec1: string;
+  aec2: string;
+  vac1: string;
+  vac2: string;
+  sem1?: Semester1Regular;
+  sem2?: Semester2Regular;
+  sem3?: Semester3Regular;
+  sem4?: Semester4Regular;
+  sem5?: Semester5Regular;
+  sem6?: Semester6Regular;
+}
+
+export interface Semester1Aedp {
+  major1: string;
+  major2: string;
+  aec1: string;
+  vac1: string;
+}
+
+export interface Semester2Aedp {
+  major1: string;
+  major2: string;
+  aec2: string;
+  vac2: string;
+}
+
+export interface Semester3Aedp {
+  major1: string;
+  major2: string;
+  mdc1: string;
+  sec1: string;
+}
+
+export interface Semester4Aedp {
+  major1: string;
+  major2: string;
+  mdc2: string;
+  sec2: string;
+}
+
+export interface Semester5_6Aedp {
+  apprenticeship: string;
+}
+
+export interface AedpCounselling {
+  major1: string;
+  major2: string;
+  mdc1: string;
+  mdc2: string;
+  aec1: string;
+  aec2: string;
+  sec1: string;
+  sec2: string;
+  vac1: string;
+  vac2: string;
+  sem1?: Semester1Aedp;
+  sem2?: Semester2Aedp;
+  sem3?: Semester3Aedp;
+  sem4?: Semester4Aedp;
+  sem5_6?: Semester5_6Aedp;
+}
+
+export interface StudentCounsellingRecord {
+  id: string; // studentId
+  studentId: string;
+  studentName: string;
+  rollNo: string;
+  universityRollNo?: string;
+  samsRegNo: string;
+  academicYear: string;
+  stream: StreamType;
+  department: string;
+  isAedp: boolean;
+  status: 'Allotted' | 'Pending' | 'Verified';
+  allottedDate?: string;
+  counselorName?: string;
+  remarks?: string;
+  regular?: RegularHonoursCounselling;
+  aedp?: AedpCounselling;
+  updatedAt: string;
+}
+
+

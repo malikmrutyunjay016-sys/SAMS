@@ -1174,3 +1174,19 @@ export function compareRollNumbers(aRoll?: string, bRoll?: string): number {
   if (!bStr) return -1;
   return aStr.localeCompare(bStr, 'en', { sensitivity: 'base' });
 }
+
+/**
+ * Multi-level student comparison helper:
+ * 1. Stream (Alphabetical)
+ * 2. Department / Honours (Alphabetical)
+ * 3. College Roll Number (Natural Alphanumeric)
+ */
+export function compareStudentsByStreamDeptRoll(a: Student, b: Student): number {
+  const streamDiff = (a.stream || '').localeCompare(b.stream || '', 'en', { sensitivity: 'base' });
+  if (streamDiff !== 0) return streamDiff;
+
+  const deptDiff = (a.department || '').localeCompare(b.department || '', 'en', { sensitivity: 'base' });
+  if (deptDiff !== 0) return deptDiff;
+
+  return compareRollNumbers(a.rollNo, b.rollNo);
+}

@@ -10,6 +10,7 @@ import {
   FacultyMember,
   FAQItem,
   StreamType,
+  StudentCounsellingRecord,
 } from '../types';
 import {
   DEFAULT_SETTINGS,
@@ -22,6 +23,7 @@ import {
   DEFAULT_FAQS,
   generate1100Students,
 } from '../lib/defaultData';
+import { generateDefaultCounselling } from '../lib/counsellingService';
 import { TRANSLATIONS, Language } from '../lib/translations';
 import { normalizeDepartmentAndStream, compareRollNumbers } from '../lib/excelParser';
 import {

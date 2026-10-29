@@ -13,6 +13,7 @@ export const TRANSLATIONS = {
     // Navigation
     home: "Home Portal",
     subjectsSeats: "Subjects & Seats",
+    subjectCounselling: "Subject Counselling",
     spotRound: "UG e-Admission",
     facultyDir: "Faculty Directory",
     faqs: "FAQs & Helpdesk",
@@ -170,6 +171,7 @@ export const TRANSLATIONS = {
     // Navigation
     home: "ମୁଖ୍ୟ ପୋର୍ଟାଲ",
     subjectsSeats: "ବିଷୟ ଓ ସିଟ୍ ମ୍ୟାଟ୍ରିକ୍ସ",
+    subjectCounselling: "ବିଷୟ କାଉନସେଲିଂ (Counselling)",
     spotRound: "UG e-Admission",
     facultyDir: "ଅଧ୍ୟାପକ ସୂଚୀ",
     faqs: "ପ୍ରଶ୍ନୋତ୍ତର (FAQs)",

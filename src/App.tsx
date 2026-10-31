@@ -7,6 +7,7 @@ import { Footer } from './components/Footer';
 import { CommonProspectusModal } from './components/CommonProspectusModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { HodLoginModal } from './components/HodLoginModal';
+import { LoadingOverlay } from './components/LoadingOverlay';
 
 import { HomeView } from './views/HomeView';
 import { SeatMatrixView } from './views/SeatMatrixView';
@@ -41,6 +42,8 @@ function AppContent() {
       data-theme={themeMode}
       className={`min-h-screen ${themeContainerClass} flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-300`}
     >
+      {/* Centered Loading Overlay Box */}
+      <LoadingOverlay />
       
       {/* Header */}
       <Header

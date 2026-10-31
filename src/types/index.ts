@@ -2,7 +2,7 @@ export type StreamType = 'Arts' | 'Biological Science' | 'Commerce' | 'Physical 
 
 export type CategoryType = 'GEN' | 'SC' | 'ST' | 'SEBC' | 'OBC';
 
-export type StudentStatus = 'Admitted' | 'Spot Applied' | 'Selected' | 'Verified' | 'Pending';
+export type StudentStatus = 'Admitted' | 'Spot Applied' | 'Selected' | 'Verified' | 'Pending' | 'CLC Taken';
 
 export const ACADEMIC_YEARS = ['2025-26', '2024-25', '2023-24'] as const;
 export type AcademicYearType = typeof ACADEMIC_YEARS[number];
@@ -33,6 +33,7 @@ export interface Student {
   phone?: string;
   dob?: string;
   status: StudentStatus;
+  isClcTaken?: boolean;
   updatedAt: string;
 }
 
@@ -193,7 +194,7 @@ export interface Semester2Regular {
   minor: string;
   mdc: string;
   aec: string;
-  vac: string;
+  sec: string;
 }
 
 export interface Semester3Regular {
@@ -306,7 +307,8 @@ export interface StudentCounsellingRecord {
   stream: StreamType;
   department: string;
   isAedp: boolean;
-  status: 'Allotted' | 'Pending' | 'Verified';
+  status: 'Allotted' | 'Pending' | 'Verified' | 'CLC Taken';
+  isClcTaken?: boolean;
   allottedDate?: string;
   counselorName?: string;
   remarks?: string;

@@ -19,7 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenP
     { id: 'home' as TabType, label: t.home, icon: Home },
     { id: 'seats' as TabType, label: t.subjectsSeats, icon: BookOpen },
     ...((isHod || isAdmin) ? [{ id: 'counselling' as TabType, label: t.subjectCounselling, icon: GraduationCap }] : []),
-    { id: 'paper_access' as TabType, label: 'Access Minor, MDC, AEC, VAC, SEC', icon: BookCheck },
+    { id: 'paper_access' as TabType, label: (isHod || isAdmin) ? 'Access Major, Minor, MDC, AEC, VAC, SEC' : 'Access Minor, MDC, AEC, VAC, SEC', icon: BookCheck },
     {
       id: 'spot' as TabType,
       label: t.spotRound,

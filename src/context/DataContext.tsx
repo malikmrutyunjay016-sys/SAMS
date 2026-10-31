@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   Student,
+  StudentStatus,
   SeatMatrixItem,
   SpotCandidate,
   AuditLog,
@@ -51,6 +52,8 @@ interface DataContextType {
   faculty: FacultyMember[];
   faqs: FAQItem[];
   isLoading: boolean;
+  isInitialLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
   lang: Language;
   setLang: (lang: Language) => void;
   themeMode: ThemeMode;
@@ -332,6 +335,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    // Initial data hydration transition to ensure smooth UX while Firestore & LocalStorage complete initialization
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, []);
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
 
@@ -628,9 +640,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteStudent = (id: string) => {
     const target = students.find((s) => s.id === id);
-    setStudents((prev) => prev.filter((s) => s.id !== id));
-    safeDeleteDoc(doc(db, 'students', id));
-    addAuditLog('STUDENT_DELETED', `Student ${target?.name || id} deleted from database.`);
+    if (!target) return;
+    const clcStudent: Student = {
+      ...target,
+      status: 'CLC Taken',
+      isClcTaken: true,
+      updatedAt: new Date().toISOString(),
+    };
+    setStudents((prev) => prev.map((s) => (s.id === id ? clcStudent : s)));
+    safeSetDoc(doc(db, 'students', id), clcStudent);
+    addAuditLog('STUDENT_CLC_TAKEN', `Student ${target.name || id} marked as CLC Taken.`);
   };
 
   const clearAllStudents = async () => {
@@ -776,11 +795,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Clears entire database across all sessions
         updatedList = sanitized;
       } else if (importMode === 'replace-session') {
-        // Preserves all students belonging to other academic sessions!
+        // Preserves students belonging to other academic sessions,
+        // and marks missing students in target session as CLC Taken instead of deleting them!
+        const sanitizedIdSet = new Set(sanitized.map((s) => s.id));
         const otherSessionsStudents = prev.filter(
           (s) => !targetSessions.has(s.academicYear || '2026-27')
         );
-        updatedList = [...sanitized, ...otherSessionsStudents];
+        const removedInSession = prev
+          .filter((s) => targetSessions.has(s.academicYear || '2026-27') && !sanitizedIdSet.has(s.id))
+          .map((s) => ({
+            ...s,
+            status: 'CLC Taken' as StudentStatus,
+            isClcTaken: true,
+            updatedAt: nowIso,
+          }));
+        updatedList = [...sanitized, ...removedInSession, ...otherSessionsStudents];
       } else {
         // 'append' mode: merge with deduplication
         updatedList = cleanAndDeduplicateStudents([...sanitized, ...prev]);
@@ -793,6 +822,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const aedpCounts = new Map<string, number>();
       for (let i = 0; i < updatedList.length; i++) {
         const s = updatedList[i];
+        if (s.isClcTaken || s.status === 'CLC Taken') continue; // Skip CLC Taken students from seat matrix count
         const sYear = s.academicYear || '2026-27';
         // Only 2026-27 admitted students count against the current year's active seat matrix!
         if (sYear !== '2026-27') continue;
@@ -852,21 +882,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         } else if (importMode === 'replace-session') {
-          // Only delete docs belonging to targetSessions that are NOT in the incoming batch!
-          // NEVER touch docs belonging to other academic sessions!
+          // Mark docs belonging to targetSessions that are NOT in the incoming batch as CLC Taken
           const oldSnap = await getDocs(collection(db, 'students'));
           if (!oldSnap.empty) {
             const newIdSet = new Set(sanitized.map((s) => s.id));
-            const docsToDelete = oldSnap.docs.filter((d) => {
+            const docsToMarkClc = oldSnap.docs.filter((d) => {
               const docYear = d.data().academicYear || '2026-27';
               return targetSessions.has(docYear) && !newIdSet.has(d.id);
             });
             const chunkSize = 400;
-            for (let i = 0; i < docsToDelete.length; i += chunkSize) {
-              const delChunk = docsToDelete.slice(i, i + chunkSize);
-              const delBatch = writeBatch(db);
-              delChunk.forEach((d) => delBatch.delete(d.ref));
-              await delBatch.commit();
+            for (let i = 0; i < docsToMarkClc.length; i += chunkSize) {
+              const markChunk = docsToMarkClc.slice(i, i + chunkSize);
+              const markBatch = writeBatch(db);
+              markChunk.forEach((d) =>
+                markBatch.set(
+                  d.ref,
+                  { ...d.data(), status: 'CLC Taken', isClcTaken: true, updatedAt: nowIso },
+                  { merge: true }
+                )
+              );
+              await markBatch.commit();
             }
           }
         }
@@ -1509,6 +1544,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         faculty,
         faqs,
         isLoading,
+        isInitialLoading,
+        setIsLoading,
         lang,
         setLang,
         themeMode,

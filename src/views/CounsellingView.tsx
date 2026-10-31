@@ -353,7 +353,7 @@ export const CounsellingView: React.FC = () => {
       formToSave.regular = {
         ...reg,
         sem1: { major: reg.major, minor: reg.minor1, mdc: reg.mdc1, aec: reg.aec1, vac: reg.vac1 },
-        sem2: { major: reg.major, minor: reg.minor2, mdc: reg.mdc2, aec: reg.aec2, vac: reg.vac2 },
+        sem2: { major: reg.major, minor: reg.minor2, mdc: reg.mdc2, aec: reg.aec2, sec: reg.sec1 || reg.sem2?.sec || '' },
         sem3: { major: reg.major, minor: reg.minor1, mdc: reg.mdc3, vac: reg.vac2 },
         sem4: reg.sem4 || { major: reg.major, minor: reg.minor2, activity: 'Internship / Community Engagement & Service / Field Work' },
         sem5: { major: reg.major, minor: reg.minor1, sec: reg.sec2, vac: reg.sem5?.vac || 'Understanding Odisha' },
@@ -801,7 +801,7 @@ export const CounsellingView: React.FC = () => {
                             {reg?.sem1 ? `Minor:${reg.sem1.minor} | MDC:${reg.sem1.mdc} | AEC:${reg.sem1.aec} | VAC:${reg.sem1.vac}` : '-'}
                           </td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
-                            {reg?.sem2 ? `Minor:${reg.sem2.minor} | MDC:${reg.sem2.mdc} | AEC:${reg.sem2.aec} | VAC:${reg.sem2.vac}` : '-'}
+                            {reg?.sem2 ? `Minor:${reg.sem2.minor} | MDC:${reg.sem2.mdc} | AEC:${reg.sem2.aec} | SEC:${reg.sem2.sec || reg.sec1 || '-'}` : '-'}
                           </td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
                             {reg?.sem3 ? `Minor:${reg.sem3.minor} | MDC:${reg.sem3.mdc} | VAC:${reg.sem3.vac}` : '-'}
@@ -932,7 +932,14 @@ export const CounsellingView: React.FC = () => {
                           {s.universityRollNo || 'N/A'}
                         </td>
                         <td className="py-3 px-3">
-                          <div className="font-bold text-white text-sm">{s.name}</div>
+                          <div className="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap">
+                            <span>{s.name}</span>
+                            {(s.isClcTaken || s.status === 'CLC Taken') && (
+                              <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold uppercase tracking-wider">
+                                CLC Taken
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[10px] text-slate-400">Father: {s.parentName || 'N/A'}</div>
                         </td>
                         <td className="py-3 px-3">
@@ -990,7 +997,7 @@ export const CounsellingView: React.FC = () => {
                               )}
                               {record.regular.sem2 && (
                                 <div className="text-slate-300">
-                                  <span className="text-amber-300 font-semibold font-mono">Sem II:</span> Minor: {record.regular.sem2.minor} | MDC: {record.regular.sem2.mdc} | AEC: {record.regular.sem2.aec} | VAC: {record.regular.sem2.vac}
+                                  <span className="text-amber-300 font-semibold font-mono">Sem II:</span> Minor: {record.regular.sem2.minor} | MDC: {record.regular.sem2.mdc} | AEC: {record.regular.sem2.aec} | SEC: {record.regular.sem2.sec || record.regular.sec1 || '-'}
                                 </div>
                               )}
                               {record.regular.sem3 && (
@@ -1387,7 +1394,9 @@ export const CounsellingView: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">SEC 1</label>
+                      <label className="block text-slate-300 font-semibold mb-1">
+                        SEC 1 <span className="text-[10px] text-amber-400 font-mono font-normal">(Fills Sem II SEC)</span>
+                      </label>
                       <input
                         type="text"
                         required

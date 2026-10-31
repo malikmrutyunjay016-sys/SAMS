@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Student, StudentCounsellingRecord } from '../types';
@@ -29,7 +29,7 @@ import * as XLSX from 'xlsx';
 
 export const PaperAccessView: React.FC = () => {
   const { students, seatMatrix, t, lang } = useData();
-  const { role, hodDeptName } = useAuth();
+  const { role, hodDeptName, isHod, isAdmin } = useAuth();
 
   // Compulsory Filter States
   const [selectedYear, setSelectedYear] = useState<string>('');
@@ -57,8 +57,23 @@ export const PaperAccessView: React.FC = () => {
   // Course Types
   const courseTypeOptions = ['Regular NEP', 'AEDP'];
 
+  // Permission check for 'Major' paper type access (HOD of department or Admin)
+  const canAccessMajor = Boolean(isHod || isAdmin || role === 'HOD' || role === 'SUPER_ADMIN');
+
   // Paper Types
-  const paperTypeOptions = ['Minor', 'MDC', 'AEC', 'VAC', 'SEC'];
+  const paperTypeOptions = useMemo(() => {
+    return canAccessMajor
+      ? ['Major', 'Minor', 'MDC', 'AEC', 'VAC', 'SEC']
+      : ['Minor', 'MDC', 'AEC', 'VAC', 'SEC'];
+  }, [canAccessMajor]);
+
+  // Reset selected paper type if user loses Major access or selects Major without permission
+  useEffect(() => {
+    if (selectedPaperType === 'Major' && !canAccessMajor) {
+      setSelectedPaperType('');
+      setSelectedPaperName('');
+    }
+  }, [selectedPaperType, canAccessMajor]);
 
   // Local counselling map cache
   const counsellingMap = useMemo(() => {
@@ -118,6 +133,15 @@ export const PaperAccessView: React.FC = () => {
 
     if (courseType === 'Regular NEP' && record.regular) {
       const reg = record.regular;
+      if (paperType === 'Major') {
+        if (semester === 'Sem I' && reg.sem1?.major) return reg.sem1.major;
+        if (semester === 'Sem II' && reg.sem2?.major) return reg.sem2.major;
+        if (semester === 'Sem III' && reg.sem3?.major) return reg.sem3.major;
+        if (semester === 'Sem IV' && reg.sem4?.major) return reg.sem4.major;
+        if (semester === 'Sem V' && reg.sem5?.major) return reg.sem5.major;
+        if (semester === 'Sem VI' && reg.sem6?.major) return reg.sem6.major;
+        return reg.major || student.department || null;
+      }
       if (semester === 'Sem I' && reg.sem1) {
         if (paperType === 'Minor') return reg.sem1.minor || reg.minor1 || null;
         if (paperType === 'MDC') return reg.sem1.mdc || reg.mdc1 || null;
@@ -128,7 +152,8 @@ export const PaperAccessView: React.FC = () => {
         if (paperType === 'Minor') return reg.sem2.minor || reg.minor2 || null;
         if (paperType === 'MDC') return reg.sem2.mdc || reg.mdc2 || null;
         if (paperType === 'AEC') return reg.sem2.aec || reg.aec2 || null;
-        if (paperType === 'VAC') return reg.sem2.vac || reg.vac2 || null;
+        if (paperType === 'VAC') return null; // No VAC in 2nd semester for Regular Honours
+        if (paperType === 'SEC') return reg.sem2.sec || reg.sec1 || null; // Filled from SEC 1 selected in Counselling Editor
       }
       if (semester === 'Sem III' && reg.sem3) {
         if (paperType === 'Minor') return reg.sem3.minor || reg.minor1 || null;
@@ -153,6 +178,13 @@ export const PaperAccessView: React.FC = () => {
 
     if (courseType === 'AEDP' && record.aedp) {
       const aedp = record.aedp;
+      if (paperType === 'Major') {
+        if (semester === 'Sem I' && aedp.sem1?.major1) return aedp.sem1.major1;
+        if (semester === 'Sem II' && aedp.sem2?.major1) return aedp.sem2.major1;
+        if (semester === 'Sem III' && aedp.sem3?.major1) return aedp.sem3.major1;
+        if (semester === 'Sem IV' && aedp.sem4?.major1) return aedp.sem4.major1;
+        return aedp.major1 || student.department || null;
+      }
       if (semester === 'Sem I' && aedp.sem1) {
         if (paperType === 'AEC') return aedp.sem1.aec1 || null;
         if (paperType === 'VAC') return aedp.sem1.vac1 || null;
@@ -181,6 +213,7 @@ export const PaperAccessView: React.FC = () => {
     const set = new Set<string>();
 
     students.forEach((s) => {
+      if (s.isClcTaken || s.status === 'CLC Taken') return;
       if (selectedYear && (s.academicYear || '2026-27') !== selectedYear) return;
 
       if (role === 'HOD' && hodDeptName) {
@@ -214,6 +247,8 @@ export const PaperAccessView: React.FC = () => {
     if (!isAllCompulsorySelected) return [];
 
     return students.filter((s) => {
+      if (s.isClcTaken || s.status === 'CLC Taken') return false;
+
       if (role === 'HOD' && hodDeptName) {
         if (!isStudentInHodDept(s, hodDeptName)) return false;
       }
@@ -733,7 +768,7 @@ export const PaperAccessView: React.FC = () => {
           {/* 1. Academic Year */}
           <div className="space-y-1.5">
             <label className="block text-slate-300 font-bold font-mono text-[11px] flex items-center justify-between">
-              <span>1. Year / Session *</span>
+              <span>1. Admission year/session *</span>
               {selectedYear ? (
                 <Check className="w-3.5 h-3.5 text-emerald-400" />
               ) : (

@@ -236,7 +236,7 @@ export function generateDefaultCounselling(student: Student): StudentCounselling
       vac1: '',
       vac2: '',
       sem1: { major: dept, minor: '', mdc: '', aec: '', vac: '' },
-      sem2: { major: dept, minor: '', mdc: '', aec: '', vac: '' },
+      sem2: { major: dept, minor: '', mdc: '', aec: '', sec: '' },
       sem3: { major: dept, minor: '', mdc: '', vac: '' },
       sem4: { major: dept, minor: '', activity: '' },
       sem5: { major: dept, minor: '', sec: '', vac: '' },
@@ -381,7 +381,7 @@ export function generateSuggestedCounselling(student: Student): StudentCounselli
       vac1: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT',
       vac2: 'ETHICS AND VALUES',
       sem1: { major: dept, minor: '', mdc: '', aec: '', vac: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT' },
-      sem2: { major: dept, minor: '', mdc: '', aec: 'ENGLISH', vac: '' },
+      sem2: { major: dept, minor: '', mdc: '', aec: 'ENGLISH', sec: '' },
       sem3: { major: dept, minor: '', mdc: '', vac: 'ETHICS AND VALUES' },
       sem4: { major: dept, minor: '', activity: 'Internship / Community Engagement & Service / Field Work' },
       sem5: { major: dept, minor: '', sec: '', vac: 'UNDERSTANDING ODISHA' },
@@ -681,6 +681,8 @@ export function extractSubjectAllocations(
         if (v3) result.push({ ...base, semester: 'Semester V', subjectName: v3, semesterTag: 'Sem V (VAC 3)' });
         if (v4) result.push({ ...base, semester: 'Semester VI', subjectName: v4, semesterTag: 'Sem VI (VAC 4)' });
       } else if (category === 'SEC') {
+        const secSem2 = reg.sem2?.sec || reg.sec1;
+        if (secSem2) result.push({ ...base, semester: 'Semester II', subjectName: secSem2, semesterTag: 'Sem II (SEC / Filled from SEC 1)' });
         if (reg.sec1) result.push({ ...base, semester: 'Semester V', subjectName: reg.sec1, semesterTag: 'Sem V (SEC 1)' });
         if (reg.sec2) result.push({ ...base, semester: 'Semester V', subjectName: reg.sec2, semesterTag: 'Sem V (SEC 2)' });
         if (reg.sec3) result.push({ ...base, semester: 'Semester VI', subjectName: reg.sec3, semesterTag: 'Sem VI (SEC 3)' });

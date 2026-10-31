@@ -202,6 +202,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   // Pagination for Students DB Table
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
+  const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'CLC' | 'ALL'>('ACTIVE');
 
   // ==========================================
   // FACULTY MANAGER STATE
@@ -455,7 +456,12 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       academicYearFilter === 'ALL' ||
       (s.academicYear || '2025-26') === academicYearFilter;
 
-    return matchesSearch && matchesStream && matchesDept && matchesAcademicYear;
+    const matchesStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'ACTIVE' && !s.isClcTaken && s.status !== 'CLC Taken') ||
+      (statusFilter === 'CLC' && (Boolean(s.isClcTaken) || s.status === 'CLC Taken'));
+
+    return matchesSearch && matchesStream && matchesDept && matchesAcademicYear && matchesStatus;
   }).sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
 
   // Filtered Faculty
@@ -1295,6 +1301,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 ))}
               </select>
 
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value as any); setCurrentPage(1); }}
+                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 font-bold focus:outline-none focus:border-amber-500"
+              >
+                <option value="ACTIVE">Status: Active Students Only</option>
+                <option value="CLC">Status: CLC Taken Students</option>
+                <option value="ALL">Status: All Records (Active + CLC)</option>
+              </select>
+
               <span className="text-slate-400 font-mono text-[11px] ml-auto">
                 Showing <strong>{pagedStudents.length}</strong> of <strong>{totalFiltered}</strong> matching (<strong>{students.length}</strong> total)
               </span>
@@ -1364,7 +1380,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                           <td className="py-2.5 px-3 font-mono text-amber-300 font-bold whitespace-nowrap">{stu.rollNo || 'N/A'}</td>
                           <td className="py-2.5 px-3 font-mono text-cyan-300 font-semibold whitespace-nowrap">{stu.universityRollNo || 'N/A'}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.samsRegNo || 'N/A'}</td>
-                          <td className="py-2.5 px-3 font-bold text-white whitespace-nowrap">{stu.name}</td>
+                          <td className="py-2.5 px-3 font-bold text-white whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span>{stu.name}</span>
+                              {(stu.isClcTaken || stu.status === 'CLC Taken') && (
+                                <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9px] font-bold">
+                                  CLC Taken
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.parentName || 'N/A'}</td>
                           <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">{stu.motherName || 'N/A'}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.aadhaarNo || 'N/A'}</td>
@@ -1393,18 +1418,18 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                               <button
                                 onClick={() => {
                                   askConfirmation(
-                                    'Delete Student Record?',
-                                    `Are you sure you want to delete ${stu.name} (${stu.rollNo || stu.samsRegNo})?`,
+                                    'Remove / Mark CLC Taken?',
+                                    `Are you sure you want to remove ${stu.name} (${stu.rollNo || stu.samsRegNo}) from SAMS Student Database Records? They will be marked as 'CLC Taken' in Subject Counselling and excluded from Paper Access.`,
                                     () => {
                                       deleteStudent(stu.id);
-                                      showToast('success', `Removed ${stu.name} from database.`);
+                                      showToast('success', `Marked ${stu.name} as CLC Taken.`);
                                     },
-                                    'Delete Student',
+                                    'Mark CLC Taken',
                                     'danger'
                                   );
                                 }}
                                 className="p-1.5 rounded bg-slate-800 hover:bg-red-950/40 text-red-400 text-xs transition"
-                                title="Delete Student"
+                                title="Remove / Mark CLC Taken"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>

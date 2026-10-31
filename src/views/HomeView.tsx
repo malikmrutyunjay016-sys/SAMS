@@ -294,14 +294,7 @@ export const HomeView: React.FC<{
                 {t.commonProspectus}
               </button>
 
-              <button
-                onClick={() => onNavigateTab('seats')}
-                className="px-5 py-3 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-200 border border-slate-700 font-semibold text-xs sm:text-sm flex items-center transition shadow-lg"
-                style={{ backgroundColor: '#060b18' }}
-              >
-                <BookOpen className="w-4 h-4 mr-2 text-amber-400" />
-                {t.checkMatrixBtn}
-              </button>
+
             </div>
 
           </div>

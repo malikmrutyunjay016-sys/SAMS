@@ -34,6 +34,7 @@ export interface Student {
   dob?: string;
   status: StudentStatus;
   isClcTaken?: boolean;
+  studentLockedFields?: string[];
   updatedAt: string;
 }
 
@@ -314,6 +315,7 @@ export interface StudentCounsellingRecord {
   remarks?: string;
   regular?: RegularHonoursCounselling;
   aedp?: AedpCounselling;
+  studentLockedFields?: string[];
   updatedAt: string;
 }
 

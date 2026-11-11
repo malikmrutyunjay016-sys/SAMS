@@ -21,6 +21,7 @@ import { AdminPortalView } from './views/AdminPortalView';
 import { FaqView } from './views/FaqView';
 import { CounsellingView } from './views/CounsellingView';
 import { PaperAccessView } from './views/PaperAccessView';
+import { StudentPortalView } from './views/StudentPortalView';
 
 function AppContent() {
   const { themeMode, isQuotaExceeded } = useData();
@@ -96,6 +97,8 @@ function AppContent() {
         {activeTab === 'counselling' && <CounsellingView />}
 
         {activeTab === 'paper_access' && <PaperAccessView />}
+
+        {activeTab === 'student_portal' && <StudentPortalView />}
 
         {activeTab === 'spot' && <SpotRoundView />}
 

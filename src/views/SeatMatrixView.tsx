@@ -8,14 +8,16 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
   const [selectedStream, setSelectedStream] = useState<string>('ALL');
   const [selectedType, setSelectedType] = useState<string>('ALL');
 
+  const activeStudents = students.filter((s) => !s.isClcTaken && s.status !== 'CLC Taken');
+
   const availableSessions = Array.from(
-    new Set(['2026-27', '2025-26', '2024-25', ...students.map((s) => s.academicYear || '2026-27'), ...seatMatrix.map((m) => m.academicYear || '2026-27')])
+    new Set(['2026-27', '2025-26', '2024-25', ...activeStudents.map((s) => s.academicYear || '2026-27'), ...seatMatrix.map((m) => m.academicYear || '2026-27')])
   ).sort().reverse();
   const [selectedSession, setSelectedSession] = useState<string>('2026-27');
 
   const sessionStudents = selectedSession === 'ALL'
-    ? students
-    : students.filter((s) => (s.academicYear || '2026-27') === selectedSession);
+    ? activeStudents
+    : activeStudents.filter((s) => (s.academicYear || '2026-27') === selectedSession);
 
   const sessionSeatMatrix = selectedSession === 'ALL'
     ? seatMatrix
@@ -88,7 +90,7 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
             <BookOpen className="w-4 h-4" />
             <span>{lang === 'or' ? 'ସାମ୍ସ ପଞ୍ଚାୟତ ମହାବିଦ୍ୟାଳୟ, ବରଗଡ଼ • ସିଟ୍ ମ୍ୟାଟ୍ରିକ୍ସ' : 'SAMS PANCHAYAT COLLEGE, BARAGADA • INTAKE MATRIX'}</span>
             <span className="ml-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded font-mono inline-flex items-center">
-              <CheckCircle className="w-3 h-3 mr-1 text-emerald-400" /> {lang === 'or' ? `ଛାତ୍ର ଡାଟାବେସ୍ ସହ ଲାଇଭ୍ ସିଙ୍କ୍ (${students.length} ରେକର୍ଡ)` : `Live Synced with Student DB (${students.length} Records)`}
+              <CheckCircle className="w-3 h-3 mr-1 text-emerald-400" /> {lang === 'or' ? `ଛାତ୍ର ଡାଟାବେସ୍ ସହ ଲାଇଭ୍ ସିଙ୍କ୍ (${activeStudents.length} ରେକର୍ଡ)` : `Live Synced with Student DB (${activeStudents.length} Records)`}
             </span>
           </div>
           <h1 className="text-2xl font-extrabold text-white font-serif">

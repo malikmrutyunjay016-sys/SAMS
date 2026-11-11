@@ -60,6 +60,10 @@ interface DataContextType {
   setThemeMode: (mode: ThemeMode) => void;
   t: typeof TRANSLATIONS.en;
   isQuotaExceeded: boolean;
+  counsellingMap: Record<string, StudentCounsellingRecord>;
+  saveCounsellingRecord: (record: StudentCounsellingRecord) => void;
+  bulkSaveCounsellingRecords: (records: StudentCounsellingRecord[], replaceAll?: boolean) => void;
+  clearCounsellingRecords: () => void;
 
   // Student Actions
   addStudent: (student: Omit<Student, 'id' | 'updatedAt'>) => void;
@@ -334,6 +338,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : DEFAULT_FAQS;
   });
 
+  const [counsellingMap, setCounsellingMap] = useState<Record<string, StudentCounsellingRecord>>(() => {
+    const saved =
+      safeGetLocalStorage(LS_PREFIX + 'counsellingRecords') ||
+      safeGetLocalStorage('sams_counselling_records_v1');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const map: Record<string, StudentCounsellingRecord> = {};
+          parsed.forEach((r: StudentCounsellingRecord) => {
+            if (r && (r.studentId || r.id)) {
+              map[r.studentId || r.id] = r;
+            }
+          });
+          return map;
+        } else if (parsed && typeof parsed === 'object') {
+          return parsed;
+        }
+      } catch {}
+    }
+    return {};
+  });
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
 
@@ -367,6 +394,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     safeSaveLocalStorage(LS_PREFIX + 'auditLogs', JSON.stringify(auditLogs));
   }, [auditLogs]);
+
+  useEffect(() => {
+    const list = Object.values(counsellingMap);
+    safeSaveLocalStorage(LS_PREFIX + 'counsellingRecords', JSON.stringify(list));
+    safeSaveLocalStorage('sams_counselling_records_v1', JSON.stringify(list));
+  }, [counsellingMap]);
 
   useEffect(() => {
     safeSaveLocalStorage(LS_PREFIX + 'hodAccounts', JSON.stringify(hodAccounts));
@@ -571,6 +604,50 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (error) => handleFirestoreError(error, OperationType.GET, 'auditLogs')
     );
 
+    // 10. Subject Counselling Records
+    const unsubCounselling = onSnapshot(
+      collection(db, 'subjectCounselling'),
+      async (snapshot) => {
+        if (!snapshot.empty) {
+          setCounsellingMap((prev) => {
+            const next = { ...prev };
+            snapshot.docs.forEach((d) => {
+              const data = d.data() as StudentCounsellingRecord;
+              const key = data.studentId || data.id || d.id;
+              if (key) {
+                next[key] = data;
+              }
+            });
+            return next;
+          });
+        } else {
+          // If Firestore is empty on first load, sync any existing local counselling records to Firestore
+          try {
+            const rawSaved = localStorage.getItem('sams_counsellingMap');
+            if (rawSaved) {
+              const saved = JSON.parse(rawSaved) as Record<string, StudentCounsellingRecord>;
+              const records: StudentCounsellingRecord[] = Object.values(saved);
+              const chunkSize = 400;
+              for (let i = 0; i < records.length; i += chunkSize) {
+                const chunk = records.slice(i, i + chunkSize);
+                const batch = writeBatch(db);
+                chunk.forEach((rec: StudentCounsellingRecord) => {
+                  const docId = String(rec.studentId || rec.id || '').replace(/\//g, '_');
+                  if (docId) {
+                    batch.set(doc(db, 'subjectCounselling', docId), rec);
+                  }
+                });
+                await batch.commit();
+              }
+            }
+          } catch {
+            // Ignore if unauthenticated guest or invalid JSON
+          }
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'subjectCounselling')
+    );
+
     return () => {
       unsubSeatMatrix();
       unsubSettings();
@@ -581,6 +658,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubSpotCandidates();
       unsubStudents();
       unsubAuditLogs();
+      unsubCounselling();
     };
   }, []);
 
@@ -1434,11 +1512,136 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ==========================================
+  // SUBJECT COUNSELLING ACTIONS
+  // ==========================================
+  const saveCounsellingRecord = (record: StudentCounsellingRecord) => {
+    const key = record.studentId || record.id;
+    if (!key) return;
+    const stamped: StudentCounsellingRecord = {
+      ...record,
+      id: key,
+      studentId: key,
+      updatedAt: new Date().toISOString(),
+    };
+    setCounsellingMap((prev) => ({
+      ...prev,
+      [key]: stamped,
+    }));
+    safeSetDoc(doc(db, 'subjectCounselling', key), stamped);
+
+    // Also sync University Roll No to student record if updated
+    if (record.universityRollNo && record.universityRollNo !== 'N/A') {
+      const targetStu = students.find((s) => s.id === key);
+      if (targetStu && targetStu.universityRollNo !== record.universityRollNo) {
+        updateStudent(key, { universityRollNo: record.universityRollNo });
+      }
+    }
+  };
+
+  const bulkSaveCounsellingRecords = (records: StudentCounsellingRecord[], replaceAll = false) => {
+    if (!records || records.length === 0) return;
+    const nowIso = new Date().toISOString();
+    setCounsellingMap((prev) => {
+      const next: Record<string, StudentCounsellingRecord> = replaceAll ? {} : { ...prev };
+      records.forEach((r) => {
+        const key = r.studentId || r.id;
+        if (key) {
+          next[key] = {
+            ...r,
+            id: key,
+            studentId: key,
+            updatedAt: nowIso,
+          };
+        }
+      });
+      return next;
+    });
+
+    // Also sync University Roll No to students in memory if provided in Excel
+    const univRollUpdates = new Map<string, string>();
+    records.forEach((r) => {
+      const key = r.studentId || r.id;
+      if (key && r.universityRollNo && r.universityRollNo !== 'N/A') {
+        univRollUpdates.set(key, r.universityRollNo);
+      }
+    });
+    if (univRollUpdates.size > 0) {
+      setStudents((prev) =>
+        prev.map((s) => {
+          const newURoll = univRollUpdates.get(s.id);
+          if (newURoll && s.universityRollNo !== newURoll) {
+            const updatedStu = { ...s, universityRollNo: newURoll, updatedAt: nowIso };
+            safeSetDoc(doc(db, 'students', s.id), updatedStu);
+            return updatedStu;
+          }
+          return s;
+        })
+      );
+    }
+
+    // Persist to Firestore in background batches of 350
+    setTimeout(async () => {
+      if (isFirestoreQuotaExceeded()) return;
+      try {
+        const chunkSize = 350;
+        for (let i = 0; i < records.length; i += chunkSize) {
+          const chunk = records.slice(i, i + chunkSize);
+          const batch = writeBatch(db);
+          chunk.forEach((r) => {
+            const key = r.studentId || r.id;
+            if (key) {
+              batch.set(doc(db, 'subjectCounselling', key), {
+                ...r,
+                id: key,
+                studentId: key,
+                updatedAt: nowIso,
+              });
+            }
+          });
+          await batch.commit();
+        }
+      } catch (e) {
+        console.warn('Firestore bulk counselling sync caught:', e);
+      }
+    }, 50);
+
+    addAuditLog(
+      'SUBJECT_COUNSELLING_IMPORT',
+      `Updated subject counselling records for ${records.length} students via Excel / Admin Suite.`
+    );
+  };
+
+  const clearCounsellingRecords = async () => {
+    setCounsellingMap({});
+    safeSaveLocalStorage(LS_PREFIX + 'counsellingRecords', JSON.stringify([]));
+    safeSaveLocalStorage('sams_counselling_records_v1', JSON.stringify([]));
+    try {
+      const snap = await getDocs(collection(db, 'subjectCounselling'));
+      if (!snap.empty) {
+        const docs = snap.docs;
+        const chunkSize = 400;
+        for (let i = 0; i < docs.length; i += chunkSize) {
+          const chunk = docs.slice(i, i + chunkSize);
+          const batch = writeBatch(db);
+          chunk.forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to clear Firestore subjectCounselling:', e);
+    }
+    addAuditLog('SUBJECT_COUNSELLING_CLEAR', 'Cleared all custom subject counselling overrides.');
+  };
+
   // Dynamically calculate seat matrix admitted counts and vacancies with student database purely in memory
   const syncedSeatMatrix = useMemo(() => {
     return seatMatrix.map((item) => {
       const admittedCount = students.filter((s) => {
-        // Only count enrolled/admitted students
+        // Only count enrolled/admitted students (exclude CLC Taken)
+        if (s.isClcTaken || s.status === 'CLC Taken') {
+          return false;
+        }
         if (s.status && s.status !== 'Admitted' && s.status !== 'Verified') {
           return false;
         }
@@ -1552,6 +1755,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setThemeMode,
         t,
         isQuotaExceeded,
+        counsellingMap,
+        saveCounsellingRecord,
+        bulkSaveCounsellingRecords,
+        clearCounsellingRecords,
         addStudent,
         updateStudent,
         deleteStudent,

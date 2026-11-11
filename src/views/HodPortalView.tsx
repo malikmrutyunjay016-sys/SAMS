@@ -110,9 +110,12 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
 
   const currentHodAccount = hodAccounts.find((h) => h.id === hodDeptId);
 
-  // Filter students belonging to this department
-  const deptStudents = students.filter((s) =>
-    (s.department || '').toLowerCase().includes((hodDeptName || '').toLowerCase())
+  // Filter active students belonging to this department (exclude CLC Taken)
+  const deptStudents = students.filter(
+    (s) =>
+      !s.isClcTaken &&
+      s.status !== 'CLC Taken' &&
+      (s.department || '').toLowerCase().includes((hodDeptName || '').toLowerCase())
   );
 
   const filteredDeptStudents = deptStudents

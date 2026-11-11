@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { Student, StudentCounsellingRecord } from '../types';
 import {
   generateSuggestedCounselling,
+  normalizeRollLookupKey,
+  normalizeLookupKey,
 } from '../lib/counsellingService';
 import { compareRollNumbers, compareStudentsByStreamDeptRoll } from '../lib/excelParser';
 import {
@@ -28,7 +30,7 @@ import {
 import * as XLSX from 'xlsx';
 
 export const PaperAccessView: React.FC = () => {
-  const { students, seatMatrix, t, lang } = useData();
+  const { students, seatMatrix, counsellingMap, t, lang } = useData();
   const { role, hodDeptName, isHod, isAdmin } = useAuth();
 
   // Compulsory Filter States
@@ -75,30 +77,49 @@ export const PaperAccessView: React.FC = () => {
     }
   }, [selectedPaperType, canAccessMajor]);
 
-  // Local counselling map cache
-  const counsellingMap = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('sams_counselling_records_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const map: Record<string, StudentCounsellingRecord> = {};
-          parsed.forEach((r) => {
-            if (r && (r.studentId || r.id)) {
-              map[r.studentId || r.id] = r;
-            }
-          });
-          return map;
-        }
-      }
-    } catch {}
-    return {};
-  }, []);
+  // Secondary lookup index by Roll No, SAMS Barcode, Univ Roll, and Name
+  const counsellingByRollOrBarcode = useMemo(() => {
+    const map: Record<string, StudentCounsellingRecord> = {};
+    Object.values(counsellingMap).forEach((rec) => {
+      if (!rec) return;
+      const rKey = normalizeLookupKey(rec.rollNo);
+      if (rKey) map[`roll_${rKey}`] = rec;
+      const rNorm = normalizeRollLookupKey(rec.rollNo);
+      if (rNorm) map[`rollnorm_${rNorm}`] = rec;
+      const sKey = normalizeLookupKey(rec.samsRegNo);
+      if (sKey) map[`sams_${sKey}`] = rec;
+      const uKey = normalizeLookupKey(rec.universityRollNo);
+      if (uKey && uKey !== 'na') map[`univ_${uKey}`] = rec;
+      const nKey = normalizeLookupKey(rec.studentName);
+      if (nKey) map[`name_${nKey}`] = rec;
+    });
+    return map;
+  }, [counsellingMap]);
 
   // Helper to get counselling record
   const getRecordForStudent = (student: Student): StudentCounsellingRecord => {
     if (counsellingMap[student.id]) {
       return counsellingMap[student.id];
+    }
+    const rKey = normalizeLookupKey(student.rollNo);
+    if (rKey && counsellingByRollOrBarcode[`roll_${rKey}`]) {
+      return counsellingByRollOrBarcode[`roll_${rKey}`];
+    }
+    const rNorm = normalizeRollLookupKey(student.rollNo);
+    if (rNorm && counsellingByRollOrBarcode[`rollnorm_${rNorm}`]) {
+      return counsellingByRollOrBarcode[`rollnorm_${rNorm}`];
+    }
+    const sKey = normalizeLookupKey(student.samsRegNo);
+    if (sKey && counsellingByRollOrBarcode[`sams_${sKey}`]) {
+      return counsellingByRollOrBarcode[`sams_${sKey}`];
+    }
+    const uKey = normalizeLookupKey(student.universityRollNo);
+    if (uKey && uKey !== 'na' && counsellingByRollOrBarcode[`univ_${uKey}`]) {
+      return counsellingByRollOrBarcode[`univ_${uKey}`];
+    }
+    const nKey = normalizeLookupKey(student.name);
+    if (nKey && counsellingByRollOrBarcode[`name_${nKey}`]) {
+      return counsellingByRollOrBarcode[`name_${nKey}`];
     }
     return generateSuggestedCounselling(student);
   };

@@ -182,7 +182,9 @@ export const HomeView: React.FC<{
     return matchesSearch && matchesCat;
   });
 
-  const activeSessionStudents = students.filter((s) => (s.academicYear || '2026-27') === '2026-27');
+  const activeSessionStudents = students.filter(
+    (s) => !s.isClcTaken && s.status !== 'CLC Taken' && (s.academicYear || '2026-27') === '2026-27'
+  );
   const activeSessionSeatMatrix = seatMatrix.filter((item) => (item.academicYear || '2026-27') === '2026-27');
   const effectiveSeatMatrix = activeSessionSeatMatrix.length > 0 ? activeSessionSeatMatrix : seatMatrix;
 
@@ -286,15 +288,12 @@ export const HomeView: React.FC<{
               </button>
 
               <button
-                onClick={onOpenProspectus}
-                className="px-5 py-3 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-amber-300 border border-amber-500/40 font-semibold text-xs sm:text-sm flex items-center transition shadow-lg"
-                style={{ backgroundColor: '#0f172a' }}
+                onClick={() => onNavigateTab('student_portal')}
+                className="px-5 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-500/40 font-bold text-xs sm:text-sm flex items-center shadow-xl transition transform hover:-translate-y-0.5"
               >
-                <FileText className="w-4 h-4 mr-2" />
-                {t.commonProspectus}
+                <Award className="w-4 h-4 mr-2 text-amber-400" />
+                {t.studentPortal || 'Student Portal'}
               </button>
-
-
             </div>
 
           </div>

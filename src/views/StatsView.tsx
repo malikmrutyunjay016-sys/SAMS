@@ -80,14 +80,16 @@ export const StatsView: React.FC = () => {
   const { students, seatMatrix, t, lang } = useData();
   const [expandedStream, setExpandedStream] = useState<string | null>(null);
 
+  const activeStudents = students.filter((s) => !s.isClcTaken && s.status !== 'CLC Taken');
+
   const availableSessions = Array.from(
-    new Set(['2026-27', '2025-26', '2024-25', ...students.map((s) => s.academicYear || '2026-27'), ...seatMatrix.map((m) => m.academicYear || '2026-27')])
+    new Set(['2026-27', '2025-26', '2024-25', ...activeStudents.map((s) => s.academicYear || '2026-27'), ...seatMatrix.map((m) => m.academicYear || '2026-27')])
   ).sort().reverse();
   const [selectedSession, setSelectedSession] = useState<string>('2026-27');
 
   const filteredStudents = selectedSession === 'ALL'
-    ? students
-    : students.filter((s) => (s.academicYear || '2026-27') === selectedSession);
+    ? activeStudents
+    : activeStudents.filter((s) => (s.academicYear || '2026-27') === selectedSession);
 
   const matchedSeatMatrix = selectedSession === 'ALL'
     ? seatMatrix

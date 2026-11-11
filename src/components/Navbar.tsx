@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Home, BookOpen, GraduationCap, UserCheck, Users, BarChart3, Download, PhoneCall, HelpCircle, Building2, ShieldCheck, Radio, BookCheck } from 'lucide-react';
 
-export type TabType = 'home' | 'seats' | 'counselling' | 'paper_access' | 'spot' | 'faculty' | 'stats' | 'downloads' | 'contact' | 'faq' | 'hod' | 'admin';
+export type TabType = 'home' | 'seats' | 'counselling' | 'paper_access' | 'student_portal' | 'spot' | 'faculty' | 'stats' | 'downloads' | 'contact' | 'faq' | 'hod' | 'admin';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -20,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenP
     { id: 'seats' as TabType, label: t.subjectsSeats, icon: BookOpen },
     ...((isHod || isAdmin) ? [{ id: 'counselling' as TabType, label: t.subjectCounselling, icon: GraduationCap }] : []),
     { id: 'paper_access' as TabType, label: (isHod || isAdmin) ? 'Access Major, Minor, MDC, AEC, VAC, SEC' : 'Access Minor, MDC, AEC, VAC, SEC', icon: BookCheck },
+    { id: 'student_portal' as TabType, label: t.studentPortal || 'Student Portal', icon: UserCheck },
     {
       id: 'spot' as TabType,
       label: t.spotRound,

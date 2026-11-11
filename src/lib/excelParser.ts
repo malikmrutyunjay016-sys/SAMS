@@ -1172,7 +1172,7 @@ export function compareRollNumbers(aRoll?: string, bRoll?: string): number {
   if (!aStr && !bStr) return 0;
   if (!aStr) return 1;
   if (!bStr) return -1;
-  return aStr.localeCompare(bStr, 'en', { sensitivity: 'base' });
+  return aStr.localeCompare(bStr, 'en', { numeric: true, sensitivity: 'base' });
 }
 
 /**

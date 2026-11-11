@@ -11,6 +11,8 @@ import {
   SubjectAllocationEntry,
   COMMON_AEC_OPTIONS,
   COMMON_VAC_OPTIONS,
+  normalizeRollLookupKey,
+  normalizeLookupKey,
 } from '../lib/counsellingService';
 import { compareRollNumbers, compareStudentsByStreamDeptRoll } from '../lib/excelParser';
 import {
@@ -36,7 +38,7 @@ import {
 const LS_COUNSELLING_KEY = 'SAMS_BARAGADA_V4_counsellingRecords';
 
 export const CounsellingView: React.FC = () => {
-  const { students, seatMatrix, loadSampleStudents, t, lang } = useData();
+  const { students, seatMatrix, loadSampleStudents, counsellingMap, saveCounsellingRecord, t, lang } = useData();
   const { role, hodDeptName } = useAuth();
   const canEdit = role === 'SUPER_ADMIN' || role === 'HOD';
 
@@ -58,25 +60,24 @@ export const CounsellingView: React.FC = () => {
   const [excelSheet, setExcelSheet] = useState<'regular' | 'aedp'>('regular');
   const [activeCategoryTab, setActiveCategoryTab] = useState<'MINOR' | 'MDC' | 'AEC' | 'VAC' | 'SEC'>('MDC');
 
-  // Local counselling records cache map (StudentID -> StudentCounsellingRecord)
-  const [counsellingMap, setCounsellingMap] = useState<Record<string, StudentCounsellingRecord>>(() => {
-    try {
-      const saved = localStorage.getItem(LS_COUNSELLING_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const map: Record<string, StudentCounsellingRecord> = {};
-          parsed.forEach((r) => {
-            if (r && (r.studentId || r.id)) {
-              map[r.studentId || r.id] = r;
-            }
-          });
-          return map;
-        }
-      }
-    } catch {}
-    return {};
-  });
+  // Secondary lookup index by Roll No, SAMS Barcode, Univ Roll, and Name in case records were imported by Roll/Barcode
+  const counsellingByRollOrBarcode = useMemo(() => {
+    const map: Record<string, StudentCounsellingRecord> = {};
+    Object.values(counsellingMap).forEach((rec) => {
+      if (!rec) return;
+      const rKey = normalizeLookupKey(rec.rollNo);
+      if (rKey) map[`roll_${rKey}`] = rec;
+      const rNorm = normalizeRollLookupKey(rec.rollNo);
+      if (rNorm) map[`rollnorm_${rNorm}`] = rec;
+      const sKey = normalizeLookupKey(rec.samsRegNo);
+      if (sKey) map[`sams_${sKey}`] = rec;
+      const uKey = normalizeLookupKey(rec.universityRollNo);
+      if (uKey && uKey !== 'na') map[`univ_${uKey}`] = rec;
+      const nKey = normalizeLookupKey(rec.studentName);
+      if (nKey) map[`name_${nKey}`] = rec;
+    });
+    return map;
+  }, [counsellingMap]);
 
   // Edit Modal State
   const [editingRecord, setEditingRecord] = useState<StudentCounsellingRecord | null>(null);
@@ -175,10 +176,30 @@ export const CounsellingView: React.FC = () => {
     return false;
   }
 
-  // Helper to get counselling record with O(1) Map lookup
+  // Helper to get counselling record with O(1) Map lookup (by student.id, rollNo, samsRegNo, univRoll, or name)
   function getRecordForStudent(student: Student): StudentCounsellingRecord {
     if (counsellingMap[student.id]) {
       return counsellingMap[student.id];
+    }
+    const rKey = normalizeLookupKey(student.rollNo);
+    if (rKey && counsellingByRollOrBarcode[`roll_${rKey}`]) {
+      return counsellingByRollOrBarcode[`roll_${rKey}`];
+    }
+    const rNorm = normalizeRollLookupKey(student.rollNo);
+    if (rNorm && counsellingByRollOrBarcode[`rollnorm_${rNorm}`]) {
+      return counsellingByRollOrBarcode[`rollnorm_${rNorm}`];
+    }
+    const sKey = normalizeLookupKey(student.samsRegNo);
+    if (sKey && counsellingByRollOrBarcode[`sams_${sKey}`]) {
+      return counsellingByRollOrBarcode[`sams_${sKey}`];
+    }
+    const uKey = normalizeLookupKey(student.universityRollNo);
+    if (uKey && uKey !== 'na' && counsellingByRollOrBarcode[`univ_${uKey}`]) {
+      return counsellingByRollOrBarcode[`univ_${uKey}`];
+    }
+    const nKey = normalizeLookupKey(student.name);
+    if (nKey && counsellingByRollOrBarcode[`name_${nKey}`]) {
+      return counsellingByRollOrBarcode[`name_${nKey}`];
     }
     return generateSuggestedCounselling(student);
   }
@@ -271,7 +292,7 @@ export const CounsellingView: React.FC = () => {
       const matchesPaperName = paperEntries.some((e) => e.paperName.toLowerCase().includes(q));
 
       return matchesStudentInfo || matchesPaperName;
-    }).sort(compareStudentsByStreamDeptRoll);
+    }).sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
   }, [
     students,
     selectedSession,
@@ -294,12 +315,22 @@ export const CounsellingView: React.FC = () => {
     });
   }, [filteredStudents, excelSheet, counsellingMap]);
 
-  // Counts for sheets
-  const regularCount = useMemo(() => filteredStudents.filter((s) => !getRecordForStudent(s).isAedp).length, [filteredStudents, counsellingMap]);
-  const aedpCount = useMemo(() => filteredStudents.filter((s) => getRecordForStudent(s).isAedp).length, [filteredStudents, counsellingMap]);
+  // Counts for sheets (exclude CLC Taken students from count)
+  const regularCount = useMemo(
+    () => filteredStudents.filter((s) => !s.isClcTaken && s.status !== 'CLC Taken' && !getRecordForStudent(s).isAedp).length,
+    [filteredStudents, counsellingMap]
+  );
+  const aedpCount = useMemo(
+    () => filteredStudents.filter((s) => !s.isClcTaken && s.status !== 'CLC Taken' && getRecordForStudent(s).isAedp).length,
+    [filteredStudents, counsellingMap]
+  );
 
   // Paginated slice for table view vs excel matrix view
   const activeStudentList = viewMode === 'excel' ? excelFilteredStudents : filteredStudents;
+  const activeCountedStudents = useMemo(
+    () => activeStudentList.filter((s) => !s.isClcTaken && s.status !== 'CLC Taken').length,
+    [activeStudentList]
+  );
   const paginatedStudents = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return activeStudentList.slice(start, start + pageSize);
@@ -309,14 +340,18 @@ export const CounsellingView: React.FC = () => {
 
   const totalPages = Math.ceil(activeStudentList.length / pageSize) || 1;
 
-  // Memoized category allocations for Minor, MDC, AEC, VAC, SEC Details tab
+  // Memoized category allocations for Minor, MDC, AEC, VAC, SEC Details tab (exclude CLC Taken students)
   const categoryAllocations = useMemo(() => {
-    const allRecords = filteredStudents.map((s) => getRecordForStudent(s));
+    const allRecords = filteredStudents
+      .filter((s) => !s.isClcTaken && s.status !== 'CLC Taken')
+      .map((s) => getRecordForStudent(s));
     const raw = extractSubjectAllocations(allRecords, activeCategoryTab);
-    if (selectedSemester === 'ALL') return raw;
-    return raw.filter(
-      (a) => a.semester === selectedSemester || a.semesterTag.toLowerCase().includes(selectedSemester.toLowerCase())
-    );
+    const list = selectedSemester === 'ALL'
+      ? raw
+      : raw.filter(
+          (a) => a.semester === selectedSemester || a.semesterTag.toLowerCase().includes(selectedSemester.toLowerCase())
+        );
+    return list.sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
   }, [filteredStudents, activeCategoryTab, selectedSemester, counsellingMap]);
 
   const uniqueSubjectsCount = useMemo(() => {
@@ -324,7 +359,9 @@ export const CounsellingView: React.FC = () => {
   }, [categoryAllocations]);
 
   const handleDownloadCategoryExcel = (cat: 'MINOR' | 'MDC' | 'AEC' | 'VAC' | 'SEC') => {
-    const allRecords = filteredStudents.map((s) => getRecordForStudent(s));
+    const allRecords = filteredStudents
+      .filter((s) => !s.isClcTaken && s.status !== 'CLC Taken')
+      .map((s) => getRecordForStudent(s));
     exportCategorySubjectExcel(allRecords, cat, `${selectedSession}_${selectedSemester}`);
     showToast(`Successfully downloaded ${cat} subject roster details for ${selectedSession} (${selectedSemester})!`);
   };
@@ -335,7 +372,7 @@ export const CounsellingView: React.FC = () => {
       return;
     }
     let counselling = getRecordForStudent(student);
-    if (counselling.status === 'Pending' || (!counselling.aedp?.major2 && !counselling.regular?.minor1)) {
+    if (!counselling.aedp && !counselling.regular) {
       counselling = generateSuggestedCounselling(student);
     }
     setEditingRecord(counselling);
@@ -361,18 +398,7 @@ export const CounsellingView: React.FC = () => {
       };
     }
 
-    const updatedMap = {
-      ...counsellingMap,
-      [formToSave.studentId || formToSave.id]: formToSave,
-    };
-    setCounsellingMap(updatedMap);
-
-    // Save to localStorage in background/synchronously
-    try {
-      localStorage.setItem(LS_COUNSELLING_KEY, JSON.stringify(Object.values(updatedMap)));
-    } catch (err) {
-      console.warn('Failed to save counselling records to localStorage:', err);
-    }
+    saveCounsellingRecord(formToSave);
 
     setIsModalOpen(false);
     showToast(`Successfully updated subject counselling record for ${editForm.studentName}!`);
@@ -601,7 +627,7 @@ export const CounsellingView: React.FC = () => {
           </select>
 
           <span className="text-slate-400 font-mono text-[11px] ml-auto">
-            Showing <strong>{activeStudentList.length}</strong> records
+            Showing <strong>{activeCountedStudents}</strong> records
           </span>
         </div>
       </div>
@@ -765,6 +791,10 @@ export const CounsellingView: React.FC = () => {
                     <th className="py-2.5 px-3 border-r border-slate-800">Major (Honours)</th>
                     <th className="py-2.5 px-3 border-r border-slate-800">Minor 1</th>
                     <th className="py-2.5 px-3 border-r border-slate-800">Minor 2</th>
+                    <th className="py-2.5 px-3 border-r border-slate-800">MDC 1 / 2 / 3</th>
+                    <th className="py-2.5 px-3 border-r border-slate-800">SEC 1 / 2 / 3</th>
+                    <th className="py-2.5 px-3 border-r border-slate-800">AEC 1 / 2</th>
+                    <th className="py-2.5 px-3 border-r border-slate-800">VAC 1 / 2</th>
                     <th className="py-2.5 px-3 border-r border-slate-800">Sem I</th>
                     <th className="py-2.5 px-3 border-r border-slate-800">Sem II</th>
                     <th className="py-2.5 px-3 border-r border-slate-800">Sem III</th>
@@ -776,7 +806,7 @@ export const CounsellingView: React.FC = () => {
                 <tbody className="divide-y divide-slate-800">
                   {paginatedExcelStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={15} className="py-12 text-center text-slate-400">
+                      <td colSpan={19} className="py-12 text-center text-slate-400">
                         No Regular Honours counselling records found for this filter.
                       </td>
                     </tr>
@@ -785,6 +815,18 @@ export const CounsellingView: React.FC = () => {
                       const record = getRecordForStudent(s);
                       const reg = record.regular;
                       const globalIdx = (currentPage - 1) * pageSize + idx + 1;
+                      const min1 = reg?.minor1 || reg?.sem1?.minor || '-';
+                      const min2 = reg?.minor2 || reg?.sem2?.minor || '-';
+                      const mdc1 = reg?.mdc1 || reg?.sem1?.mdc || '-';
+                      const mdc2 = reg?.mdc2 || reg?.sem2?.mdc || '-';
+                      const mdc3 = reg?.mdc3 || reg?.sem3?.mdc || '-';
+                      const sec1 = reg?.sec1 || reg?.sem2?.sec || '-';
+                      const sec2 = reg?.sec2 || reg?.sem5?.sec || '-';
+                      const sec3 = reg?.sec3 || reg?.sem6?.sec || '-';
+                      const aec1 = reg?.aec1 || reg?.sem1?.aec || '-';
+                      const aec2 = reg?.aec2 || reg?.sem2?.aec || '-';
+                      const vac1 = reg?.vac1 || reg?.sem1?.vac || '-';
+                      const vac2 = reg?.vac2 || reg?.sem3?.vac || '-';
 
                       return (
                         <tr key={s.id} className="hover:bg-slate-800/60 transition">
@@ -795,25 +837,37 @@ export const CounsellingView: React.FC = () => {
                           <td className="py-2 px-3 border-r border-slate-800 font-sans font-bold text-white">{s.name}</td>
                           <td className="py-2 px-3 border-r border-slate-800 text-purple-300">{s.stream}</td>
                           <td className="py-2 px-3 border-r border-slate-800 text-amber-200 font-bold">{reg?.major || s.department}</td>
-                          <td className="py-2 px-3 border-r border-slate-800 text-slate-300">{reg?.minor1 || '-'}</td>
-                          <td className="py-2 px-3 border-r border-slate-800 text-slate-400">{reg?.minor2 || '-'}</td>
+                          <td className="py-2 px-3 border-r border-slate-800 text-emerald-300 font-semibold">{min1}</td>
+                          <td className="py-2 px-3 border-r border-slate-800 text-emerald-200 font-semibold">{min2}</td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
-                            {reg?.sem1 ? `Minor:${reg.sem1.minor} | MDC:${reg.sem1.mdc} | AEC:${reg.sem1.aec} | VAC:${reg.sem1.vac}` : '-'}
+                            {`${mdc1} | ${mdc2} | ${mdc3}`}
+                          </td>
+                          <td className="py-2 px-3 border-r border-slate-800 text-cyan-300 text-[10px] font-semibold">
+                            {`${sec1} | ${sec2} | ${sec3}`}
                           </td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
-                            {reg?.sem2 ? `Minor:${reg.sem2.minor} | MDC:${reg.sem2.mdc} | AEC:${reg.sem2.aec} | SEC:${reg.sem2.sec || reg.sec1 || '-'}` : '-'}
+                            {`${aec1} | ${aec2}`}
                           </td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
-                            {reg?.sem3 ? `Minor:${reg.sem3.minor} | MDC:${reg.sem3.mdc} | VAC:${reg.sem3.vac}` : '-'}
+                            {`${vac1} | ${vac2}`}
                           </td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
-                            {reg?.sem4 ? `Minor:${reg.sem4.minor} | Act:${reg.sem4.activity}` : '-'}
+                            {`Minor:${min1} | MDC:${mdc1} | AEC:${aec1} | VAC:${vac1}`}
                           </td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
-                            {reg?.sem5 ? `Minor:${reg.sem5.minor} | SEC:${reg.sem5.sec} | VAC:${reg.sem5.vac}` : '-'}
+                            {`Minor:${min2} | MDC:${mdc2} | AEC:${aec2} | SEC:${sec1}`}
+                          </td>
+                          <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
+                            {`Minor:${min1} | MDC:${mdc3} | VAC:${vac2}`}
+                          </td>
+                          <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
+                            {`Minor:${min2} | Act:${reg?.sem4?.activity || 'Internship / Community Engagement'}`}
+                          </td>
+                          <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
+                            {`Minor:${min1} | SEC:${sec2} | VAC:${reg?.sem5?.vac || 'UNDERSTANDING ODISHA'}`}
                           </td>
                           <td className="py-2 px-3 text-slate-300 text-[10px]">
-                            {reg?.sem6 ? `Minor:${reg.sem6.minor} | SEC:${reg.sem6.sec} | VAC:${reg.sem6.vac}` : '-'}
+                            {`Minor:${min2} | SEC:${sec3} | VAC:${reg?.sem6?.vac || 'Creative Writing'}`}
                           </td>
                         </tr>
                       );
@@ -989,37 +1043,37 @@ export const CounsellingView: React.FC = () => {
                             </div>
                           ) : record.regular ? (
                             <div className="space-y-1.5 text-[11px]">
-                              <div className="font-bold text-amber-400">Major: {record.regular.major}</div>
-                              {record.regular.sem1 && (
-                                <div className="text-slate-300">
-                                  <span className="text-amber-300 font-semibold font-mono">Sem I:</span> Minor: {record.regular.sem1.minor} | MDC: {record.regular.sem1.mdc} | AEC: {record.regular.sem1.aec} | VAC: {record.regular.sem1.vac}
-                                </div>
-                              )}
-                              {record.regular.sem2 && (
-                                <div className="text-slate-300">
-                                  <span className="text-amber-300 font-semibold font-mono">Sem II:</span> Minor: {record.regular.sem2.minor} | MDC: {record.regular.sem2.mdc} | AEC: {record.regular.sem2.aec} | SEC: {record.regular.sem2.sec || record.regular.sec1 || '-'}
-                                </div>
-                              )}
-                              {record.regular.sem3 && (
-                                <div className="text-slate-300">
-                                  <span className="text-amber-300 font-semibold font-mono">Sem III:</span> Minor: {record.regular.sem3.minor} | MDC: {record.regular.sem3.mdc} | VAC: {record.regular.sem3.vac}
-                                </div>
-                              )}
-                              {record.regular.sem4 && (
-                                <div className="text-slate-300">
-                                  <span className="text-amber-300 font-semibold font-mono">Sem IV:</span> Minor: {record.regular.sem4.minor} | Activity: {record.regular.sem4.activity}
-                                </div>
-                              )}
-                              {record.regular.sem5 && (
-                                <div className="text-slate-300">
-                                  <span className="text-amber-300 font-semibold font-mono">Sem V:</span> Minor: {record.regular.sem5.minor} | SEC: {record.regular.sem5.sec} | VAC: {record.regular.sem5.vac}
-                                </div>
-                              )}
-                              {record.regular.sem6 && (
-                                <div className="text-slate-300">
-                                  <span className="text-amber-300 font-semibold font-mono">Sem VI:</span> Minor: {record.regular.sem6.minor} | SEC: {record.regular.sem6.sec} | VAC: {record.regular.sem6.vac}
-                                </div>
-                              )}
+                              <div className="font-bold text-amber-400">Major: {record.regular.major || s.department}</div>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-emerald-300 font-semibold font-mono text-[10px] bg-slate-950/70 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                                <span>Minor 1: <strong className="text-white">{record.regular.minor1 || record.regular.sem1?.minor || '-'}</strong></span>
+                                <span>•</span>
+                                <span>Minor 2: <strong className="text-white">{record.regular.minor2 || record.regular.sem2?.minor || '-'}</strong></span>
+                              </div>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-cyan-300 font-semibold font-mono text-[10px] bg-slate-950/70 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                                <span>SEC 1: <strong className="text-white">{record.regular.sec1 || record.regular.sem2?.sec || '-'}</strong></span>
+                                <span>•</span>
+                                <span>SEC 2: <strong className="text-white">{record.regular.sec2 || record.regular.sem5?.sec || '-'}</strong></span>
+                                <span>•</span>
+                                <span>SEC 3: <strong className="text-white">{record.regular.sec3 || record.regular.sem6?.sec || '-'}</strong></span>
+                              </div>
+                              <div className="text-slate-300">
+                                <span className="text-amber-300 font-semibold font-mono">Sem I:</span> Minor: {record.regular.sem1?.minor || record.regular.minor1 || '-'} | MDC: {record.regular.sem1?.mdc || record.regular.mdc1 || '-'} | AEC: {record.regular.sem1?.aec || record.regular.aec1 || '-'} | VAC: {record.regular.sem1?.vac || record.regular.vac1 || '-'}
+                              </div>
+                              <div className="text-slate-300">
+                                <span className="text-amber-300 font-semibold font-mono">Sem II:</span> Minor: {record.regular.sem2?.minor || record.regular.minor2 || '-'} | MDC: {record.regular.sem2?.mdc || record.regular.mdc2 || '-'} | AEC: {record.regular.sem2?.aec || record.regular.aec2 || '-'} | SEC: {record.regular.sem2?.sec || record.regular.sec1 || '-'}
+                              </div>
+                              <div className="text-slate-300">
+                                <span className="text-amber-300 font-semibold font-mono">Sem III:</span> Minor: {record.regular.sem3?.minor || record.regular.minor1 || '-'} | MDC: {record.regular.sem3?.mdc || record.regular.mdc3 || '-'} | VAC: {record.regular.sem3?.vac || record.regular.vac2 || '-'}
+                              </div>
+                              <div className="text-slate-300">
+                                <span className="text-amber-300 font-semibold font-mono">Sem IV:</span> Minor: {record.regular.sem4?.minor || record.regular.minor2 || '-'} | Activity: {record.regular.sem4?.activity || 'Internship / Community Engagement'}
+                              </div>
+                              <div className="text-slate-300">
+                                <span className="text-amber-300 font-semibold font-mono">Sem V:</span> Minor: {record.regular.sem5?.minor || record.regular.minor1 || '-'} | SEC: {record.regular.sem5?.sec || record.regular.sec2 || '-'} | VAC: {record.regular.sem5?.vac || 'UNDERSTANDING ODISHA'}
+                              </div>
+                              <div className="text-slate-300">
+                                <span className="text-amber-300 font-semibold font-mono">Sem VI:</span> Minor: {record.regular.sem6?.minor || record.regular.minor2 || '-'} | SEC: {record.regular.sem6?.sec || record.regular.sec3 || '-'} | VAC: {record.regular.sem6?.vac || 'Creative Writing'}
+                              </div>
                             </div>
                           ) : null}
                         </td>
@@ -1048,7 +1102,7 @@ export const CounsellingView: React.FC = () => {
       {totalPages > 1 && (
         <div className="bg-slate-950 px-4 py-3 border-t border-slate-800 rounded-2xl flex items-center justify-between text-xs text-slate-300 shadow-xl">
           <div>
-            Showing page <strong>{currentPage}</strong> of <strong>{totalPages}</strong> ({activeStudentList.length} total records)
+            Showing page <strong>{currentPage}</strong> of <strong>{totalPages}</strong> ({activeCountedStudents} total records)
           </div>
           <div className="flex items-center space-x-2">
             <button
@@ -1120,7 +1174,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">Major 1 (Core Industrial Specialization)</label>
                       <input
                         type="text"
-                        required
                         value={editForm.aedp.major1}
                         onChange={(e) =>
                           setEditForm({
@@ -1136,7 +1189,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">Major 2 (Applied Allied Technology)</label>
                       <input
                         type="text"
-                        required
                         value={editForm.aedp.major2}
                         onChange={(e) =>
                           setEditForm({
@@ -1154,7 +1206,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">MDC 1 (Multidisciplinary Course)</label>
                       <input
                         type="text"
-                        required
                         value={editForm.aedp.mdc1}
                         onChange={(e) =>
                           setEditForm({
@@ -1170,7 +1221,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">MDC 2</label>
                       <input
                         type="text"
-                        required
                         value={editForm.aedp.mdc2}
                         onChange={(e) =>
                           setEditForm({
@@ -1188,7 +1238,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">AEC 1 (Ability Enhancement Course)</label>
                       <input
                         type="text"
-                        required
                         value={editForm.aedp.aec1}
                         onChange={(e) =>
                           setEditForm({
@@ -1204,7 +1253,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">AEC 2</label>
                       <input
                         type="text"
-                        required
                         value={editForm.aedp.aec2}
                         onChange={(e) =>
                           setEditForm({
@@ -1222,7 +1270,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">SEC 1 (Apprenticeship OJT 1)</label>
                       <input
                         type="text"
-                        required
                         value={editForm.aedp.sec1}
                         onChange={(e) =>
                           setEditForm({
@@ -1238,7 +1285,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">SEC 2 (Apprenticeship OJT 2)</label>
                       <input
                         type="text"
-                        required
                         value={editForm.aedp.sec2}
                         onChange={(e) =>
                           setEditForm({
@@ -1256,7 +1302,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">VAC 1 (Value Added Course)</label>
                       <input
                         type="text"
-                        required
                         value={editForm.aedp.vac1}
                         onChange={(e) =>
                           setEditForm({
@@ -1272,7 +1317,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">VAC 2</label>
                       <input
                         type="text"
-                        required
                         value={editForm.aedp.vac2}
                         onChange={(e) =>
                           setEditForm({
@@ -1297,7 +1341,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">Major (Honours)</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.major}
                         onChange={(e) =>
                           setEditForm({
@@ -1313,7 +1356,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">Minor 1</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.minor1}
                         onChange={(e) =>
                           setEditForm({
@@ -1329,7 +1371,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">Minor 2</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.minor2}
                         onChange={(e) =>
                           setEditForm({
@@ -1347,7 +1388,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">MDC 1</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.mdc1}
                         onChange={(e) =>
                           setEditForm({
@@ -1363,7 +1403,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">MDC 2</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.mdc2}
                         onChange={(e) =>
                           setEditForm({
@@ -1379,7 +1418,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">MDC 3</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.mdc3}
                         onChange={(e) =>
                           setEditForm({
@@ -1399,7 +1437,6 @@ export const CounsellingView: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.sec1}
                         onChange={(e) =>
                           setEditForm({
@@ -1415,7 +1452,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">SEC 2</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.sec2}
                         onChange={(e) =>
                           setEditForm({
@@ -1431,7 +1467,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">SEC 3</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.sec3}
                         onChange={(e) =>
                           setEditForm({
@@ -1449,7 +1484,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">AEC 1</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.aec1}
                         onChange={(e) =>
                           setEditForm({
@@ -1465,7 +1499,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">AEC 2</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.aec2}
                         onChange={(e) =>
                           setEditForm({
@@ -1481,7 +1514,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">VAC 1</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.vac1}
                         onChange={(e) =>
                           setEditForm({
@@ -1497,7 +1529,6 @@ export const CounsellingView: React.FC = () => {
                       <label className="block text-slate-300 font-semibold mb-1">VAC 2</label>
                       <input
                         type="text"
-                        required
                         value={editForm.regular.vac2}
                         onChange={(e) =>
                           setEditForm({

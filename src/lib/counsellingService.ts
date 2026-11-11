@@ -240,7 +240,7 @@ export function generateDefaultCounselling(student: Student): StudentCounselling
       sem3: { major: dept, minor: '', mdc: '', vac: '' },
       sem4: { major: dept, minor: '', activity: '' },
       sem5: { major: dept, minor: '', sec: '', vac: '' },
-      sem6: { major: dept, minor: '', sec: '', vac: 'Creative Writing' },
+      sem6: { major: dept, minor: '', sec: '', vac: '' },
     };
   }
 
@@ -317,23 +317,23 @@ export function generateSuggestedCounselling(student: Student): StudentCounselli
       major2: m2,
       mdc1: md1,
       mdc2: md2,
-      aec1: 'English: Business and Communication',
-      aec2: 'English: Word and Presentation',
+      aec1: '',
+      aec2: '',
       sec1: sc1,
       sec2: sc2,
-      vac1: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT',
-      vac2: 'Good Citizenship',
+      vac1: '',
+      vac2: '',
       sem1: {
         major1: m1,
         major2: m2,
-        aec1: 'English: Business and Communication',
-        vac1: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT',
+        aec1: '',
+        vac1: '',
       },
       sem2: {
         major1: m1,
         major2: m2,
-        aec2: 'English: Word and Presentation',
-        vac2: 'Good Citizenship',
+        aec2: '',
+        vac2: '',
       },
       sem3: {
         major1: m1,
@@ -352,20 +352,6 @@ export function generateSuggestedCounselling(student: Student): StudentCounselli
       },
     };
   } else {
-    const mapping = REGULAR_MINOR_MAPPING[dept] || {
-      minor1: ['Allied Elective I', 'Foundational Studies'],
-      minor2: ['Allied Elective II', 'Interdisciplinary Studies'],
-    };
-    const streamMdc = STREAM_MDC_OPTIONS[stream] || STREAM_MDC_OPTIONS['Arts'];
-    const streamSec = STREAM_SEC_OPTIONS[stream] || STREAM_SEC_OPTIONS['Arts'];
-    const m1 = mapping.minor1[0] || 'Allied Minor Discipline I';
-    const m2 = mapping.minor2[0] || 'Allied Minor Discipline II';
-    const sMdc1 = streamMdc[0] || 'Natural Sciences in Daily Life';
-    const sMdc2 = streamMdc[1] || 'Foundations of Society & Culture';
-    const sMdc3 = streamMdc[2] || 'Information & Communication Essentials';
-    const sSec2 = streamSec[1] || 'Digital & Quantitative Skills II';
-    const sSec3 = streamSec[2] || 'Professional Technical Skills III';
-
     regular = {
       major: dept,
       minor1: '',
@@ -377,15 +363,15 @@ export function generateSuggestedCounselling(student: Student): StudentCounselli
       sec2: '',
       sec3: '',
       aec1: '',
-      aec2: 'ENGLISH',
-      vac1: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT',
-      vac2: 'ETHICS AND VALUES',
-      sem1: { major: dept, minor: '', mdc: '', aec: '', vac: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT' },
-      sem2: { major: dept, minor: '', mdc: '', aec: 'ENGLISH', sec: '' },
-      sem3: { major: dept, minor: '', mdc: '', vac: 'ETHICS AND VALUES' },
+      aec2: '',
+      vac1: '',
+      vac2: '',
+      sem1: { major: dept, minor: '', mdc: '', aec: '', vac: '' },
+      sem2: { major: dept, minor: '', mdc: '', aec: '', sec: '' },
+      sem3: { major: dept, minor: '', mdc: '', vac: '' },
       sem4: { major: dept, minor: '', activity: 'Internship / Community Engagement & Service / Field Work' },
-      sem5: { major: dept, minor: '', sec: '', vac: 'UNDERSTANDING ODISHA' },
-      sem6: { major: dept, minor: '', sec: '', vac: 'Creative Writing' },
+      sem5: { major: dept, minor: '', sec: '', vac: '' },
+      sem6: { major: dept, minor: '', sec: '', vac: '' },
     };
   }
 
@@ -681,8 +667,8 @@ export function extractSubjectAllocations(
       } else if (category === 'VAC') {
         const v1 = reg.vac1 || reg.sem1?.vac;
         const v2 = reg.vac2 || reg.sem3?.vac;
-        const v3 = reg.sem5?.vac || 'UNDERSTANDING ODISHA';
-        const v4 = reg.sem6?.vac || 'Creative Writing';
+        const v3 = reg.sem5?.vac || '';
+        const v4 = reg.sem6?.vac || '';
         if (v1) result.push({ ...base, semester: 'Semester I', subjectName: v1, semesterTag: 'Sem I (VAC 1)' });
         if (v2) result.push({ ...base, semester: 'Semester III', subjectName: v2, semesterTag: 'Sem III (VAC 2)' });
         if (v3) result.push({ ...base, semester: 'Semester V', subjectName: v3, semesterTag: 'Sem V (VAC 3)' });
@@ -1877,7 +1863,7 @@ export async function parseCounsellingExcelFile(
               parsedMap.get(studentId) ||
               existingMap[studentId] ||
               (matchedStudent
-                ? generateSuggestedCounselling(matchedStudent)
+                ? generateDefaultCounselling(matchedStudent)
                 : {
                     id: studentId,
                     studentId,
@@ -1966,12 +1952,12 @@ export async function parseCounsellingExcelFile(
                 major2: '',
                 mdc1: '',
                 mdc2: '',
-                aec1: 'English: Business and Communication',
-                aec2: 'English: Word and Presentation',
+                aec1: '',
+                aec2: '',
                 sec1: '',
                 sec2: '',
-                vac1: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT',
-                vac2: 'Good Citizenship',
+                vac1: '',
+                vac2: '',
               };
 
               const nextMajor1 = m1Val || prevAedp.major1;
@@ -2015,9 +2001,9 @@ export async function parseCounsellingExcelFile(
                 sec2: '',
                 sec3: '',
                 aec1: '',
-                aec2: 'ENGLISH',
-                vac1: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT',
-                vac2: 'ETHICS AND VALUES',
+                aec2: '',
+                vac1: '',
+                vac2: '',
               };
 
               const nextMajor = m1Val || prevReg.major;
@@ -2033,8 +2019,8 @@ export async function parseCounsellingExcelFile(
               const nextAec2 = aec2Val || prevReg.aec2;
               const nextVac1 = vac1Val || prevReg.vac1;
               const nextVac2 = vac2Val || prevReg.vac2;
-              const nextVac3 = vac3Val || prevReg.sem5?.vac || 'UNDERSTANDING ODISHA';
-              const nextVac4 = vac4Val || prevReg.sem6?.vac || 'Creative Writing';
+              const nextVac3 = vac3Val || prevReg.sem5?.vac || '';
+              const nextVac4 = vac4Val || prevReg.sem6?.vac || '';
 
               baseRecord.isAedp = false;
               baseRecord.regular = {

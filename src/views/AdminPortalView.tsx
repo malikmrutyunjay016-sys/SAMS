@@ -15,7 +15,7 @@ import {
 import {
   parseCounsellingExcelFile,
   exportCounsellingExcel,
-  generateSuggestedCounselling,
+  generateDefaultCounselling,
   CounsellingExcelImportResult,
   normalizeRollLookupKey,
   normalizeLookupKey,
@@ -596,7 +596,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       if (uKey && uKey !== 'na' && normalizeLookupKey(rec.universityRollNo) === uKey) return rec;
       if (nKey && normalizeLookupKey(rec.studentName) === nKey) return rec;
     }
-    return generateSuggestedCounselling(student);
+    return generateDefaultCounselling(student);
   };
 
   const handleCounsellingFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -767,8 +767,8 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
         sem2: { major: reg.major, minor: reg.minor2, mdc: reg.mdc2, aec: reg.aec2, sec: reg.sec1 || reg.sem2?.sec || '' },
         sem3: { major: reg.major, minor: reg.minor1, mdc: reg.mdc3, vac: reg.vac2 },
         sem4: reg.sem4 || { major: reg.major, minor: reg.minor2, activity: 'Internship / Community Engagement & Service / Field Work' },
-        sem5: { major: reg.major, minor: reg.minor1, sec: reg.sec2, vac: reg.sem5?.vac || 'UNDERSTANDING ODISHA' },
-        sem6: { major: reg.major, minor: reg.minor2, sec: reg.sec3, vac: reg.sem6?.vac || 'Creative Writing' },
+        sem5: { major: reg.major, minor: reg.minor1, sec: reg.sec2, vac: reg.sem5?.vac || '' },
+        sem6: { major: reg.major, minor: reg.minor2, sec: reg.sec3, vac: reg.sem6?.vac || '' },
       };
     } else if (formToSave.aedp) {
       const a = formToSave.aedp;

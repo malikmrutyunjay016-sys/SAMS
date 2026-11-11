@@ -1,13 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../context/DataContext';
-import { Student, StudentCounsellingRecord, StreamType } from '../types';
+import { Student, StudentCounsellingRecord } from '../types';
 import {
-  COMMON_AEC_OPTIONS,
-  COMMON_VAC_OPTIONS,
-  STREAM_MDC_OPTIONS,
-  STREAM_SEC_OPTIONS,
-  REGULAR_MINOR_MAPPING,
-  generateSuggestedCounselling,
   generateDefaultCounselling,
   normalizeLookupKey,
   normalizeRollLookupKey,
@@ -39,6 +33,7 @@ import {
   Check,
   ChevronRight,
   Info,
+  Plus,
 } from 'lucide-react';
 
 const LS_STUDENT_SESSION_KEY = 'SAMS_BARAGADA_STUDENT_ID';
@@ -105,7 +100,7 @@ export const StudentPortalView: React.FC = () => {
     return students.find((s) => s.id === currentStudentId) || null;
   }, [currentStudentId, students]);
 
-  // Secondary lookup map for counselling records matching CounsellingView.tsx logic
+  // Secondary lookup map for counselling records from Menu -> Subject Counselling
   const counsellingByRollOrBarcode = useMemo(() => {
     const map: Record<string, StudentCounsellingRecord> = {};
     Object.values(counsellingMap).forEach((rec) => {
@@ -124,7 +119,7 @@ export const StudentPortalView: React.FC = () => {
     return map;
   }, [counsellingMap]);
 
-  // Robust resolver for Student Counselling Record (exact match with CounsellingView.tsx)
+  // Direct resolver for Student Counselling Record matching Menu -> Subject Counselling
   const currentRecord = useMemo<StudentCounsellingRecord | null>(() => {
     if (!student) return null;
 
@@ -161,7 +156,7 @@ export const StudentPortalView: React.FC = () => {
       }
     }
     if (!base) {
-      base = generateSuggestedCounselling(student);
+      base = generateDefaultCounselling(student);
     }
 
     const isAedpEffective = Boolean(
@@ -196,7 +191,103 @@ export const StudentPortalView: React.FC = () => {
     return set;
   }, [student, currentRecord]);
 
-  // Form State for Student Editing
+  // DYNAMIC SUBJECT OPTIONS DERIVED EXCLUSIVELY FROM MENU -> SUBJECT COUNSELLING (No default mock subjects)
+  const menuCounsellingMinorOptions = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(counsellingMap).forEach((r) => {
+      if (r?.regular) {
+        const reg = r.regular;
+        [reg.minor1, reg.minor2, reg.sem1?.minor, reg.sem2?.minor, reg.sem3?.minor, reg.sem4?.minor, reg.sem5?.minor, reg.sem6?.minor].forEach((val) => {
+          if (val && !isUnfilledOrNA(val)) set.add(val.trim());
+        });
+      }
+      if (r?.aedp) {
+        const a = r.aedp;
+        [a.major2, a.sem1?.major2, a.sem2?.major2, a.sem3?.major2, a.sem4?.major2].forEach((val) => {
+          if (val && !isUnfilledOrNA(val)) set.add(val.trim());
+        });
+      }
+    });
+    return Array.from(set).sort();
+  }, [counsellingMap]);
+
+  const menuCounsellingAecOptions = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(counsellingMap).forEach((r) => {
+      if (r?.regular) {
+        const reg = r.regular;
+        [reg.aec1, reg.aec2, reg.sem1?.aec, reg.sem2?.aec].forEach((val) => {
+          if (val && !isUnfilledOrNA(val)) set.add(val.trim());
+        });
+      }
+      if (r?.aedp) {
+        const a = r.aedp;
+        [a.aec1, a.aec2, a.sem1?.aec1, a.sem2?.aec2].forEach((val) => {
+          if (val && !isUnfilledOrNA(val)) set.add(val.trim());
+        });
+      }
+    });
+    return Array.from(set).sort();
+  }, [counsellingMap]);
+
+  const menuCounsellingSecOptions = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(counsellingMap).forEach((r) => {
+      if (r?.regular) {
+        const reg = r.regular;
+        [reg.sec1, reg.sec2, reg.sec3, reg.sem2?.sec, reg.sem5?.sec, reg.sem6?.sec].forEach((val) => {
+          if (val && !isUnfilledOrNA(val)) set.add(val.trim());
+        });
+      }
+      if (r?.aedp) {
+        const a = r.aedp;
+        [a.sec1, a.sec2, a.sem3?.sec1, a.sem4?.sec2].forEach((val) => {
+          if (val && !isUnfilledOrNA(val)) set.add(val.trim());
+        });
+      }
+    });
+    return Array.from(set).sort();
+  }, [counsellingMap]);
+
+  const menuCounsellingMdcOptions = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(counsellingMap).forEach((r) => {
+      if (r?.regular) {
+        const reg = r.regular;
+        [reg.mdc1, reg.mdc2, reg.mdc3, reg.sem1?.mdc, reg.sem2?.mdc, reg.sem3?.mdc].forEach((val) => {
+          if (val && !isUnfilledOrNA(val)) set.add(val.trim());
+        });
+      }
+      if (r?.aedp) {
+        const a = r.aedp;
+        [a.mdc1, a.mdc2, a.sem3?.mdc1, a.sem4?.mdc2].forEach((val) => {
+          if (val && !isUnfilledOrNA(val)) set.add(val.trim());
+        });
+      }
+    });
+    return Array.from(set).sort();
+  }, [counsellingMap]);
+
+  const menuCounsellingVacOptions = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(counsellingMap).forEach((r) => {
+      if (r?.regular) {
+        const reg = r.regular;
+        [reg.vac1, reg.vac2, reg.sem1?.vac, reg.sem3?.vac, reg.sem5?.vac, reg.sem6?.vac].forEach((val) => {
+          if (val && !isUnfilledOrNA(val)) set.add(val.trim());
+        });
+      }
+      if (r?.aedp) {
+        const a = r.aedp;
+        [a.vac1, a.vac2, a.sem1?.vac1, a.sem2?.vac2].forEach((val) => {
+          if (val && !isUnfilledOrNA(val)) set.add(val.trim());
+        });
+      }
+    });
+    return Array.from(set).sort();
+  }, [counsellingMap]);
+
+  // Form State for Student Choices
   const [univRollValue, setUnivRollValue] = useState<string>('');
   const [regularChoices, setRegularChoices] = useState<{
     minor1: string;
@@ -248,10 +339,10 @@ export const StudentPortalView: React.FC = () => {
     vac2: '',
   });
 
-  // Track initial values so we know if a field was ALREADY filled by admin / college initially
+  // Track initial values so we know if a field was ALREADY filled in Menu -> Subject Counselling
   const [initialFilledFields, setInitialFilledFields] = useState<Record<string, boolean>>({});
 
-  // Sync state whenever student or currentRecord changes, incorporating fallback to semester fields
+  // Sync state directly from Menu -> Subject Counselling (NO arbitrary defaults)
   useEffect(() => {
     if (!currentRecord || !student) return;
 
@@ -268,10 +359,10 @@ export const StudentPortalView: React.FC = () => {
       const d2 = a.mdc2 || a.sem4?.mdc2 || '';
       const s1 = a.sec1 || a.sem3?.sec1 || '';
       const s2 = a.sec2 || a.sem4?.sec2 || '';
-      const e1 = a.aec1 || a.sem1?.aec1 || 'English: Business and Communication';
-      const e2 = a.aec2 || a.sem2?.aec2 || 'English: Word and Presentation';
-      const v1 = a.vac1 || a.sem1?.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
-      const v2 = a.vac2 || a.sem2?.vac2 || 'Good Citizenship';
+      const e1 = a.aec1 || a.sem1?.aec1 || '';
+      const e2 = a.aec2 || a.sem2?.aec2 || '';
+      const v1 = a.vac1 || a.sem1?.vac1 || '';
+      const v2 = a.vac2 || a.sem2?.vac2 || '';
 
       setAedpChoices({
         major2: m2,
@@ -305,9 +396,9 @@ export const StudentPortalView: React.FC = () => {
       const s2 = r?.sec2 || r?.sem5?.sec || '';
       const s3 = r?.sec3 || r?.sem6?.sec || '';
       const e1 = r?.aec1 || r?.sem1?.aec || '';
-      const e2 = r?.aec2 || r?.sem2?.aec || 'ENGLISH';
-      const v1 = r?.vac1 || r?.sem1?.vac || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
-      const v2 = r?.vac2 || r?.sem3?.vac || 'ETHICS AND VALUES';
+      const e2 = r?.aec2 || r?.sem2?.aec || '';
+      const v1 = r?.vac1 || r?.sem1?.vac || '';
+      const v2 = r?.vac2 || r?.sem3?.vac || '';
 
       setRegularChoices({
         minor1: m1,
@@ -383,8 +474,6 @@ export const StudentPortalView: React.FC = () => {
     const storedAadhaar = cleanCredential(matched.aadhaarNo);
     const storedRoll = cleanCredential(matched.rollNo);
 
-    // Password matches if it equals stored Aadhaar No,
-    // or if Aadhaar was not provided in system yet, matches roll number or 'password'
     const isAadhaarMatch = storedAadhaar && storedAadhaar === inputPass;
     const isFallbackMatch = !storedAadhaar && (inputPass === storedRoll || inputPass === 'password' || inputPass === '123456789012');
 
@@ -415,114 +504,6 @@ export const StudentPortalView: React.FC = () => {
     showNotification('You have logged out safely.', 'info');
   };
 
-  // Collect all unique paper names across the DB to make sure options are never missing
-  const allKnownSubjectNames = useMemo(() => {
-    const set = new Set<string>();
-    Object.values(counsellingMap).forEach((r) => {
-      if (r?.regular) {
-        const reg = r.regular;
-        [reg.minor1, reg.minor2, reg.mdc1, reg.mdc2, reg.mdc3, reg.sec1, reg.sec2, reg.sec3, reg.aec1, reg.aec2, reg.vac1, reg.vac2].forEach((p) => {
-          if (p && !isUnfilledOrNA(p)) set.add(p.trim());
-        });
-      }
-      if (r?.aedp) {
-        const a = r.aedp;
-        [a.major1, a.major2, a.mdc1, a.mdc2, a.sec1, a.sec2, a.aec1, a.aec2, a.vac1, a.vac2].forEach((p) => {
-          if (p && !isUnfilledOrNA(p)) set.add(p.trim());
-        });
-      }
-    });
-    return Array.from(set);
-  }, [counsellingMap]);
-
-  // Minor subject options with fallback and current value preservation
-  const minorOptions = useMemo(() => {
-    if (!student) return { minor1: [], minor2: [] };
-    const dept = (student.department || '').trim();
-    const mapped = REGULAR_MINOR_MAPPING[dept];
-
-    let m1List = mapped?.minor1 ? [...mapped.minor1] : [];
-    let m2List = mapped?.minor2 ? [...mapped.minor2] : [];
-
-    // Fallbacks based on stream
-    if (m1List.length === 0) {
-      if (student.stream === 'Physical Science') {
-        m1List = ['Chemistry', 'Mathematics', 'Physics', 'Computer Science'];
-        m2List = ['Mathematics', 'Statistics', 'Electronics', 'Geology'];
-      } else if (student.stream === 'Biological Science') {
-        m1List = ['Botany', 'Zoology', 'Chemistry'];
-        m2List = ['Chemistry', 'Biotechnology', 'Environmental Science'];
-      } else if (student.stream === 'Commerce') {
-        m1List = ['Business Economics', 'Business Law & Corporate Governance'];
-        m2List = ['Business Mathematics & Statistics', 'Financial Markets & Institutions'];
-      } else {
-        m1List = ['History', 'Political Science', 'Economics', 'Sociology', 'Odia', 'Education'];
-        m2List = ['Political Science', 'Philosophy', 'Psychology', 'Geography', 'Sanskrit', 'English'];
-      }
-    }
-
-    // Always include currently selected values so select dropdown never drops them
-    if (regularChoices.minor1 && !m1List.includes(regularChoices.minor1)) {
-      m1List.unshift(regularChoices.minor1);
-    }
-    if (regularChoices.minor2 && !m2List.includes(regularChoices.minor2)) {
-      m2List.unshift(regularChoices.minor2);
-    }
-
-    return {
-      minor1: Array.from(new Set(m1List)),
-      minor2: Array.from(new Set(m2List)),
-    };
-  }, [student, regularChoices.minor1, regularChoices.minor2]);
-
-  // MDC Options
-  const mdcOptions = useMemo(() => {
-    if (!student) return [];
-    const base = STREAM_MDC_OPTIONS[student.stream] || STREAM_MDC_OPTIONS['Arts'] || [];
-    const merged = [...base];
-    [regularChoices.mdc1, regularChoices.mdc2, regularChoices.mdc3, aedpChoices.mdc1, aedpChoices.mdc2].forEach((val) => {
-      if (val && !merged.includes(val) && !isUnfilledOrNA(val)) {
-        merged.unshift(val);
-      }
-    });
-    return Array.from(new Set(merged));
-  }, [student, regularChoices, aedpChoices]);
-
-  // SEC Options
-  const secOptions = useMemo(() => {
-    if (!student) return [];
-    const base = STREAM_SEC_OPTIONS[student.stream] || STREAM_SEC_OPTIONS['Arts'] || [];
-    const merged = [...base];
-    [regularChoices.sec1, regularChoices.sec2, regularChoices.sec3, aedpChoices.sec1, aedpChoices.sec2].forEach((val) => {
-      if (val && !merged.includes(val) && !isUnfilledOrNA(val)) {
-        merged.unshift(val);
-      }
-    });
-    return Array.from(new Set(merged));
-  }, [student, regularChoices, aedpChoices]);
-
-  // AEC Options
-  const aecOptions = useMemo(() => {
-    const merged = [...COMMON_AEC_OPTIONS, 'ENGLISH'];
-    [regularChoices.aec1, regularChoices.aec2, aedpChoices.aec1, aedpChoices.aec2].forEach((val) => {
-      if (val && !merged.includes(val) && !isUnfilledOrNA(val)) {
-        merged.unshift(val);
-      }
-    });
-    return Array.from(new Set(merged));
-  }, [regularChoices, aedpChoices]);
-
-  // VAC Options
-  const vacOptions = useMemo(() => {
-    const merged = [...COMMON_VAC_OPTIONS, 'ETHICS AND VALUES', 'UNDERSTANDING ODISHA', 'Good Citizenship'];
-    [regularChoices.vac1, regularChoices.vac2, aedpChoices.vac1, aedpChoices.vac2].forEach((val) => {
-      if (val && !merged.includes(val) && !isUnfilledOrNA(val)) {
-        merged.unshift(val);
-      }
-    });
-    return Array.from(new Set(merged));
-  }, [regularChoices, aedpChoices]);
-
   // Helper to determine if a specific field is locked for editing
   const isFieldLocked = (fieldKey: string): { locked: boolean; reason: 'STUDENT_LOCKED' | 'COLLEGE_ALLOTTED' | 'CLC_TAKEN' | 'OPEN' } => {
     if (student?.isClcTaken || student?.status === 'CLC Taken') {
@@ -535,6 +516,64 @@ export const StudentPortalView: React.FC = () => {
       return { locked: true, reason: 'COLLEGE_ALLOTTED' };
     }
     return { locked: false, reason: 'OPEN' };
+  };
+
+  // Helper to render an editable paper selector populated dynamically from Menu -> Subject Counselling
+  const renderSubjectSelector = (
+    fieldKey: string,
+    currentVal: string,
+    onValueChange: (val: string) => void,
+    counsellingOptions: string[],
+    placeholder: string
+  ) => {
+    const status = isFieldLocked(fieldKey);
+    if (status.locked) {
+      return (
+        <div className="text-sm font-semibold text-emerald-300 font-mono">
+          {currentVal || 'N/A'}
+        </div>
+      );
+    }
+
+    // Ensure currently selected value is present in options list
+    const optionsWithCurrent = [...counsellingOptions];
+    if (currentVal && !optionsWithCurrent.includes(currentVal) && !isUnfilledOrNA(currentVal)) {
+      optionsWithCurrent.unshift(currentVal);
+    }
+
+    return (
+      <div className="space-y-2">
+        {optionsWithCurrent.length > 0 ? (
+          <select
+            value={currentVal}
+            onChange={(e) => onValueChange(e.target.value)}
+            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400 font-sans"
+          >
+            <option value="">-- {placeholder} (from Menu Counselling) --</option>
+            {optionsWithCurrent.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="text-xs text-amber-300/80 italic">
+            No subjects currently loaded in Menu &rarr; Subject Counselling for this category. You may type directly below:
+          </div>
+        )}
+
+        {/* Input for direct subject entry or custom adjustment */}
+        <div className="relative">
+          <input
+            type="text"
+            value={currentVal}
+            onChange={(e) => onValueChange(e.target.value)}
+            placeholder={`Or type ${placeholder} name...`}
+            className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 hover:border-slate-600 focus:border-amber-400 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none"
+          />
+        </div>
+      </div>
+    );
   };
 
   // Collect pending changes before showing confirmation modal
@@ -591,9 +630,9 @@ export const StudentPortalView: React.FC = () => {
         { key: 'mdc1', label: 'MDC 1 (Multidisciplinary Course 1)' },
         { key: 'mdc2', label: 'MDC 2 (Multidisciplinary Course 2)' },
         { key: 'mdc3', label: 'MDC 3 (Multidisciplinary Course 3)' },
-        { key: 'aec1', label: 'AEC 1 (MIL Communication)' },
-        { key: 'aec2', label: 'AEC 2 (Environmental Studies)' },
-        { key: 'vac1', label: 'VAC 1 (Ethics & Human Values)' },
+        { key: 'aec1', label: 'AEC 1 (Ability Enhancement 1)' },
+        { key: 'aec2', label: 'AEC 2 (Ability Enhancement 2)' },
+        { key: 'vac1', label: 'VAC 1 (Value Added Course 1)' },
         { key: 'vac2', label: 'VAC 2 (Value Added Course 2)' },
       ];
 
@@ -635,7 +674,7 @@ export const StudentPortalView: React.FC = () => {
       updatedUnivRoll = univChange.value;
     }
 
-    // Build fully synchronized record with both flat and semester fields
+    // Build fully synchronized record with both flat and semester fields without arbitrary defaults
     let updatedRecord: StudentCounsellingRecord = {
       ...currentRecord,
       universityRollNo: updatedUnivRoll || currentRecord.universityRollNo || 'N/A',
@@ -657,15 +696,15 @@ export const StudentPortalView: React.FC = () => {
         vac2: '',
       };
       const finalM1 = prevAedp.major1 || student.department;
-      const finalM2 = aedpChoices.major2 || prevAedp.major2;
-      const finalD1 = aedpChoices.mdc1 || prevAedp.mdc1;
-      const finalD2 = aedpChoices.mdc2 || prevAedp.mdc2;
-      const finalS1 = aedpChoices.sec1 || prevAedp.sec1;
-      const finalS2 = aedpChoices.sec2 || prevAedp.sec2;
-      const finalE1 = aedpChoices.aec1 || prevAedp.aec1 || 'English: Business and Communication';
-      const finalE2 = aedpChoices.aec2 || prevAedp.aec2 || 'English: Word and Presentation';
-      const finalV1 = aedpChoices.vac1 || prevAedp.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
-      const finalV2 = aedpChoices.vac2 || prevAedp.vac2 || 'Good Citizenship';
+      const finalM2 = aedpChoices.major2 || prevAedp.major2 || '';
+      const finalD1 = aedpChoices.mdc1 || prevAedp.mdc1 || '';
+      const finalD2 = aedpChoices.mdc2 || prevAedp.mdc2 || '';
+      const finalS1 = aedpChoices.sec1 || prevAedp.sec1 || '';
+      const finalS2 = aedpChoices.sec2 || prevAedp.sec2 || '';
+      const finalE1 = aedpChoices.aec1 || prevAedp.aec1 || '';
+      const finalE2 = aedpChoices.aec2 || prevAedp.aec2 || '';
+      const finalV1 = aedpChoices.vac1 || prevAedp.vac1 || '';
+      const finalV2 = aedpChoices.vac2 || prevAedp.vac2 || '';
 
       updatedRecord.aedp = {
         major1: finalM1,
@@ -701,20 +740,20 @@ export const StudentPortalView: React.FC = () => {
         vac2: '',
       };
       const finalMajor = prevReg.major || student.department;
-      const finalMin1 = regularChoices.minor1 || prevReg.minor1;
-      const finalMin2 = regularChoices.minor2 || prevReg.minor2;
-      const finalD1 = regularChoices.mdc1 || prevReg.mdc1;
-      const finalD2 = regularChoices.mdc2 || prevReg.mdc2;
-      const finalD3 = regularChoices.mdc3 || prevReg.mdc3;
-      const finalS1 = regularChoices.sec1 || prevReg.sec1;
-      const finalS2 = regularChoices.sec2 || prevReg.sec2;
-      const finalS3 = regularChoices.sec3 || prevReg.sec3;
-      const finalE1 = regularChoices.aec1 || prevReg.aec1;
-      const finalE2 = regularChoices.aec2 || prevReg.aec2 || 'ENGLISH';
-      const finalV1 = regularChoices.vac1 || prevReg.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
-      const finalV2 = regularChoices.vac2 || prevReg.vac2 || 'ETHICS AND VALUES';
-      const finalV3 = prevReg.sem5?.vac || 'UNDERSTANDING ODISHA';
-      const finalV4 = prevReg.sem6?.vac || 'Creative Writing';
+      const finalMin1 = regularChoices.minor1 || prevReg.minor1 || '';
+      const finalMin2 = regularChoices.minor2 || prevReg.minor2 || '';
+      const finalD1 = regularChoices.mdc1 || prevReg.mdc1 || '';
+      const finalD2 = regularChoices.mdc2 || prevReg.mdc2 || '';
+      const finalD3 = regularChoices.mdc3 || prevReg.mdc3 || '';
+      const finalS1 = regularChoices.sec1 || prevReg.sec1 || '';
+      const finalS2 = regularChoices.sec2 || prevReg.sec2 || '';
+      const finalS3 = regularChoices.sec3 || prevReg.sec3 || '';
+      const finalE1 = regularChoices.aec1 || prevReg.aec1 || '';
+      const finalE2 = regularChoices.aec2 || prevReg.aec2 || '';
+      const finalV1 = regularChoices.vac1 || prevReg.vac1 || '';
+      const finalV2 = regularChoices.vac2 || prevReg.vac2 || '';
+      const finalV3 = prevReg.sem5?.vac || '';
+      const finalV4 = prevReg.sem6?.vac || '';
 
       updatedRecord.regular = {
         major: finalMajor,
@@ -962,13 +1001,13 @@ export const StudentPortalView: React.FC = () => {
                 can be edited and submitted by the student <strong className="text-amber-300">only once</strong>.
               </li>
               <li>
+                Subject options and current papers are synced live from <strong>Menu &rarr; Subject Counselling</strong>.
+              </li>
+              <li>
                 Once you save your choices, those fields are immediately and permanently locked against any further modifications.
               </li>
               <li>
                 All submitted selections are synchronized directly with the college examination database and HOD records in real time.
-              </li>
-              <li>
-                If you encounter any discrepancy in your Honours department or major allotment, contact the SAMS Admission Helpdesk in Room No. 12.
               </li>
             </ul>
           </div>
@@ -1075,7 +1114,7 @@ export const StudentPortalView: React.FC = () => {
     papers: RoadmapPaper[];
   }
 
-  // Compute values for Semester Roadmap breakdown
+  // Compute values for Semester Roadmap breakdown directly from current counselling state
   const semesterRoadmap = useMemo<RoadmapSemester[]>(() => {
     if (isAedp) {
       return [
@@ -1084,9 +1123,9 @@ export const StudentPortalView: React.FC = () => {
           title: 'Foundation & Core Alignment',
           papers: [
             { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
-            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Selection' },
-            { label: 'AEC 1', name: aedpChoices.aec1 || 'English: Business and Communication' },
-            { label: 'VAC 1', name: aedpChoices.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT' },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
+            { label: 'AEC 1', name: aedpChoices.aec1 || 'Pending Allotment / Unfilled' },
+            { label: 'VAC 1', name: aedpChoices.vac1 || 'Pending Allotment / Unfilled' },
           ],
         },
         {
@@ -1094,9 +1133,9 @@ export const StudentPortalView: React.FC = () => {
           title: 'Communication & Ethics',
           papers: [
             { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
-            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Selection' },
-            { label: 'AEC 2', name: aedpChoices.aec2 || 'English: Word and Presentation' },
-            { label: 'VAC 2', name: aedpChoices.vac2 || 'Good Citizenship' },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
+            { label: 'AEC 2', name: aedpChoices.aec2 || 'Pending Allotment / Unfilled' },
+            { label: 'VAC 2', name: aedpChoices.vac2 || 'Pending Allotment / Unfilled' },
           ],
         },
         {
@@ -1104,9 +1143,9 @@ export const StudentPortalView: React.FC = () => {
           title: 'Multidisciplinary & Skill I',
           papers: [
             { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
-            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Selection' },
-            { label: 'MDC 1', name: aedpChoices.mdc1 || 'Pending Selection' },
-            { label: 'SEC 1', name: aedpChoices.sec1 || 'Pending Selection' },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
+            { label: 'MDC 1', name: aedpChoices.mdc1 || 'Pending Allotment / Unfilled' },
+            { label: 'SEC 1', name: aedpChoices.sec1 || 'Pending Allotment / Unfilled' },
           ],
         },
         {
@@ -1114,9 +1153,9 @@ export const StudentPortalView: React.FC = () => {
           title: 'Multidisciplinary & Skill II',
           papers: [
             { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
-            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Selection' },
-            { label: 'MDC 2', name: aedpChoices.mdc2 || 'Pending Selection' },
-            { label: 'SEC 2', name: aedpChoices.sec2 || 'Pending Selection' },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
+            { label: 'MDC 2', name: aedpChoices.mdc2 || 'Pending Allotment / Unfilled' },
+            { label: 'SEC 2', name: aedpChoices.sec2 || 'Pending Allotment / Unfilled' },
           ],
         },
         {
@@ -1141,10 +1180,10 @@ export const StudentPortalView: React.FC = () => {
         title: 'Core, Minor-I, MDC-1, AEC-1, VAC-1',
         papers: [
           { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Selection' },
-          { label: 'MDC-1', name: regularChoices.mdc1 || 'Pending Selection' },
-          { label: 'AEC-1', name: regularChoices.aec1 || 'Pending Selection' },
-          { label: 'VAC-1', name: regularChoices.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT' },
+          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Allotment / Unfilled' },
+          { label: 'MDC-1', name: regularChoices.mdc1 || 'Pending Allotment / Unfilled' },
+          { label: 'AEC-1', name: regularChoices.aec1 || 'Pending Allotment / Unfilled' },
+          { label: 'VAC-1', name: regularChoices.vac1 || 'Pending Allotment / Unfilled' },
         ],
       },
       {
@@ -1152,10 +1191,10 @@ export const StudentPortalView: React.FC = () => {
         title: 'Core, Minor-II, MDC-2, AEC-2, SEC-1',
         papers: [
           { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Selection' },
-          { label: 'MDC-2', name: regularChoices.mdc2 || 'Pending Selection' },
-          { label: 'AEC-2', name: regularChoices.aec2 || 'ENGLISH' },
-          { label: 'SEC-1 (Skill 2nd Sem)', name: regularChoices.sec1 || 'Pending Selection' },
+          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Allotment / Unfilled' },
+          { label: 'MDC-2', name: regularChoices.mdc2 || 'Pending Allotment / Unfilled' },
+          { label: 'AEC-2', name: regularChoices.aec2 || 'Pending Allotment / Unfilled' },
+          { label: 'SEC-1 (Skill 2nd Sem)', name: regularChoices.sec1 || 'Pending Allotment / Unfilled' },
         ],
       },
       {
@@ -1163,9 +1202,9 @@ export const StudentPortalView: React.FC = () => {
         title: 'Core, Minor-I, MDC-3, VAC-2',
         papers: [
           { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Selection' },
-          { label: 'MDC-3', name: regularChoices.mdc3 || 'Pending Selection' },
-          { label: 'VAC-2', name: regularChoices.vac2 || 'ETHICS AND VALUES' },
+          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Allotment / Unfilled' },
+          { label: 'MDC-3', name: regularChoices.mdc3 || 'Pending Allotment / Unfilled' },
+          { label: 'VAC-2', name: regularChoices.vac2 || 'Pending Allotment / Unfilled' },
         ],
       },
       {
@@ -1173,28 +1212,26 @@ export const StudentPortalView: React.FC = () => {
         title: 'Core, Minor-II, Mandatory Field Activity',
         papers: [
           { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Selection' },
+          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Allotment / Unfilled' },
           { label: 'Activity', name: 'Internship / Community Engagement & Service / Field Work', fixed: true },
         ],
       },
       {
         sem: 'Semester V',
-        title: 'Core, Minor-I, SEC-2, VAC-3',
+        title: 'Core, Minor-I, SEC-2',
         papers: [
           { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Selection' },
-          { label: 'SEC-2 (Skill 5th Sem)', name: regularChoices.sec2 || 'Pending Selection' },
-          { label: 'VAC-3', name: 'UNDERSTANDING ODISHA', fixed: true },
+          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Allotment / Unfilled' },
+          { label: 'SEC-2 (Skill 5th Sem)', name: regularChoices.sec2 || 'Pending Allotment / Unfilled' },
         ],
       },
       {
         sem: 'Semester VI',
-        title: 'Core, Minor-II, SEC-3, VAC-4',
+        title: 'Core, Minor-II, SEC-3',
         papers: [
           { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Selection' },
-          { label: 'SEC-3 (Skill 6th Sem)', name: regularChoices.sec3 || 'Pending Selection' },
-          { label: 'VAC-4', name: 'Creative Writing', fixed: true },
+          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Allotment / Unfilled' },
+          { label: 'SEC-3 (Skill 6th Sem)', name: regularChoices.sec3 || 'Pending Allotment / Unfilled' },
         ],
       },
     ];
@@ -1341,7 +1378,7 @@ export const StudentPortalView: React.FC = () => {
       {/* SUB-VIEW 1: SUBJECT COUNSELLING EDIT & ALLOTMENT */}
       {activeSubTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: University Roll Number Card & Policy */}
+          {/* Left Column: University Roll Number Card & Quick Stats */}
           <div className="space-y-6">
             {/* University Roll Number */}
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
@@ -1397,10 +1434,10 @@ export const StudentPortalView: React.FC = () => {
               })()}
             </div>
 
-            {/* Quick Summary of Current Allotment */}
+            {/* Quick Summary of Current Allotment directly from Menu -> Subject Counselling */}
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center">
-                <Sparkles className="w-4 h-4 mr-1.5" /> Allotment Summary
+                <Sparkles className="w-4 h-4 mr-1.5" /> Live Allotment from Menu Counselling
               </h3>
               <div className="space-y-2 text-xs">
                 <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
@@ -1411,16 +1448,32 @@ export const StudentPortalView: React.FC = () => {
                   <>
                     <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
                       <span className="text-slate-400">Minor 1:</span>
-                      <span className="font-semibold text-emerald-300">{regularChoices.minor1 || 'Not Allotted'}</span>
+                      <span className="font-semibold text-emerald-300 font-mono">
+                        {regularChoices.minor1 || <span className="text-slate-500 italic">Unfilled</span>}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
                       <span className="text-slate-400">Minor 2:</span>
-                      <span className="font-semibold text-emerald-200">{regularChoices.minor2 || 'Not Allotted'}</span>
+                      <span className="font-semibold text-emerald-200 font-mono">
+                        {regularChoices.minor2 || <span className="text-slate-500 italic">Unfilled</span>}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
-                      <span className="text-slate-400">SEC 1, 2, 3:</span>
-                      <span className="font-semibold text-cyan-300">
+                      <span className="text-slate-400">SEC (Skill):</span>
+                      <span className="font-semibold text-cyan-300 font-mono">
                         {[regularChoices.sec1, regularChoices.sec2, regularChoices.sec3].filter(Boolean).length} / 3 Allotted
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400">MDC:</span>
+                      <span className="font-semibold text-slate-300 font-mono">
+                        {[regularChoices.mdc1, regularChoices.mdc2, regularChoices.mdc3].filter(Boolean).length} / 3 Allotted
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400">AEC:</span>
+                      <span className="font-semibold text-slate-300 font-mono">
+                        {[regularChoices.aec1, regularChoices.aec2].filter(Boolean).length} / 2 Allotted
                       </span>
                     </div>
                   </>
@@ -1428,7 +1481,9 @@ export const StudentPortalView: React.FC = () => {
                   <>
                     <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
                       <span className="text-slate-400">Major 2:</span>
-                      <span className="font-semibold text-purple-300">{aedpChoices.major2 || 'Not Allotted'}</span>
+                      <span className="font-semibold text-purple-300 font-mono">
+                        {aedpChoices.major2 || <span className="text-slate-500 italic">Unfilled</span>}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
                       <span className="text-slate-400">Apprenticeship:</span>
@@ -1442,17 +1497,15 @@ export const StudentPortalView: React.FC = () => {
             {/* Academic Information Card */}
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center">
-                <Award className="w-4 h-4 mr-1.5 text-amber-400" /> NEP 2020 State Curriculum Guidelines
+                <Award className="w-4 h-4 mr-1.5 text-amber-400" /> SAMS Subject Counselling Rules
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                As per Higher Education Department, Govt. of Odisha:
+                Subjects are synchronized directly with <strong>Menu &rarr; Subject Counselling</strong>.
               </p>
               <ul className="text-xs text-slate-400 space-y-1.5 list-disc pl-4">
-                <li><strong>Major Discipline:</strong> Fixed department specialization chosen during SAMS CAF admission.</li>
-                <li><strong>Minor-I:</strong> Taught in Semesters 1, 3, and 5.</li>
-                <li><strong>Minor-II:</strong> Taught in Semesters 2, 4, and 6.</li>
-                <li><strong>SEC (Skill Enhancement):</strong> SEC-1 in Sem 2, SEC-2 in Sem 5, SEC-3 in Sem 6.</li>
-                <li><strong>MDC (Multidisciplinary):</strong> 3 breadth papers across Sem 1, 2, and 3.</li>
+                <li>Options contain exclusively real subject papers present in the college subject counselling database.</li>
+                <li>All pre-allotted or verified subjects are displayed in read-only locked mode.</li>
+                <li>Any section currently unfilled or &quot;N/A&quot; can be selected and submitted once by the student.</li>
               </ul>
             </div>
           </div>
@@ -1467,7 +1520,7 @@ export const StudentPortalView: React.FC = () => {
                     Subject Combinations & Paper Allocation
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Review your allotted papers. Each unfilled/N.A. section can be chosen and locked once by the student.
+                    Updated from Menu &rarr; Subject Counselling. Select your preference for any unfilled sections.
                   </p>
                 </div>
 
@@ -1505,21 +1558,13 @@ export const StudentPortalView: React.FC = () => {
                       <span className="text-xs font-bold text-slate-200">Major-II (Allied Domain)</span>
                       {renderStatusBadge('major2')}
                     </div>
-                    {(() => {
-                      const status = isFieldLocked('major2');
-                      if (status.locked) {
-                        return <div className="text-sm font-semibold text-slate-300">{aedpChoices.major2 || 'N/A'}</div>;
-                      }
-                      return (
-                        <input
-                          type="text"
-                          value={aedpChoices.major2}
-                          onChange={(e) => setAedpChoices({ ...aedpChoices, major2: e.target.value })}
-                          placeholder="Enter Major-II preference (e.g. Data Analytics / BFSI)"
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        />
-                      );
-                    })()}
+                    {renderSubjectSelector(
+                      'major2',
+                      aedpChoices.major2,
+                      (val) => setAedpChoices({ ...aedpChoices, major2: val }),
+                      menuCounsellingMinorOptions,
+                      'Major-II Subject'
+                    )}
                   </div>
 
                   {/* MDC 1 & MDC 2 */}
@@ -1531,26 +1576,13 @@ export const StudentPortalView: React.FC = () => {
                         </span>
                         {renderStatusBadge(key)}
                       </div>
-                      {(() => {
-                        const status = isFieldLocked(key);
-                        if (status.locked) {
-                          return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
-                        }
-                        return (
-                          <select
-                            value={aedpChoices[key]}
-                            onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                          >
-                            <option value="">-- Select MDC-{idx + 1} Paper --</option>
-                            {mdcOptions.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        );
-                      })()}
+                      {renderSubjectSelector(
+                        key,
+                        aedpChoices[key],
+                        (val) => setAedpChoices({ ...aedpChoices, [key]: val }),
+                        menuCounsellingMdcOptions,
+                        `MDC-${idx + 1} Paper`
+                      )}
                     </div>
                   ))}
 
@@ -1563,26 +1595,13 @@ export const StudentPortalView: React.FC = () => {
                         </span>
                         {renderStatusBadge(key)}
                       </div>
-                      {(() => {
-                        const status = isFieldLocked(key);
-                        if (status.locked) {
-                          return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
-                        }
-                        return (
-                          <select
-                            value={aedpChoices[key]}
-                            onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                          >
-                            <option value="">-- Select SEC-{idx + 1} Paper --</option>
-                            {secOptions.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        );
-                      })()}
+                      {renderSubjectSelector(
+                        key,
+                        aedpChoices[key],
+                        (val) => setAedpChoices({ ...aedpChoices, [key]: val }),
+                        menuCounsellingSecOptions,
+                        `SEC-${idx + 1} Paper`
+                      )}
                     </div>
                   ))}
 
@@ -1595,26 +1614,13 @@ export const StudentPortalView: React.FC = () => {
                         </span>
                         {renderStatusBadge(key)}
                       </div>
-                      {(() => {
-                        const status = isFieldLocked(key);
-                        if (status.locked) {
-                          return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
-                        }
-                        return (
-                          <select
-                            value={aedpChoices[key]}
-                            onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                          >
-                            <option value="">-- Select AEC-{idx + 1} Paper --</option>
-                            {aecOptions.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        );
-                      })()}
+                      {renderSubjectSelector(
+                        key,
+                        aedpChoices[key],
+                        (val) => setAedpChoices({ ...aedpChoices, [key]: val }),
+                        menuCounsellingAecOptions,
+                        `AEC-${idx + 1} Paper`
+                      )}
                     </div>
                   ))}
 
@@ -1627,26 +1633,13 @@ export const StudentPortalView: React.FC = () => {
                         </span>
                         {renderStatusBadge(key)}
                       </div>
-                      {(() => {
-                        const status = isFieldLocked(key);
-                        if (status.locked) {
-                          return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
-                        }
-                        return (
-                          <select
-                            value={aedpChoices[key]}
-                            onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                          >
-                            <option value="">-- Select VAC-{idx + 1} Paper --</option>
-                            {vacOptions.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        );
-                      })()}
+                      {renderSubjectSelector(
+                        key,
+                        aedpChoices[key],
+                        (val) => setAedpChoices({ ...aedpChoices, [key]: val }),
+                        menuCounsellingVacOptions,
+                        `VAC-${idx + 1} Paper`
+                      )}
                     </div>
                   ))}
 
@@ -1686,30 +1679,13 @@ export const StudentPortalView: React.FC = () => {
                       </div>
                       {renderStatusBadge('minor1')}
                     </div>
-                    {(() => {
-                      const status = isFieldLocked('minor1');
-                      if (status.locked) {
-                        return (
-                          <div className="text-sm font-semibold text-emerald-300">
-                            {regularChoices.minor1 || 'N/A'}
-                          </div>
-                        );
-                      }
-                      return (
-                        <select
-                          value={regularChoices.minor1}
-                          onChange={(e) => setRegularChoices({ ...regularChoices, minor1: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="">-- Select Minor-I Subject --</option>
-                          {minorOptions.minor1.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
+                    {renderSubjectSelector(
+                      'minor1',
+                      regularChoices.minor1,
+                      (val) => setRegularChoices({ ...regularChoices, minor1: val }),
+                      menuCounsellingMinorOptions,
+                      'Core-II (Minor-I) Subject'
+                    )}
                   </div>
 
                   {/* Minor 2: Core-III (Minor-II) */}
@@ -1721,30 +1697,13 @@ export const StudentPortalView: React.FC = () => {
                       </div>
                       {renderStatusBadge('minor2')}
                     </div>
-                    {(() => {
-                      const status = isFieldLocked('minor2');
-                      if (status.locked) {
-                        return (
-                          <div className="text-sm font-semibold text-emerald-200">
-                            {regularChoices.minor2 || 'N/A'}
-                          </div>
-                        );
-                      }
-                      return (
-                        <select
-                          value={regularChoices.minor2}
-                          onChange={(e) => setRegularChoices({ ...regularChoices, minor2: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="">-- Select Minor-II Subject --</option>
-                          {minorOptions.minor2.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
+                    {renderSubjectSelector(
+                      'minor2',
+                      regularChoices.minor2,
+                      (val) => setRegularChoices({ ...regularChoices, minor2: val }),
+                      menuCounsellingMinorOptions,
+                      'Core-III (Minor-II) Subject'
+                    )}
                   </div>
 
                   {/* SEC 1 (2nd Sem) */}
@@ -1753,26 +1712,13 @@ export const StudentPortalView: React.FC = () => {
                       <span className="text-xs font-bold text-slate-200">SEC-1 (Skill Enhancement Course - 2nd Sem)</span>
                       {renderStatusBadge('sec1')}
                     </div>
-                    {(() => {
-                      const status = isFieldLocked('sec1');
-                      if (status.locked) {
-                        return <div className="text-sm font-semibold text-cyan-300">{regularChoices.sec1 || 'N/A'}</div>;
-                      }
-                      return (
-                        <select
-                          value={regularChoices.sec1}
-                          onChange={(e) => setRegularChoices({ ...regularChoices, sec1: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="">-- Select SEC-1 Subject --</option>
-                          {secOptions.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
+                    {renderSubjectSelector(
+                      'sec1',
+                      regularChoices.sec1,
+                      (val) => setRegularChoices({ ...regularChoices, sec1: val }),
+                      menuCounsellingSecOptions,
+                      'SEC-1 Subject'
+                    )}
                   </div>
 
                   {/* SEC 2 (5th Sem) */}
@@ -1781,26 +1727,13 @@ export const StudentPortalView: React.FC = () => {
                       <span className="text-xs font-bold text-slate-200">SEC-2 (Skill Enhancement Course - 5th Sem)</span>
                       {renderStatusBadge('sec2')}
                     </div>
-                    {(() => {
-                      const status = isFieldLocked('sec2');
-                      if (status.locked) {
-                        return <div className="text-sm font-semibold text-cyan-300">{regularChoices.sec2 || 'N/A'}</div>;
-                      }
-                      return (
-                        <select
-                          value={regularChoices.sec2}
-                          onChange={(e) => setRegularChoices({ ...regularChoices, sec2: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="">-- Select SEC-2 Subject --</option>
-                          {secOptions.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
+                    {renderSubjectSelector(
+                      'sec2',
+                      regularChoices.sec2,
+                      (val) => setRegularChoices({ ...regularChoices, sec2: val }),
+                      menuCounsellingSecOptions,
+                      'SEC-2 Subject'
+                    )}
                   </div>
 
                   {/* SEC 3 (6th Sem) */}
@@ -1809,26 +1742,13 @@ export const StudentPortalView: React.FC = () => {
                       <span className="text-xs font-bold text-slate-200">SEC-3 (Skill Enhancement Course - 6th Sem)</span>
                       {renderStatusBadge('sec3')}
                     </div>
-                    {(() => {
-                      const status = isFieldLocked('sec3');
-                      if (status.locked) {
-                        return <div className="text-sm font-semibold text-cyan-300">{regularChoices.sec3 || 'N/A'}</div>;
-                      }
-                      return (
-                        <select
-                          value={regularChoices.sec3}
-                          onChange={(e) => setRegularChoices({ ...regularChoices, sec3: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="">-- Select SEC-3 Subject --</option>
-                          {secOptions.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
+                    {renderSubjectSelector(
+                      'sec3',
+                      regularChoices.sec3,
+                      (val) => setRegularChoices({ ...regularChoices, sec3: val }),
+                      menuCounsellingSecOptions,
+                      'SEC-3 Subject'
+                    )}
                   </div>
 
                   {/* MDC 1, MDC 2, MDC 3 */}
@@ -1840,26 +1760,13 @@ export const StudentPortalView: React.FC = () => {
                         </span>
                         {renderStatusBadge(key)}
                       </div>
-                      {(() => {
-                        const status = isFieldLocked(key);
-                        if (status.locked) {
-                          return <div className="text-sm font-semibold text-slate-300">{regularChoices[key] || 'N/A'}</div>;
-                        }
-                        return (
-                          <select
-                            value={regularChoices[key]}
-                            onChange={(e) => setRegularChoices({ ...regularChoices, [key]: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                          >
-                            <option value="">-- Select MDC-{idx + 1} Paper --</option>
-                            {mdcOptions.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        );
-                      })()}
+                      {renderSubjectSelector(
+                        key,
+                        regularChoices[key],
+                        (val) => setRegularChoices({ ...regularChoices, [key]: val }),
+                        menuCounsellingMdcOptions,
+                        `MDC-${idx + 1} Paper`
+                      )}
                     </div>
                   ))}
 
@@ -1872,26 +1779,13 @@ export const StudentPortalView: React.FC = () => {
                         </span>
                         {renderStatusBadge(key)}
                       </div>
-                      {(() => {
-                        const status = isFieldLocked(key);
-                        if (status.locked) {
-                          return <div className="text-sm font-semibold text-slate-300">{regularChoices[key] || 'N/A'}</div>;
-                        }
-                        return (
-                          <select
-                            value={regularChoices[key]}
-                            onChange={(e) => setRegularChoices({ ...regularChoices, [key]: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                          >
-                            <option value="">-- Select AEC-{idx + 1} Paper --</option>
-                            {aecOptions.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        );
-                      })()}
+                      {renderSubjectSelector(
+                        key,
+                        regularChoices[key],
+                        (val) => setRegularChoices({ ...regularChoices, [key]: val }),
+                        menuCounsellingAecOptions,
+                        `AEC-${idx + 1} Paper`
+                      )}
                     </div>
                   ))}
 
@@ -1904,26 +1798,13 @@ export const StudentPortalView: React.FC = () => {
                         </span>
                         {renderStatusBadge(key)}
                       </div>
-                      {(() => {
-                        const status = isFieldLocked(key);
-                        if (status.locked) {
-                          return <div className="text-sm font-semibold text-slate-300">{regularChoices[key] || 'N/A'}</div>;
-                        }
-                        return (
-                          <select
-                            value={regularChoices[key]}
-                            onChange={(e) => setRegularChoices({ ...regularChoices, [key]: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                          >
-                            <option value="">-- Select VAC-{idx + 1} Paper --</option>
-                            {vacOptions.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        );
-                      })()}
+                      {renderSubjectSelector(
+                        key,
+                        regularChoices[key],
+                        (val) => setRegularChoices({ ...regularChoices, [key]: val }),
+                        menuCounsellingVacOptions,
+                        `VAC-${idx + 1} Paper`
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1994,7 +1875,7 @@ export const StudentPortalView: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <div className={`font-semibold text-xs truncate ${isPending ? 'italic text-amber-300/80' : 'text-slate-100'}`}>
+                        <div className={`font-semibold text-xs truncate ${isPending ? 'italic text-amber-300/80' : 'text-slate-100 font-mono'}`}>
                           {paper.name}
                         </div>
                       </div>

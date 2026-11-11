@@ -4,13 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import { Student, StudentCounsellingRecord, StreamType } from '../types';
 import {
   generateDefaultCounselling,
-  generateSuggestedCounselling,
   exportCounsellingExcel,
   exportCategorySubjectExcel,
   extractSubjectAllocations,
   SubjectAllocationEntry,
-  COMMON_AEC_OPTIONS,
-  COMMON_VAC_OPTIONS,
   normalizeRollLookupKey,
   normalizeLookupKey,
 } from '../lib/counsellingService';
@@ -201,7 +198,7 @@ export const CounsellingView: React.FC = () => {
     if (nKey && counsellingByRollOrBarcode[`name_${nKey}`]) {
       return counsellingByRollOrBarcode[`name_${nKey}`];
     }
-    return generateSuggestedCounselling(student);
+    return generateDefaultCounselling(student);
   }
 
   // Extract all unique paper names across the entire student counselling database
@@ -373,7 +370,7 @@ export const CounsellingView: React.FC = () => {
     }
     let counselling = getRecordForStudent(student);
     if (!counselling.aedp && !counselling.regular) {
-      counselling = generateSuggestedCounselling(student);
+      counselling = generateDefaultCounselling(student);
     }
     setEditingRecord(counselling);
     setEditForm(JSON.parse(JSON.stringify(counselling)));
@@ -393,8 +390,8 @@ export const CounsellingView: React.FC = () => {
         sem2: { major: reg.major, minor: reg.minor2, mdc: reg.mdc2, aec: reg.aec2, sec: reg.sec1 || reg.sem2?.sec || '' },
         sem3: { major: reg.major, minor: reg.minor1, mdc: reg.mdc3, vac: reg.vac2 },
         sem4: reg.sem4 || { major: reg.major, minor: reg.minor2, activity: 'Internship / Community Engagement & Service / Field Work' },
-        sem5: { major: reg.major, minor: reg.minor1, sec: reg.sec2, vac: reg.sem5?.vac || 'Understanding Odisha' },
-        sem6: { major: reg.major, minor: reg.minor2, sec: reg.sec3, vac: reg.sem6?.vac || 'Creative Writing' },
+        sem5: { major: reg.major, minor: reg.minor1, sec: reg.sec2, vac: reg.sem5?.vac || '' },
+        sem6: { major: reg.major, minor: reg.minor2, sec: reg.sec3, vac: reg.sem6?.vac || '' },
       };
     }
 
@@ -864,10 +861,10 @@ export const CounsellingView: React.FC = () => {
                             {`Minor:${min2} | Act:${reg?.sem4?.activity || 'Internship / Community Engagement'}`}
                           </td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
-                            {`Minor:${min1} | SEC:${sec2} | VAC:${reg?.sem5?.vac || 'UNDERSTANDING ODISHA'}`}
+                            {`Minor:${min1} | SEC:${sec2} | VAC:${reg?.sem5?.vac || '-'}`}
                           </td>
                           <td className="py-2 px-3 text-slate-300 text-[10px]">
-                            {`Minor:${min2} | SEC:${sec3} | VAC:${reg?.sem6?.vac || 'Creative Writing'}`}
+                            {`Minor:${min2} | SEC:${sec3} | VAC:${reg?.sem6?.vac || '-'}`}
                           </td>
                         </tr>
                       );
@@ -1069,10 +1066,10 @@ export const CounsellingView: React.FC = () => {
                                 <span className="text-amber-300 font-semibold font-mono">Sem IV:</span> Minor: {record.regular.sem4?.minor || record.regular.minor2 || '-'} | Activity: {record.regular.sem4?.activity || 'Internship / Community Engagement'}
                               </div>
                               <div className="text-slate-300">
-                                <span className="text-amber-300 font-semibold font-mono">Sem V:</span> Minor: {record.regular.sem5?.minor || record.regular.minor1 || '-'} | SEC: {record.regular.sem5?.sec || record.regular.sec2 || '-'} | VAC: {record.regular.sem5?.vac || 'UNDERSTANDING ODISHA'}
+                                <span className="text-amber-300 font-semibold font-mono">Sem V:</span> Minor: {record.regular.sem5?.minor || record.regular.minor1 || '-'} | SEC: {record.regular.sem5?.sec || record.regular.sec2 || '-'} | VAC: {record.regular.sem5?.vac || '-'}
                               </div>
                               <div className="text-slate-300">
-                                <span className="text-amber-300 font-semibold font-mono">Sem VI:</span> Minor: {record.regular.sem6?.minor || record.regular.minor2 || '-'} | SEC: {record.regular.sem6?.sec || record.regular.sec3 || '-'} | VAC: {record.regular.sem6?.vac || 'Creative Writing'}
+                                <span className="text-amber-300 font-semibold font-mono">Sem VI:</span> Minor: {record.regular.sem6?.minor || record.regular.minor2 || '-'} | SEC: {record.regular.sem6?.sec || record.regular.sec3 || '-'} | VAC: {record.regular.sem6?.vac || '-'}
                               </div>
                             </div>
                           ) : null}

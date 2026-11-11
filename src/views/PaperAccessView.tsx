@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Student, StudentCounsellingRecord } from '../types';
 import {
-  generateSuggestedCounselling,
+  generateDefaultCounselling,
   normalizeRollLookupKey,
   normalizeLookupKey,
 } from '../lib/counsellingService';
@@ -121,7 +121,7 @@ export const PaperAccessView: React.FC = () => {
     if (nKey && counsellingByRollOrBarcode[`name_${nKey}`]) {
       return counsellingByRollOrBarcode[`name_${nKey}`];
     }
-    return generateSuggestedCounselling(student);
+    return generateDefaultCounselling(student);
   };
 
   // Helper to check if student belongs to HOD department or corresponding AEDP
@@ -188,12 +188,12 @@ export const PaperAccessView: React.FC = () => {
       if (semester === 'Sem V' && reg.sem5) {
         if (paperType === 'Minor') return reg.sem5.minor || reg.minor1 || null;
         if (paperType === 'SEC') return reg.sem5.sec || reg.sec2 || null;
-        if (paperType === 'VAC') return reg.sem5.vac || 'Understanding Odisha';
+        if (paperType === 'VAC') return reg.sem5.vac || null;
       }
       if (semester === 'Sem VI' && reg.sem6) {
         if (paperType === 'Minor') return reg.sem6.minor || reg.minor2 || null;
         if (paperType === 'SEC') return reg.sem6.sec || reg.sec3 || null;
-        if (paperType === 'VAC') return reg.sem6.vac || 'Creative Writing';
+        if (paperType === 'VAC') return reg.sem6.vac || null;
       }
     }
 

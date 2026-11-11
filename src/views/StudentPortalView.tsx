@@ -59,6 +59,20 @@ function cleanCredential(str: string | undefined | null): string {
   return str.replace(/[\s\-_]/g, '').toLowerCase().trim();
 }
 
+interface RoadmapPaper {
+  label: string;
+  name: string;
+  fixed?: boolean;
+  highlight?: boolean;
+}
+
+interface RoadmapSemester {
+  sem: string;
+  title: string;
+  isFullYear?: boolean;
+  papers: RoadmapPaper[];
+}
+
 export const StudentPortalView: React.FC = () => {
   const {
     students,
@@ -846,6 +860,133 @@ export const StudentPortalView: React.FC = () => {
       .slice(0, 10);
   }, [students, lookupQuery]);
 
+  const isClcTaken = Boolean(student?.isClcTaken || student?.status === 'CLC Taken');
+  const isAedp = Boolean(currentRecord?.isAedp);
+
+  // Compute values for Semester Roadmap breakdown directly from current counselling state
+  const semesterRoadmap = useMemo<RoadmapSemester[]>(() => {
+    if (!student) return [];
+    if (isAedp) {
+      return [
+        {
+          sem: 'Semester I',
+          title: 'Foundation & Core Alignment',
+          papers: [
+            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
+            { label: 'AEC 1', name: aedpChoices.aec1 || 'Pending Allotment / Unfilled' },
+            { label: 'VAC 1', name: aedpChoices.vac1 || 'Pending Allotment / Unfilled' },
+          ],
+        },
+        {
+          sem: 'Semester II',
+          title: 'Communication & Ethics',
+          papers: [
+            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
+            { label: 'AEC 2', name: aedpChoices.aec2 || 'Pending Allotment / Unfilled' },
+            { label: 'VAC 2', name: aedpChoices.vac2 || 'Pending Allotment / Unfilled' },
+          ],
+        },
+        {
+          sem: 'Semester III',
+          title: 'Multidisciplinary & Skill I',
+          papers: [
+            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
+            { label: 'MDC 1', name: aedpChoices.mdc1 || 'Pending Allotment / Unfilled' },
+            { label: 'SEC 1', name: aedpChoices.sec1 || 'Pending Allotment / Unfilled' },
+          ],
+        },
+        {
+          sem: 'Semester IV',
+          title: 'Multidisciplinary & Skill II',
+          papers: [
+            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
+            { label: 'MDC 2', name: aedpChoices.mdc2 || 'Pending Allotment / Unfilled' },
+            { label: 'SEC 2', name: aedpChoices.sec2 || 'Pending Allotment / Unfilled' },
+          ],
+        },
+        {
+          sem: 'Semester V & VI',
+          title: 'Final Year Paid Apprenticeship',
+          isFullYear: true,
+          papers: [
+            {
+              label: '1-Year On-The-Job Apprenticeship',
+              name: 'Mandatory Stipendiary Industrial Apprenticeship & Capstone Industry Project',
+              highlight: true,
+            },
+          ],
+        },
+      ];
+    }
+
+    // Regular Honours Roadmap
+    return [
+      {
+        sem: 'Semester I',
+        title: 'Core, Minor-I, MDC-1, AEC-1, VAC-1',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Allotment / Unfilled' },
+          { label: 'MDC-1', name: regularChoices.mdc1 || 'Pending Allotment / Unfilled' },
+          { label: 'AEC-1', name: regularChoices.aec1 || 'Pending Allotment / Unfilled' },
+          { label: 'VAC-1', name: regularChoices.vac1 || 'Pending Allotment / Unfilled' },
+        ],
+      },
+      {
+        sem: 'Semester II',
+        title: 'Core, Minor-II, MDC-2, AEC-2, SEC-1',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Allotment / Unfilled' },
+          { label: 'MDC-2', name: regularChoices.mdc2 || 'Pending Allotment / Unfilled' },
+          { label: 'AEC-2', name: regularChoices.aec2 || 'Pending Allotment / Unfilled' },
+          { label: 'SEC-1 (Skill 2nd Sem)', name: regularChoices.sec1 || 'Pending Allotment / Unfilled' },
+        ],
+      },
+      {
+        sem: 'Semester III',
+        title: 'Core, Minor-I, MDC-3, VAC-2',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Allotment / Unfilled' },
+          { label: 'MDC-3', name: regularChoices.mdc3 || 'Pending Allotment / Unfilled' },
+          { label: 'VAC-2', name: regularChoices.vac2 || 'Pending Allotment / Unfilled' },
+        ],
+      },
+      {
+        sem: 'Semester IV',
+        title: 'Core, Minor-II, Mandatory Field Activity',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Allotment / Unfilled' },
+          { label: 'Activity', name: 'Internship / Community Engagement & Service / Field Work', fixed: true },
+        ],
+      },
+      {
+        sem: 'Semester V',
+        title: 'Core, Minor-I, SEC-2',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Allotment / Unfilled' },
+          { label: 'SEC-2 (Skill 5th Sem)', name: regularChoices.sec2 || 'Pending Allotment / Unfilled' },
+        ],
+      },
+      {
+        sem: 'Semester VI',
+        title: 'Core, Minor-II, SEC-3',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Allotment / Unfilled' },
+          { label: 'SEC-3 (Skill 6th Sem)', name: regularChoices.sec3 || 'Pending Allotment / Unfilled' },
+        ],
+      },
+    ];
+  }, [student, isAedp, regularChoices, aedpChoices]);
+
   // ==========================================
   // VIEW: 1. STUDENT LOGIN SCREEN
   // ==========================================
@@ -1097,145 +1238,6 @@ export const StudentPortalView: React.FC = () => {
   // ==========================================
   // VIEW: 2. LOGGED-IN STUDENT DASHBOARD
   // ==========================================
-  const isClcTaken = Boolean(student.isClcTaken || student.status === 'CLC Taken');
-  const isAedp = Boolean(currentRecord?.isAedp);
-
-  interface RoadmapPaper {
-    label: string;
-    name: string;
-    fixed?: boolean;
-    highlight?: boolean;
-  }
-
-  interface RoadmapSemester {
-    sem: string;
-    title: string;
-    isFullYear?: boolean;
-    papers: RoadmapPaper[];
-  }
-
-  // Compute values for Semester Roadmap breakdown directly from current counselling state
-  const semesterRoadmap = useMemo<RoadmapSemester[]>(() => {
-    if (isAedp) {
-      return [
-        {
-          sem: 'Semester I',
-          title: 'Foundation & Core Alignment',
-          papers: [
-            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
-            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
-            { label: 'AEC 1', name: aedpChoices.aec1 || 'Pending Allotment / Unfilled' },
-            { label: 'VAC 1', name: aedpChoices.vac1 || 'Pending Allotment / Unfilled' },
-          ],
-        },
-        {
-          sem: 'Semester II',
-          title: 'Communication & Ethics',
-          papers: [
-            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
-            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
-            { label: 'AEC 2', name: aedpChoices.aec2 || 'Pending Allotment / Unfilled' },
-            { label: 'VAC 2', name: aedpChoices.vac2 || 'Pending Allotment / Unfilled' },
-          ],
-        },
-        {
-          sem: 'Semester III',
-          title: 'Multidisciplinary & Skill I',
-          papers: [
-            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
-            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
-            { label: 'MDC 1', name: aedpChoices.mdc1 || 'Pending Allotment / Unfilled' },
-            { label: 'SEC 1', name: aedpChoices.sec1 || 'Pending Allotment / Unfilled' },
-          ],
-        },
-        {
-          sem: 'Semester IV',
-          title: 'Multidisciplinary & Skill II',
-          papers: [
-            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
-            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Allotment / Unfilled' },
-            { label: 'MDC 2', name: aedpChoices.mdc2 || 'Pending Allotment / Unfilled' },
-            { label: 'SEC 2', name: aedpChoices.sec2 || 'Pending Allotment / Unfilled' },
-          ],
-        },
-        {
-          sem: 'Semester V & VI',
-          title: 'Final Year Paid Apprenticeship',
-          isFullYear: true,
-          papers: [
-            {
-              label: '1-Year On-The-Job Apprenticeship',
-              name: 'Mandatory Stipendiary Industrial Apprenticeship & Capstone Industry Project',
-              highlight: true,
-            },
-          ],
-        },
-      ];
-    }
-
-    // Regular Honours Roadmap
-    return [
-      {
-        sem: 'Semester I',
-        title: 'Core, Minor-I, MDC-1, AEC-1, VAC-1',
-        papers: [
-          { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Allotment / Unfilled' },
-          { label: 'MDC-1', name: regularChoices.mdc1 || 'Pending Allotment / Unfilled' },
-          { label: 'AEC-1', name: regularChoices.aec1 || 'Pending Allotment / Unfilled' },
-          { label: 'VAC-1', name: regularChoices.vac1 || 'Pending Allotment / Unfilled' },
-        ],
-      },
-      {
-        sem: 'Semester II',
-        title: 'Core, Minor-II, MDC-2, AEC-2, SEC-1',
-        papers: [
-          { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Allotment / Unfilled' },
-          { label: 'MDC-2', name: regularChoices.mdc2 || 'Pending Allotment / Unfilled' },
-          { label: 'AEC-2', name: regularChoices.aec2 || 'Pending Allotment / Unfilled' },
-          { label: 'SEC-1 (Skill 2nd Sem)', name: regularChoices.sec1 || 'Pending Allotment / Unfilled' },
-        ],
-      },
-      {
-        sem: 'Semester III',
-        title: 'Core, Minor-I, MDC-3, VAC-2',
-        papers: [
-          { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Allotment / Unfilled' },
-          { label: 'MDC-3', name: regularChoices.mdc3 || 'Pending Allotment / Unfilled' },
-          { label: 'VAC-2', name: regularChoices.vac2 || 'Pending Allotment / Unfilled' },
-        ],
-      },
-      {
-        sem: 'Semester IV',
-        title: 'Core, Minor-II, Mandatory Field Activity',
-        papers: [
-          { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Allotment / Unfilled' },
-          { label: 'Activity', name: 'Internship / Community Engagement & Service / Field Work', fixed: true },
-        ],
-      },
-      {
-        sem: 'Semester V',
-        title: 'Core, Minor-I, SEC-2',
-        papers: [
-          { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Allotment / Unfilled' },
-          { label: 'SEC-2 (Skill 5th Sem)', name: regularChoices.sec2 || 'Pending Allotment / Unfilled' },
-        ],
-      },
-      {
-        sem: 'Semester VI',
-        title: 'Core, Minor-II, SEC-3',
-        papers: [
-          { label: 'Core-I (Major)', name: student.department, fixed: true },
-          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Allotment / Unfilled' },
-          { label: 'SEC-3 (Skill 6th Sem)', name: regularChoices.sec3 || 'Pending Allotment / Unfilled' },
-        ],
-      },
-    ];
-  }, [isAedp, student.department, regularChoices, aedpChoices]);
 
   return (
     <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">

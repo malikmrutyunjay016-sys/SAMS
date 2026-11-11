@@ -7,6 +7,7 @@ import {
   STREAM_MDC_OPTIONS,
   STREAM_SEC_OPTIONS,
   REGULAR_MINOR_MAPPING,
+  generateSuggestedCounselling,
   generateDefaultCounselling,
   normalizeLookupKey,
   normalizeRollLookupKey,
@@ -34,6 +35,10 @@ import {
   Clock,
   ArrowRight,
   HelpCircle,
+  FileText,
+  Check,
+  ChevronRight,
+  Info,
 } from 'lucide-react';
 
 const LS_STUDENT_SESSION_KEY = 'SAMS_BARAGADA_STUDENT_ID';
@@ -49,7 +54,8 @@ function isUnfilledOrNA(val: string | undefined | null): boolean {
     cleaned === 'na' ||
     cleaned === 'nil' ||
     cleaned === 'none' ||
-    cleaned === 'unfilled'
+    cleaned === 'unfilled' ||
+    cleaned === 'pending'
   );
 }
 
@@ -59,7 +65,19 @@ function cleanCredential(str: string | undefined | null): string {
 }
 
 export const StudentPortalView: React.FC = () => {
-  const { students, counsellingMap, saveCounsellingRecord, updateStudent, addAuditLog, themeMode, lang, t } = useData();
+  const {
+    students,
+    counsellingMap,
+    saveCounsellingRecord,
+    updateStudent,
+    addAuditLog,
+    themeMode,
+    lang,
+    t,
+  } = useData();
+
+  // Active view sub-tab inside portal
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'semester_roadmap'>('overview');
 
   // Session State
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(() => {
@@ -87,7 +105,7 @@ export const StudentPortalView: React.FC = () => {
     return students.find((s) => s.id === currentStudentId) || null;
   }, [currentStudentId, students]);
 
-  // Secondary lookup map for counselling records
+  // Secondary lookup map for counselling records matching CounsellingView.tsx logic
   const counsellingByRollOrBarcode = useMemo(() => {
     const map: Record<string, StudentCounsellingRecord> = {};
     Object.values(counsellingMap).forEach((rec) => {
@@ -100,30 +118,69 @@ export const StudentPortalView: React.FC = () => {
       if (sKey) map[`sams_${sKey}`] = rec;
       const uKey = normalizeLookupKey(rec.universityRollNo);
       if (uKey && uKey !== 'na') map[`univ_${uKey}`] = rec;
+      const nKey = normalizeLookupKey(rec.studentName);
+      if (nKey) map[`name_${nKey}`] = rec;
     });
     return map;
   }, [counsellingMap]);
 
-  // Fetch or generate current counselling record
+  // Robust resolver for Student Counselling Record (exact match with CounsellingView.tsx)
   const currentRecord = useMemo<StudentCounsellingRecord | null>(() => {
     if (!student) return null;
-    const existing =
-      counsellingMap[student.id] ||
-      counsellingByRollOrBarcode[`sams_${normalizeLookupKey(student.samsRegNo)}`] ||
-      counsellingByRollOrBarcode[`roll_${normalizeLookupKey(student.rollNo)}`] ||
-      generateDefaultCounselling(student);
+
+    let base: StudentCounsellingRecord | undefined = counsellingMap[student.id];
+
+    if (!base) {
+      const rKey = normalizeLookupKey(student.rollNo);
+      if (rKey && counsellingByRollOrBarcode[`roll_${rKey}`]) {
+        base = counsellingByRollOrBarcode[`roll_${rKey}`];
+      }
+    }
+    if (!base) {
+      const rNorm = normalizeRollLookupKey(student.rollNo);
+      if (rNorm && counsellingByRollOrBarcode[`rollnorm_${rNorm}`]) {
+        base = counsellingByRollOrBarcode[`rollnorm_${rNorm}`];
+      }
+    }
+    if (!base) {
+      const sKey = normalizeLookupKey(student.samsRegNo);
+      if (sKey && counsellingByRollOrBarcode[`sams_${sKey}`]) {
+        base = counsellingByRollOrBarcode[`sams_${sKey}`];
+      }
+    }
+    if (!base) {
+      const uKey = normalizeLookupKey(student.universityRollNo);
+      if (uKey && uKey !== 'na' && counsellingByRollOrBarcode[`univ_${uKey}`]) {
+        base = counsellingByRollOrBarcode[`univ_${uKey}`];
+      }
+    }
+    if (!base) {
+      const nKey = normalizeLookupKey(student.name);
+      if (nKey && counsellingByRollOrBarcode[`name_${nKey}`]) {
+        base = counsellingByRollOrBarcode[`name_${nKey}`];
+      }
+    }
+    if (!base) {
+      base = generateSuggestedCounselling(student);
+    }
+
+    const isAedpEffective = Boolean(
+      base.isAedp ||
+      student.isAedp ||
+      (student.department || '').toLowerCase().includes('aedp')
+    );
 
     return {
-      ...existing,
+      ...base,
       studentId: student.id,
       id: student.id,
       studentName: student.name,
       rollNo: student.rollNo,
       samsRegNo: student.samsRegNo,
       stream: student.stream,
-      department: student.department,
-      isAedp: student.isAedp,
-      universityRollNo: student.universityRollNo || existing.universityRollNo || '',
+      department: student.department || base.department,
+      isAedp: isAedpEffective,
+      universityRollNo: student.universityRollNo || base.universityRollNo || '',
     };
   }, [student, counsellingMap, counsellingByRollOrBarcode]);
 
@@ -194,7 +251,7 @@ export const StudentPortalView: React.FC = () => {
   // Track initial values so we know if a field was ALREADY filled by admin / college initially
   const [initialFilledFields, setInitialFilledFields] = useState<Record<string, boolean>>({});
 
-  // Sync state whenever student or currentRecord changes
+  // Sync state whenever student or currentRecord changes, incorporating fallback to semester fields
   useEffect(() => {
     if (!currentRecord || !student) return;
 
@@ -206,54 +263,79 @@ export const StudentPortalView: React.FC = () => {
 
     if (currentRecord.isAedp && currentRecord.aedp) {
       const a = currentRecord.aedp;
+      const m2 = a.major2 || a.sem1?.major2 || '';
+      const d1 = a.mdc1 || a.sem3?.mdc1 || '';
+      const d2 = a.mdc2 || a.sem4?.mdc2 || '';
+      const s1 = a.sec1 || a.sem3?.sec1 || '';
+      const s2 = a.sec2 || a.sem4?.sec2 || '';
+      const e1 = a.aec1 || a.sem1?.aec1 || 'English: Business and Communication';
+      const e2 = a.aec2 || a.sem2?.aec2 || 'English: Word and Presentation';
+      const v1 = a.vac1 || a.sem1?.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
+      const v2 = a.vac2 || a.sem2?.vac2 || 'Good Citizenship';
+
       setAedpChoices({
-        major2: a.major2 || '',
-        mdc1: a.mdc1 || '',
-        mdc2: a.mdc2 || '',
-        sec1: a.sec1 || '',
-        sec2: a.sec2 || '',
-        aec1: a.aec1 || '',
-        aec2: a.aec2 || '',
-        vac1: a.vac1 || '',
-        vac2: a.vac2 || '',
+        major2: m2,
+        mdc1: d1,
+        mdc2: d2,
+        sec1: s1,
+        sec2: s2,
+        aec1: e1,
+        aec2: e2,
+        vac1: v1,
+        vac2: v2,
       });
-      initialMap['major2'] = !isUnfilledOrNA(a.major2);
-      initialMap['mdc1'] = !isUnfilledOrNA(a.mdc1);
-      initialMap['mdc2'] = !isUnfilledOrNA(a.mdc2);
-      initialMap['sec1'] = !isUnfilledOrNA(a.sec1);
-      initialMap['sec2'] = !isUnfilledOrNA(a.sec2);
-      initialMap['aec1'] = !isUnfilledOrNA(a.aec1);
-      initialMap['aec2'] = !isUnfilledOrNA(a.aec2);
-      initialMap['vac1'] = !isUnfilledOrNA(a.vac1);
-      initialMap['vac2'] = !isUnfilledOrNA(a.vac2);
-    } else if (currentRecord.regular) {
+
+      initialMap['major2'] = !isUnfilledOrNA(m2);
+      initialMap['mdc1'] = !isUnfilledOrNA(d1);
+      initialMap['mdc2'] = !isUnfilledOrNA(d2);
+      initialMap['sec1'] = !isUnfilledOrNA(s1);
+      initialMap['sec2'] = !isUnfilledOrNA(s2);
+      initialMap['aec1'] = !isUnfilledOrNA(e1);
+      initialMap['aec2'] = !isUnfilledOrNA(e2);
+      initialMap['vac1'] = !isUnfilledOrNA(v1);
+      initialMap['vac2'] = !isUnfilledOrNA(v2);
+    } else {
       const r = currentRecord.regular;
+      const m1 = r?.minor1 || r?.sem1?.minor || r?.sem3?.minor || r?.sem5?.minor || '';
+      const m2 = r?.minor2 || r?.sem2?.minor || r?.sem4?.minor || r?.sem6?.minor || '';
+      const d1 = r?.mdc1 || r?.sem1?.mdc || '';
+      const d2 = r?.mdc2 || r?.sem2?.mdc || '';
+      const d3 = r?.mdc3 || r?.sem3?.mdc || '';
+      const s1 = r?.sec1 || r?.sem2?.sec || '';
+      const s2 = r?.sec2 || r?.sem5?.sec || '';
+      const s3 = r?.sec3 || r?.sem6?.sec || '';
+      const e1 = r?.aec1 || r?.sem1?.aec || '';
+      const e2 = r?.aec2 || r?.sem2?.aec || 'ENGLISH';
+      const v1 = r?.vac1 || r?.sem1?.vac || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
+      const v2 = r?.vac2 || r?.sem3?.vac || 'ETHICS AND VALUES';
+
       setRegularChoices({
-        minor1: r.minor1 || '',
-        minor2: r.minor2 || '',
-        mdc1: r.mdc1 || '',
-        mdc2: r.mdc2 || '',
-        mdc3: r.mdc3 || '',
-        sec1: r.sec1 || '',
-        sec2: r.sec2 || '',
-        sec3: r.sec3 || '',
-        aec1: r.aec1 || '',
-        aec2: r.aec2 || '',
-        vac1: r.vac1 || '',
-        vac2: r.vac2 || '',
+        minor1: m1,
+        minor2: m2,
+        mdc1: d1,
+        mdc2: d2,
+        mdc3: d3,
+        sec1: s1,
+        sec2: s2,
+        sec3: s3,
+        aec1: e1,
+        aec2: e2,
+        vac1: v1,
+        vac2: v2,
       });
-      initialMap['minor1'] = !isUnfilledOrNA(r.minor1);
-      initialMap['minor2'] = !isUnfilledOrNA(r.minor2);
-      initialMap['mdc1'] = !isUnfilledOrNA(r.mdc1);
-      initialMap['mdc2'] = !isUnfilledOrNA(r.mdc2);
-      initialMap['mdc3'] = !isUnfilledOrNA(r.mdc3);
-      initialMap['sec1'] = !isUnfilledOrNA(r.sec1);
-      initialMap['sec2'] = !isUnfilledOrNA(r.sec2);
-      initialMap['sec3'] = !isUnfilledOrNA(r.sec3);
-      initialMap['aec1'] = !isUnfilledOrNA(r.aec1);
-      initialMap['aec2'] = !isUnfilledOrNA(r.aec2);
-      initialMap['vac1'] = !isUnfilledOrNA(r.vac1);
-      initialMap['vac2'] = !isUnfilledOrNA(r.vac2);
+
+      initialMap['minor1'] = !isUnfilledOrNA(m1);
+      initialMap['minor2'] = !isUnfilledOrNA(m2);
+      initialMap['mdc1'] = !isUnfilledOrNA(d1);
+      initialMap['mdc2'] = !isUnfilledOrNA(d2);
+      initialMap['mdc3'] = !isUnfilledOrNA(d3);
+      initialMap['sec1'] = !isUnfilledOrNA(s1);
+      initialMap['sec2'] = !isUnfilledOrNA(s2);
+      initialMap['sec3'] = !isUnfilledOrNA(s3);
+      initialMap['aec1'] = !isUnfilledOrNA(e1);
+      initialMap['aec2'] = !isUnfilledOrNA(e2);
+      initialMap['vac1'] = !isUnfilledOrNA(v1);
+      initialMap['vac2'] = !isUnfilledOrNA(v2);
     }
 
     setInitialFilledFields(initialMap);
@@ -333,51 +415,115 @@ export const StudentPortalView: React.FC = () => {
     showNotification('You have logged out safely.', 'info');
   };
 
-  // Available subject choices
+  // Collect all unique paper names across the DB to make sure options are never missing
+  const allKnownSubjectNames = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(counsellingMap).forEach((r) => {
+      if (r?.regular) {
+        const reg = r.regular;
+        [reg.minor1, reg.minor2, reg.mdc1, reg.mdc2, reg.mdc3, reg.sec1, reg.sec2, reg.sec3, reg.aec1, reg.aec2, reg.vac1, reg.vac2].forEach((p) => {
+          if (p && !isUnfilledOrNA(p)) set.add(p.trim());
+        });
+      }
+      if (r?.aedp) {
+        const a = r.aedp;
+        [a.major1, a.major2, a.mdc1, a.mdc2, a.sec1, a.sec2, a.aec1, a.aec2, a.vac1, a.vac2].forEach((p) => {
+          if (p && !isUnfilledOrNA(p)) set.add(p.trim());
+        });
+      }
+    });
+    return Array.from(set);
+  }, [counsellingMap]);
+
+  // Minor subject options with fallback and current value preservation
   const minorOptions = useMemo(() => {
     if (!student) return { minor1: [], minor2: [] };
-    const dept = student.department || '';
+    const dept = (student.department || '').trim();
     const mapped = REGULAR_MINOR_MAPPING[dept];
-    if (mapped) return mapped;
 
-    // Stream-based fallback
-    if (student.stream === 'Physical Science') {
-      return {
-        minor1: ['Physics', 'Chemistry', 'Mathematics', 'Computer Science'],
-        minor2: ['Mathematics', 'Statistics', 'Electronics', 'Geology'],
-      };
-    } else if (student.stream === 'Biological Science') {
-      return {
-        minor1: ['Botany', 'Zoology', 'Chemistry'],
-        minor2: ['Chemistry', 'Biotechnology', 'Environmental Science'],
-      };
-    } else if (student.stream === 'Commerce') {
-      return {
-        minor1: ['Business Economics', 'Business Law & Corporate Governance'],
-        minor2: ['Business Mathematics & Statistics', 'Financial Markets & Institutions'],
-      };
+    let m1List = mapped?.minor1 ? [...mapped.minor1] : [];
+    let m2List = mapped?.minor2 ? [...mapped.minor2] : [];
+
+    // Fallbacks based on stream
+    if (m1List.length === 0) {
+      if (student.stream === 'Physical Science') {
+        m1List = ['Chemistry', 'Mathematics', 'Physics', 'Computer Science'];
+        m2List = ['Mathematics', 'Statistics', 'Electronics', 'Geology'];
+      } else if (student.stream === 'Biological Science') {
+        m1List = ['Botany', 'Zoology', 'Chemistry'];
+        m2List = ['Chemistry', 'Biotechnology', 'Environmental Science'];
+      } else if (student.stream === 'Commerce') {
+        m1List = ['Business Economics', 'Business Law & Corporate Governance'];
+        m2List = ['Business Mathematics & Statistics', 'Financial Markets & Institutions'];
+      } else {
+        m1List = ['History', 'Political Science', 'Economics', 'Sociology', 'Odia', 'Education'];
+        m2List = ['Political Science', 'Philosophy', 'Psychology', 'Geography', 'Sanskrit', 'English'];
+      }
     }
-    return {
-      minor1: ['History', 'Political Science', 'Economics', 'Sociology', 'Odia', 'Education'],
-      minor2: ['Political Science', 'Philosophy', 'Psychology', 'Geography', 'Sanskrit', 'English'],
-    };
-  }, [student]);
 
+    // Always include currently selected values so select dropdown never drops them
+    if (regularChoices.minor1 && !m1List.includes(regularChoices.minor1)) {
+      m1List.unshift(regularChoices.minor1);
+    }
+    if (regularChoices.minor2 && !m2List.includes(regularChoices.minor2)) {
+      m2List.unshift(regularChoices.minor2);
+    }
+
+    return {
+      minor1: Array.from(new Set(m1List)),
+      minor2: Array.from(new Set(m2List)),
+    };
+  }, [student, regularChoices.minor1, regularChoices.minor2]);
+
+  // MDC Options
   const mdcOptions = useMemo(() => {
     if (!student) return [];
-    return STREAM_MDC_OPTIONS[student.stream] || STREAM_MDC_OPTIONS['Arts'] || [];
-  }, [student]);
+    const base = STREAM_MDC_OPTIONS[student.stream] || STREAM_MDC_OPTIONS['Arts'] || [];
+    const merged = [...base];
+    [regularChoices.mdc1, regularChoices.mdc2, regularChoices.mdc3, aedpChoices.mdc1, aedpChoices.mdc2].forEach((val) => {
+      if (val && !merged.includes(val) && !isUnfilledOrNA(val)) {
+        merged.unshift(val);
+      }
+    });
+    return Array.from(new Set(merged));
+  }, [student, regularChoices, aedpChoices]);
 
+  // SEC Options
   const secOptions = useMemo(() => {
     if (!student) return [];
-    return STREAM_SEC_OPTIONS[student.stream] || STREAM_SEC_OPTIONS['Arts'] || [];
-  }, [student]);
+    const base = STREAM_SEC_OPTIONS[student.stream] || STREAM_SEC_OPTIONS['Arts'] || [];
+    const merged = [...base];
+    [regularChoices.sec1, regularChoices.sec2, regularChoices.sec3, aedpChoices.sec1, aedpChoices.sec2].forEach((val) => {
+      if (val && !merged.includes(val) && !isUnfilledOrNA(val)) {
+        merged.unshift(val);
+      }
+    });
+    return Array.from(new Set(merged));
+  }, [student, regularChoices, aedpChoices]);
+
+  // AEC Options
+  const aecOptions = useMemo(() => {
+    const merged = [...COMMON_AEC_OPTIONS, 'ENGLISH'];
+    [regularChoices.aec1, regularChoices.aec2, aedpChoices.aec1, aedpChoices.aec2].forEach((val) => {
+      if (val && !merged.includes(val) && !isUnfilledOrNA(val)) {
+        merged.unshift(val);
+      }
+    });
+    return Array.from(new Set(merged));
+  }, [regularChoices, aedpChoices]);
+
+  // VAC Options
+  const vacOptions = useMemo(() => {
+    const merged = [...COMMON_VAC_OPTIONS, 'ETHICS AND VALUES', 'UNDERSTANDING ODISHA', 'Good Citizenship'];
+    [regularChoices.vac1, regularChoices.vac2, aedpChoices.vac1, aedpChoices.vac2].forEach((val) => {
+      if (val && !merged.includes(val) && !isUnfilledOrNA(val)) {
+        merged.unshift(val);
+      }
+    });
+    return Array.from(new Set(merged));
+  }, [regularChoices, aedpChoices]);
 
   // Helper to determine if a specific field is locked for editing
-  // A field is locked IF:
-  // 1. It is already in lockedFieldsSet (student already edited & submitted it once)
-  // 2. OR it was ALREADY filled by college/admin prior to student login (not unfilled/NA)
-  // 3. OR the student is marked CLC Taken
   const isFieldLocked = (fieldKey: string): { locked: boolean; reason: 'STUDENT_LOCKED' | 'COLLEGE_ALLOTTED' | 'CLC_TAKEN' | 'OPEN' } => {
     if (student?.isClcTaken || student?.status === 'CLC Taken') {
       return { locked: true, reason: 'CLC_TAKEN' };
@@ -411,7 +557,7 @@ export const StudentPortalView: React.FC = () => {
       }
     }
 
-    if (student.isAedp) {
+    if (currentRecord.isAedp) {
       // AEDP Fields
       const aedpKeys: Array<{ key: keyof typeof aedpChoices; label: string }> = [
         { key: 'major2', label: 'Major 2 (Specialization)' },
@@ -439,12 +585,12 @@ export const StudentPortalView: React.FC = () => {
       const regularKeys: Array<{ key: keyof typeof regularChoices; label: string }> = [
         { key: 'minor1', label: 'Core-II (Minor-I)' },
         { key: 'minor2', label: 'Core-III (Minor-II)' },
-        { key: 'mdc1', label: 'MDC 1 (Multidisciplinary Course 1)' },
-        { key: 'mdc2', label: 'MDC 2 (Multidisciplinary Course 2)' },
-        { key: 'mdc3', label: 'MDC 3 (Multidisciplinary Course 3)' },
         { key: 'sec1', label: 'SEC 1 (Skill Enhancement 2nd Sem)' },
         { key: 'sec2', label: 'SEC 2 (Skill Enhancement 5th Sem)' },
         { key: 'sec3', label: 'SEC 3 (Skill Enhancement 6th Sem)' },
+        { key: 'mdc1', label: 'MDC 1 (Multidisciplinary Course 1)' },
+        { key: 'mdc2', label: 'MDC 2 (Multidisciplinary Course 2)' },
+        { key: 'mdc3', label: 'MDC 3 (Multidisciplinary Course 3)' },
         { key: 'aec1', label: 'AEC 1 (MIL Communication)' },
         { key: 'aec2', label: 'AEC 2 (Environmental Studies)' },
         { key: 'vac1', label: 'VAC 1 (Ethics & Human Values)' },
@@ -483,24 +629,21 @@ export const StudentPortalView: React.FC = () => {
 
     const nowIso = new Date().toISOString();
 
-    // Prepare updated record
+    let updatedUnivRoll = student.universityRollNo || '';
+    const univChange = pendingChangesList.find((c) => c.fieldKey === 'universityRollNo');
+    if (univChange) {
+      updatedUnivRoll = univChange.value;
+    }
+
+    // Build fully synchronized record with both flat and semester fields
     let updatedRecord: StudentCounsellingRecord = {
       ...currentRecord,
+      universityRollNo: updatedUnivRoll || currentRecord.universityRollNo || 'N/A',
       studentLockedFields: updatedLockedFields,
       updatedAt: nowIso,
     };
 
-    let updatedUnivRoll = student.universityRollNo || '';
-
-    // Apply University Roll Number change
-    const univChange = pendingChangesList.find((c) => c.fieldKey === 'universityRollNo');
-    if (univChange) {
-      updatedUnivRoll = univChange.value;
-      updatedRecord.universityRollNo = univChange.value;
-    }
-
-    // Apply Counselling Paper updates
-    if (student.isAedp) {
+    if (currentRecord.isAedp) {
       const prevAedp = currentRecord.aedp || {
         major1: student.department,
         major2: '',
@@ -513,19 +656,34 @@ export const StudentPortalView: React.FC = () => {
         vac1: '',
         vac2: '',
       };
-      const updatedAedp = {
-        ...prevAedp,
-        major2: aedpChoices.major2 || prevAedp.major2,
-        mdc1: aedpChoices.mdc1 || prevAedp.mdc1,
-        mdc2: aedpChoices.mdc2 || prevAedp.mdc2,
-        sec1: aedpChoices.sec1 || prevAedp.sec1,
-        sec2: aedpChoices.sec2 || prevAedp.sec2,
-        aec1: aedpChoices.aec1 || prevAedp.aec1,
-        aec2: aedpChoices.aec2 || prevAedp.aec2,
-        vac1: aedpChoices.vac1 || prevAedp.vac1,
-        vac2: aedpChoices.vac2 || prevAedp.vac2,
+      const finalM1 = prevAedp.major1 || student.department;
+      const finalM2 = aedpChoices.major2 || prevAedp.major2;
+      const finalD1 = aedpChoices.mdc1 || prevAedp.mdc1;
+      const finalD2 = aedpChoices.mdc2 || prevAedp.mdc2;
+      const finalS1 = aedpChoices.sec1 || prevAedp.sec1;
+      const finalS2 = aedpChoices.sec2 || prevAedp.sec2;
+      const finalE1 = aedpChoices.aec1 || prevAedp.aec1 || 'English: Business and Communication';
+      const finalE2 = aedpChoices.aec2 || prevAedp.aec2 || 'English: Word and Presentation';
+      const finalV1 = aedpChoices.vac1 || prevAedp.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
+      const finalV2 = aedpChoices.vac2 || prevAedp.vac2 || 'Good Citizenship';
+
+      updatedRecord.aedp = {
+        major1: finalM1,
+        major2: finalM2,
+        mdc1: finalD1,
+        mdc2: finalD2,
+        sec1: finalS1,
+        sec2: finalS2,
+        aec1: finalE1,
+        aec2: finalE2,
+        vac1: finalV1,
+        vac2: finalV2,
+        sem1: { major1: finalM1, major2: finalM2, aec1: finalE1, vac1: finalV1 },
+        sem2: { major1: finalM1, major2: finalM2, aec2: finalE2, vac2: finalV2 },
+        sem3: { major1: finalM1, major2: finalM2, mdc1: finalD1, sec1: finalS1 },
+        sem4: { major1: finalM1, major2: finalM2, mdc2: finalD2, sec2: finalS2 },
+        sem5_6: { apprenticeship: 'APPRENTICESHIP' },
       };
-      updatedRecord.aedp = updatedAedp;
     } else {
       const prevReg = currentRecord.regular || {
         major: student.department,
@@ -542,22 +700,43 @@ export const StudentPortalView: React.FC = () => {
         vac1: '',
         vac2: '',
       };
-      const updatedReg = {
-        ...prevReg,
-        minor1: regularChoices.minor1 || prevReg.minor1,
-        minor2: regularChoices.minor2 || prevReg.minor2,
-        mdc1: regularChoices.mdc1 || prevReg.mdc1,
-        mdc2: regularChoices.mdc2 || prevReg.mdc2,
-        mdc3: regularChoices.mdc3 || prevReg.mdc3,
-        sec1: regularChoices.sec1 || prevReg.sec1,
-        sec2: regularChoices.sec2 || prevReg.sec2,
-        sec3: regularChoices.sec3 || prevReg.sec3,
-        aec1: regularChoices.aec1 || prevReg.aec1,
-        aec2: regularChoices.aec2 || prevReg.aec2,
-        vac1: regularChoices.vac1 || prevReg.vac1,
-        vac2: regularChoices.vac2 || prevReg.vac2,
+      const finalMajor = prevReg.major || student.department;
+      const finalMin1 = regularChoices.minor1 || prevReg.minor1;
+      const finalMin2 = regularChoices.minor2 || prevReg.minor2;
+      const finalD1 = regularChoices.mdc1 || prevReg.mdc1;
+      const finalD2 = regularChoices.mdc2 || prevReg.mdc2;
+      const finalD3 = regularChoices.mdc3 || prevReg.mdc3;
+      const finalS1 = regularChoices.sec1 || prevReg.sec1;
+      const finalS2 = regularChoices.sec2 || prevReg.sec2;
+      const finalS3 = regularChoices.sec3 || prevReg.sec3;
+      const finalE1 = regularChoices.aec1 || prevReg.aec1;
+      const finalE2 = regularChoices.aec2 || prevReg.aec2 || 'ENGLISH';
+      const finalV1 = regularChoices.vac1 || prevReg.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
+      const finalV2 = regularChoices.vac2 || prevReg.vac2 || 'ETHICS AND VALUES';
+      const finalV3 = prevReg.sem5?.vac || 'UNDERSTANDING ODISHA';
+      const finalV4 = prevReg.sem6?.vac || 'Creative Writing';
+
+      updatedRecord.regular = {
+        major: finalMajor,
+        minor1: finalMin1,
+        minor2: finalMin2,
+        mdc1: finalD1,
+        mdc2: finalD2,
+        mdc3: finalD3,
+        sec1: finalS1,
+        sec2: finalS2,
+        sec3: finalS3,
+        aec1: finalE1,
+        aec2: finalE2,
+        vac1: finalV1,
+        vac2: finalV2,
+        sem1: { major: finalMajor, minor: finalMin1, mdc: finalD1, aec: finalE1, vac: finalV1 },
+        sem2: { major: finalMajor, minor: finalMin2, mdc: finalD2, aec: finalE2, sec: finalS1 },
+        sem3: { major: finalMajor, minor: finalMin1, mdc: finalD3, vac: finalV2 },
+        sem4: { major: finalMajor, minor: finalMin2, activity: 'Internship / Community Engagement & Service / Field Work' },
+        sem5: { major: finalMajor, minor: finalMin1, sec: finalS2, vac: finalV3 },
+        sem6: { major: finalMajor, minor: finalMin2, sec: finalS3, vac: finalV4 },
       };
-      updatedRecord.regular = updatedReg;
     }
 
     // Save to DataContext (persists to Firestore, LocalStorage, Memory)
@@ -565,7 +744,7 @@ export const StudentPortalView: React.FC = () => {
 
     // Update student document as well
     updateStudent(student.id, {
-      universityRollNo: updatedUnivRoll,
+      universityRollNo: updatedUnivRoll || student.universityRollNo,
       studentLockedFields: updatedLockedFields,
     });
 
@@ -577,7 +756,7 @@ export const StudentPortalView: React.FC = () => {
     setShowConfirmModal(false);
     setPendingChangesList([]);
     showNotification(
-      `Successfully saved! ${newlyLockedKeys.length} section(s) have been permanently locked and updated across the entire college portal.`,
+      `Successfully updated! ${newlyLockedKeys.length} section(s) have been permanently locked and updated across the entire college site.`,
       'success'
     );
   };
@@ -595,19 +774,19 @@ export const StudentPortalView: React.FC = () => {
     if (reason === 'COLLEGE_ALLOTTED') {
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-          <Shield className="w-3 h-3 mr-1" /> Allotted by College (Locked)
+          <Shield className="w-3 h-3 mr-1" /> Allotted & Verified
         </span>
       );
     }
     if (reason === 'STUDENT_LOCKED') {
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">
-          <Lock className="w-3 h-3 mr-1" /> Submitted by You (Permanently Locked)
+          <Lock className="w-3 h-3 mr-1" /> Submitted & Locked
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
         <Unlock className="w-3 h-3 mr-1" /> Action Required (Editable Once)
       </span>
     );
@@ -880,6 +1059,146 @@ export const StudentPortalView: React.FC = () => {
   // VIEW: 2. LOGGED-IN STUDENT DASHBOARD
   // ==========================================
   const isClcTaken = Boolean(student.isClcTaken || student.status === 'CLC Taken');
+  const isAedp = Boolean(currentRecord?.isAedp);
+
+  interface RoadmapPaper {
+    label: string;
+    name: string;
+    fixed?: boolean;
+    highlight?: boolean;
+  }
+
+  interface RoadmapSemester {
+    sem: string;
+    title: string;
+    isFullYear?: boolean;
+    papers: RoadmapPaper[];
+  }
+
+  // Compute values for Semester Roadmap breakdown
+  const semesterRoadmap = useMemo<RoadmapSemester[]>(() => {
+    if (isAedp) {
+      return [
+        {
+          sem: 'Semester I',
+          title: 'Foundation & Core Alignment',
+          papers: [
+            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Selection' },
+            { label: 'AEC 1', name: aedpChoices.aec1 || 'English: Business and Communication' },
+            { label: 'VAC 1', name: aedpChoices.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT' },
+          ],
+        },
+        {
+          sem: 'Semester II',
+          title: 'Communication & Ethics',
+          papers: [
+            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Selection' },
+            { label: 'AEC 2', name: aedpChoices.aec2 || 'English: Word and Presentation' },
+            { label: 'VAC 2', name: aedpChoices.vac2 || 'Good Citizenship' },
+          ],
+        },
+        {
+          sem: 'Semester III',
+          title: 'Multidisciplinary & Skill I',
+          papers: [
+            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Selection' },
+            { label: 'MDC 1', name: aedpChoices.mdc1 || 'Pending Selection' },
+            { label: 'SEC 1', name: aedpChoices.sec1 || 'Pending Selection' },
+          ],
+        },
+        {
+          sem: 'Semester IV',
+          title: 'Multidisciplinary & Skill II',
+          papers: [
+            { label: 'Major 1', name: student.department || 'AEDP Specialization', fixed: true },
+            { label: 'Major 2', name: aedpChoices.major2 || 'Pending Selection' },
+            { label: 'MDC 2', name: aedpChoices.mdc2 || 'Pending Selection' },
+            { label: 'SEC 2', name: aedpChoices.sec2 || 'Pending Selection' },
+          ],
+        },
+        {
+          sem: 'Semester V & VI',
+          title: 'Final Year Paid Apprenticeship',
+          isFullYear: true,
+          papers: [
+            {
+              label: '1-Year On-The-Job Apprenticeship',
+              name: 'Mandatory Stipendiary Industrial Apprenticeship & Capstone Industry Project',
+              highlight: true,
+            },
+          ],
+        },
+      ];
+    }
+
+    // Regular Honours Roadmap
+    return [
+      {
+        sem: 'Semester I',
+        title: 'Core, Minor-I, MDC-1, AEC-1, VAC-1',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Selection' },
+          { label: 'MDC-1', name: regularChoices.mdc1 || 'Pending Selection' },
+          { label: 'AEC-1', name: regularChoices.aec1 || 'Pending Selection' },
+          { label: 'VAC-1', name: regularChoices.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT' },
+        ],
+      },
+      {
+        sem: 'Semester II',
+        title: 'Core, Minor-II, MDC-2, AEC-2, SEC-1',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Selection' },
+          { label: 'MDC-2', name: regularChoices.mdc2 || 'Pending Selection' },
+          { label: 'AEC-2', name: regularChoices.aec2 || 'ENGLISH' },
+          { label: 'SEC-1 (Skill 2nd Sem)', name: regularChoices.sec1 || 'Pending Selection' },
+        ],
+      },
+      {
+        sem: 'Semester III',
+        title: 'Core, Minor-I, MDC-3, VAC-2',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Selection' },
+          { label: 'MDC-3', name: regularChoices.mdc3 || 'Pending Selection' },
+          { label: 'VAC-2', name: regularChoices.vac2 || 'ETHICS AND VALUES' },
+        ],
+      },
+      {
+        sem: 'Semester IV',
+        title: 'Core, Minor-II, Mandatory Field Activity',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Selection' },
+          { label: 'Activity', name: 'Internship / Community Engagement & Service / Field Work', fixed: true },
+        ],
+      },
+      {
+        sem: 'Semester V',
+        title: 'Core, Minor-I, SEC-2, VAC-3',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-II (Minor-I)', name: regularChoices.minor1 || 'Pending Selection' },
+          { label: 'SEC-2 (Skill 5th Sem)', name: regularChoices.sec2 || 'Pending Selection' },
+          { label: 'VAC-3', name: 'UNDERSTANDING ODISHA', fixed: true },
+        ],
+      },
+      {
+        sem: 'Semester VI',
+        title: 'Core, Minor-II, SEC-3, VAC-4',
+        papers: [
+          { label: 'Core-I (Major)', name: student.department, fixed: true },
+          { label: 'Core-III (Minor-II)', name: regularChoices.minor2 || 'Pending Selection' },
+          { label: 'SEC-3 (Skill 6th Sem)', name: regularChoices.sec3 || 'Pending Selection' },
+          { label: 'VAC-4', name: 'Creative Writing', fixed: true },
+        ],
+      },
+    ];
+  }, [isAedp, student.department, regularChoices, aedpChoices]);
 
   return (
     <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
@@ -935,12 +1254,12 @@ export const StudentPortalView: React.FC = () => {
                 <h1 className="text-xl sm:text-2xl font-bold text-white">{student.name}</h1>
                 <span
                   className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
-                    student.isAedp
+                    isAedp
                       ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
                       : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                   }`}
                 >
-                  {student.isAedp ? 'AEDP Specialization' : 'Regular Honours'}
+                  {isAedp ? 'AEDP Specialization' : 'Regular Honours'}
                 </span>
                 {isClcTaken ? (
                   <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40">
@@ -959,11 +1278,15 @@ export const StudentPortalView: React.FC = () => {
                 </span>
                 <span>•</span>
                 <span>
+                  University Roll: <strong className="font-mono text-cyan-300">{univRollValue || student.universityRollNo || 'Pending'}</strong>
+                </span>
+                <span>•</span>
+                <span>
                   SAMS Barcode: <strong className="font-mono text-slate-200">{student.samsRegNo}</strong>
                 </span>
                 <span>•</span>
                 <span>
-                  Department / Major: <strong className="text-slate-200">{student.department}</strong>
+                  Major: <strong className="text-amber-200">{student.department}</strong>
                 </span>
                 <span>•</span>
                 <span>
@@ -987,179 +1310,399 @@ export const StudentPortalView: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* View Switcher: Subject Allotment Overview vs Semester-Wise Roadmap */}
+        <div className="flex items-center space-x-2 mt-6 pt-4 border-t border-slate-800">
+          <button
+            onClick={() => setActiveSubTab('overview')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 transition-all ${
+              activeSubTab === 'overview'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
+                : 'bg-slate-800/80 text-slate-300 hover:text-white border border-slate-700'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Subject Counselling Allotment</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('semester_roadmap')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 transition-all ${
+              activeSubTab === 'semester_roadmap'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
+                : 'bg-slate-800/80 text-slate-300 hover:text-white border border-slate-700'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Semester-Wise Course Roadmap (Sem I – VI)</span>
+          </button>
+        </div>
       </div>
 
-      {/* Main Grid: University Roll No & Subject Counselling */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column: University Roll Number Card & Quick Stats */}
-        <div className="space-y-6">
-          {/* Section 1: University Roll Number */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center space-x-2">
-                <Hash className="w-5 h-5 text-amber-400" />
-                <h2 className="text-base font-bold text-white">University Roll Number</h2>
+      {/* SUB-VIEW 1: SUBJECT COUNSELLING EDIT & ALLOTMENT */}
+      {activeSubTab === 'overview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column: University Roll Number Card & Policy */}
+          <div className="space-y-6">
+            {/* University Roll Number */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <Hash className="w-5 h-5 text-amber-400" />
+                  <h2 className="text-base font-bold text-white">University Roll Number</h2>
+                </div>
+                {renderStatusBadge('universityRollNo')}
               </div>
-              {renderStatusBadge('universityRollNo')}
-            </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Assigned by the Sambalpur University / Council examination wing. If unfilled, enter your official
-              examination roll number carefully.
-            </p>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Assigned by the Sambalpur University / Council examination wing. If unfilled, enter your official
+                examination roll number carefully.
+              </p>
 
-            {(() => {
-              const { locked, reason } = isFieldLocked('universityRollNo');
-              if (locked) {
-                return (
-                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                    <div className="text-[11px] uppercase tracking-wider text-slate-400">Recorded University Roll No</div>
-                    <div className="text-xl font-mono font-bold text-amber-400">
-                      {univRollValue || student.universityRollNo || 'N/A'}
+              {(() => {
+                const { locked, reason } = isFieldLocked('universityRollNo');
+                if (locked) {
+                  return (
+                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                      <div className="text-[11px] uppercase tracking-wider text-slate-400">Recorded University Roll No</div>
+                      <div className="text-xl font-mono font-bold text-cyan-400">
+                        {univRollValue || student.universityRollNo || 'N/A'}
+                      </div>
+                      <div className="flex items-center text-[11px] text-slate-400 pt-1">
+                        <Lock className="w-3.5 h-3.5 text-slate-500 mr-1.5" />
+                        {reason === 'STUDENT_LOCKED'
+                          ? 'Updated & permanently locked by student'
+                          : 'Official allotment confirmed by examination cell'}
+                      </div>
                     </div>
-                    <div className="flex items-center text-[11px] text-slate-400 pt-1">
-                      <Lock className="w-3.5 h-3.5 text-slate-500 mr-1.5" />
-                      {reason === 'STUDENT_LOCKED'
-                        ? 'Updated & permanently locked by student'
-                        : 'Official allotment confirmed by examination cell'}
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        disabled={isClcTaken}
+                        value={univRollValue}
+                        onChange={(e) => setUnivRollValue(e.target.value.toUpperCase())}
+                        placeholder="e.g. 24UG01004"
+                        className="w-full px-4 py-2.5 bg-slate-950 border border-amber-500/50 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                      />
+                    </div>
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 leading-relaxed">
+                      <strong>Notice:</strong> This field is currently empty. You may enter it <strong>only once</strong>. Once saved, it cannot be changed.
                     </div>
                   </div>
                 );
-              }
-
-              return (
-                <div className="space-y-3">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      disabled={isClcTaken}
-                      value={univRollValue}
-                      onChange={(e) => setUnivRollValue(e.target.value.toUpperCase())}
-                      placeholder="e.g. 24UG01004"
-                      className="w-full px-4 py-2.5 bg-slate-950 border border-amber-500/50 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
-                    />
-                  </div>
-                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 leading-relaxed">
-                    <strong>Notice:</strong> This field is currently empty. You may enter it <strong>only once</strong>. Once saved, it cannot be changed.
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Policy Information Box */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center">
-              <Award className="w-4 h-4 mr-1.5 text-amber-400" /> NEP 2020 Subject Framework
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Under Odisha State Higher Education NEP 2020 curriculum, every undergraduate student completes:
-            </p>
-            <ul className="text-xs text-slate-400 space-y-1.5 list-disc pl-4">
-              <li><strong>Major (Honours):</strong> Fixed departmental specialization</li>
-              <li><strong>Minor-I & Minor-II:</strong> Two complementary allied disciplines</li>
-              <li><strong>MDC 1, 2, 3:</strong> Multidisciplinary breadth courses across other faculties</li>
-              <li><strong>SEC 1, 2, 3:</strong> Skill enhancement courses for practical employability</li>
-              <li><strong>AEC 1, 2:</strong> Language communication & environment</li>
-              <li><strong>VAC 1, 2:</strong> Ethics, human values & community health</li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Right Column: Subject Counselling Papers Table & Selection */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-white flex items-center">
-                  <BookOpen className="w-5 h-5 mr-2 text-amber-400" />
-                  Subject Counselling Allotment
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Review your allotted papers. Each unfilled/N.A. section can be chosen and locked once by the student.
-                </p>
-              </div>
-
-              {/* Submit Button */}
-              {!isClcTaken && (
-                <button
-                  type="button"
-                  onClick={handleInitiateSave}
-                  className="px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md flex items-center justify-center space-x-2 transition-all self-start sm:self-auto"
-                >
-                  <Save className="w-4 h-4 text-slate-950" />
-                  <span>Save & Lock My Selections</span>
-                </button>
-              )}
+              })()}
             </div>
 
-            {/* SUBJECTS LISTING */}
-            {student.isAedp ? (
-              // ==========================================
-              // AEDP PAPERS
-              // ==========================================
-              <div className="space-y-4">
-                {/* Major 1 (Fixed) */}
-                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-slate-200">Major-I (Specialization Honours)</div>
-                    <div className="text-sm font-semibold text-amber-300 mt-0.5">{student.department}</div>
-                  </div>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    <Shield className="w-3 h-3 mr-1" /> Admitted Major (Fixed)
-                  </span>
+            {/* Quick Summary of Current Allotment */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center">
+                <Sparkles className="w-4 h-4 mr-1.5" /> Allotment Summary
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                  <span className="text-slate-400">Major:</span>
+                  <span className="font-bold text-amber-300">{student.department}</span>
                 </div>
-
-                {/* Major 2 */}
-                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-200">Major-II (Allied Domain)</span>
-                    {renderStatusBadge('major2')}
-                  </div>
-                  {(() => {
-                    const status = isFieldLocked('major2');
-                    if (status.locked) {
-                      return (
-                        <div className="text-sm font-semibold text-slate-300">
-                          {aedpChoices.major2 || 'N/A'}
-                        </div>
-                      );
-                    }
-                    return (
-                      <input
-                        type="text"
-                        value={aedpChoices.major2}
-                        onChange={(e) => setAedpChoices({ ...aedpChoices, major2: e.target.value })}
-                        placeholder="Enter Major-II preference (e.g. Data Analytics / BFSI)"
-                        className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                      />
-                    );
-                  })()}
-                </div>
-
-                {/* MDC 1 & MDC 2 */}
-                {(['mdc1', 'mdc2'] as const).map((key, idx) => (
-                  <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-200">
-                        MDC-{idx + 1} (Multidisciplinary Course)
+                {!isAedp ? (
+                  <>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400">Minor 1:</span>
+                      <span className="font-semibold text-emerald-300">{regularChoices.minor1 || 'Not Allotted'}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400">Minor 2:</span>
+                      <span className="font-semibold text-emerald-200">{regularChoices.minor2 || 'Not Allotted'}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400">SEC 1, 2, 3:</span>
+                      <span className="font-semibold text-cyan-300">
+                        {[regularChoices.sec1, regularChoices.sec2, regularChoices.sec3].filter(Boolean).length} / 3 Allotted
                       </span>
-                      {renderStatusBadge(key)}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400">Major 2:</span>
+                      <span className="font-semibold text-purple-300">{aedpChoices.major2 || 'Not Allotted'}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400">Apprenticeship:</span>
+                      <span className="font-semibold text-emerald-300">Mandatory (Sem 5 & 6)</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Academic Information Card */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center">
+                <Award className="w-4 h-4 mr-1.5 text-amber-400" /> NEP 2020 State Curriculum Guidelines
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                As per Higher Education Department, Govt. of Odisha:
+              </p>
+              <ul className="text-xs text-slate-400 space-y-1.5 list-disc pl-4">
+                <li><strong>Major Discipline:</strong> Fixed department specialization chosen during SAMS CAF admission.</li>
+                <li><strong>Minor-I:</strong> Taught in Semesters 1, 3, and 5.</li>
+                <li><strong>Minor-II:</strong> Taught in Semesters 2, 4, and 6.</li>
+                <li><strong>SEC (Skill Enhancement):</strong> SEC-1 in Sem 2, SEC-2 in Sem 5, SEC-3 in Sem 6.</li>
+                <li><strong>MDC (Multidisciplinary):</strong> 3 breadth papers across Sem 1, 2, and 3.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Right Column: Complete Subject Counselling Papers Form */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center">
+                    <BookOpen className="w-5 h-5 mr-2 text-amber-400" />
+                    Subject Combinations & Paper Allocation
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Review your allotted papers. Each unfilled/N.A. section can be chosen and locked once by the student.
+                  </p>
+                </div>
+
+                {/* Save Button */}
+                {!isClcTaken && (
+                  <button
+                    type="button"
+                    onClick={handleInitiateSave}
+                    className="px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md flex items-center justify-center space-x-2 transition-all self-start sm:self-auto"
+                  >
+                    <Save className="w-4 h-4 text-slate-950" />
+                    <span>Save & Lock My Selections</span>
+                  </button>
+                )}
+              </div>
+
+              {/* SUBJECTS FORM */}
+              {isAedp ? (
+                // AEDP PAPERS
+                <div className="space-y-4">
+                  {/* Major 1 (Fixed) */}
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-slate-200">Major-I (Specialization Honours)</div>
+                      <div className="text-sm font-semibold text-amber-300 mt-0.5">{student.department}</div>
+                    </div>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      <Shield className="w-3 h-3 mr-1" /> Admitted Major (Fixed)
+                    </span>
+                  </div>
+
+                  {/* Major 2 */}
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-200">Major-II (Allied Domain)</span>
+                      {renderStatusBadge('major2')}
                     </div>
                     {(() => {
-                      const status = isFieldLocked(key);
+                      const status = isFieldLocked('major2');
                       if (status.locked) {
-                        return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
+                        return <div className="text-sm font-semibold text-slate-300">{aedpChoices.major2 || 'N/A'}</div>;
+                      }
+                      return (
+                        <input
+                          type="text"
+                          value={aedpChoices.major2}
+                          onChange={(e) => setAedpChoices({ ...aedpChoices, major2: e.target.value })}
+                          placeholder="Enter Major-II preference (e.g. Data Analytics / BFSI)"
+                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                        />
+                      );
+                    })()}
+                  </div>
+
+                  {/* MDC 1 & MDC 2 */}
+                  {(['mdc1', 'mdc2'] as const).map((key, idx) => (
+                    <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-200">
+                          MDC-{idx + 1} (Multidisciplinary Course - Sem {idx + 3})
+                        </span>
+                        {renderStatusBadge(key)}
+                      </div>
+                      {(() => {
+                        const status = isFieldLocked(key);
+                        if (status.locked) {
+                          return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
+                        }
+                        return (
+                          <select
+                            value={aedpChoices[key]}
+                            onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                          >
+                            <option value="">-- Select MDC-{idx + 1} Paper --</option>
+                            {mdcOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  ))}
+
+                  {/* SEC 1 & SEC 2 */}
+                  {(['sec1', 'sec2'] as const).map((key, idx) => (
+                    <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-200">
+                          SEC-{idx + 1} (Skill Enhancement Course - Sem {idx + 3})
+                        </span>
+                        {renderStatusBadge(key)}
+                      </div>
+                      {(() => {
+                        const status = isFieldLocked(key);
+                        if (status.locked) {
+                          return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
+                        }
+                        return (
+                          <select
+                            value={aedpChoices[key]}
+                            onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                          >
+                            <option value="">-- Select SEC-{idx + 1} Paper --</option>
+                            {secOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  ))}
+
+                  {/* AEC 1 & AEC 2 */}
+                  {(['aec1', 'aec2'] as const).map((key, idx) => (
+                    <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-200">
+                          AEC-{idx + 1} (Ability Enhancement Course - Sem {idx + 1})
+                        </span>
+                        {renderStatusBadge(key)}
+                      </div>
+                      {(() => {
+                        const status = isFieldLocked(key);
+                        if (status.locked) {
+                          return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
+                        }
+                        return (
+                          <select
+                            value={aedpChoices[key]}
+                            onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                          >
+                            <option value="">-- Select AEC-{idx + 1} Paper --</option>
+                            {aecOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  ))}
+
+                  {/* VAC 1 & VAC 2 */}
+                  {(['vac1', 'vac2'] as const).map((key, idx) => (
+                    <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-200">
+                          VAC-{idx + 1} (Value Added Course - Sem {idx + 1})
+                        </span>
+                        {renderStatusBadge(key)}
+                      </div>
+                      {(() => {
+                        const status = isFieldLocked(key);
+                        if (status.locked) {
+                          return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
+                        }
+                        return (
+                          <select
+                            value={aedpChoices[key]}
+                            onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                          >
+                            <option value="">-- Select VAC-{idx + 1} Paper --</option>
+                            {vacOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  ))}
+
+                  {/* Final Year Apprenticeship */}
+                  <div className="p-4 rounded-xl bg-purple-950/40 border border-purple-500/40 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-purple-300">Semesters 5 & 6 (Final Year)</div>
+                      <div className="text-sm font-semibold text-white mt-0.5">
+                        1-Year Paid Industrial Apprenticeship & Capstone Project
+                      </div>
+                    </div>
+                    <span className="text-xs font-extrabold text-purple-300 bg-purple-500/20 px-3 py-1 rounded-full border border-purple-500/40">
+                      Mandatory Stipendiary
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                // REGULAR HONOURS PAPERS
+                <div className="space-y-4">
+                  {/* Major (Fixed) */}
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-slate-400">Core-I: Major Discipline (Honours)</div>
+                      <div className="text-base font-bold text-amber-400 mt-0.5">{student.department}</div>
+                    </div>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      <Shield className="w-3 h-3 mr-1" /> Admitted Major (Fixed)
+                    </span>
+                  </div>
+
+                  {/* Minor 1: Core-II (Minor-I) */}
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-slate-200">Core-II (Minor-I)</span>
+                        <span className="text-[11px] text-slate-400 ml-2">Semesters 1, 3, 5</span>
+                      </div>
+                      {renderStatusBadge('minor1')}
+                    </div>
+                    {(() => {
+                      const status = isFieldLocked('minor1');
+                      if (status.locked) {
+                        return (
+                          <div className="text-sm font-semibold text-emerald-300">
+                            {regularChoices.minor1 || 'N/A'}
+                          </div>
+                        );
                       }
                       return (
                         <select
-                          value={aedpChoices[key]}
-                          onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
+                          value={regularChoices.minor1}
+                          onChange={(e) => setRegularChoices({ ...regularChoices, minor1: e.target.value })}
                           className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
                         >
-                          <option value="">-- Select MDC-{idx + 1} Paper --</option>
-                          {mdcOptions.map((opt) => (
+                          <option value="">-- Select Minor-I Subject --</option>
+                          {minorOptions.minor1.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
                             </option>
@@ -1168,29 +1711,60 @@ export const StudentPortalView: React.FC = () => {
                       );
                     })()}
                   </div>
-                ))}
 
-                {/* SEC 1 & SEC 2 */}
-                {(['sec1', 'sec2'] as const).map((key, idx) => (
-                  <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  {/* Minor 2: Core-III (Minor-II) */}
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-200">
-                        SEC-{idx + 1} (Skill Enhancement Course)
-                      </span>
-                      {renderStatusBadge(key)}
+                      <div>
+                        <span className="text-xs font-bold text-slate-200">Core-III (Minor-II)</span>
+                        <span className="text-[11px] text-slate-400 ml-2">Semesters 2, 4, 6</span>
+                      </div>
+                      {renderStatusBadge('minor2')}
                     </div>
                     {(() => {
-                      const status = isFieldLocked(key);
+                      const status = isFieldLocked('minor2');
                       if (status.locked) {
-                        return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
+                        return (
+                          <div className="text-sm font-semibold text-emerald-200">
+                            {regularChoices.minor2 || 'N/A'}
+                          </div>
+                        );
                       }
                       return (
                         <select
-                          value={aedpChoices[key]}
-                          onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
+                          value={regularChoices.minor2}
+                          onChange={(e) => setRegularChoices({ ...regularChoices, minor2: e.target.value })}
                           className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
                         >
-                          <option value="">-- Select SEC-{idx + 1} Paper --</option>
+                          <option value="">-- Select Minor-II Subject --</option>
+                          {minorOptions.minor2.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+                  </div>
+
+                  {/* SEC 1 (2nd Sem) */}
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-200">SEC-1 (Skill Enhancement Course - 2nd Sem)</span>
+                      {renderStatusBadge('sec1')}
+                    </div>
+                    {(() => {
+                      const status = isFieldLocked('sec1');
+                      if (status.locked) {
+                        return <div className="text-sm font-semibold text-cyan-300">{regularChoices.sec1 || 'N/A'}</div>;
+                      }
+                      return (
+                        <select
+                          value={regularChoices.sec1}
+                          onChange={(e) => setRegularChoices({ ...regularChoices, sec1: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                        >
+                          <option value="">-- Select SEC-1 Subject --</option>
                           {secOptions.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
@@ -1200,373 +1774,253 @@ export const StudentPortalView: React.FC = () => {
                       );
                     })()}
                   </div>
-                ))}
 
-                {/* AEC 1 & AEC 2 */}
-                {(['aec1', 'aec2'] as const).map((key, idx) => (
-                  <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  {/* SEC 2 (5th Sem) */}
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-200">
-                        AEC-{idx + 1} (Ability Enhancement Course)
-                      </span>
-                      {renderStatusBadge(key)}
-                    </div>
-                    {(() => {
-                      const status = isFieldLocked(key);
-                      if (status.locked) {
-                        return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
-                      }
-                      return (
-                        <select
-                          value={aedpChoices[key]}
-                          onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="">-- Select AEC-{idx + 1} Paper --</option>
-                          {COMMON_AEC_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
-                  </div>
-                ))}
-
-                {/* VAC 1 & VAC 2 */}
-                {(['vac1', 'vac2'] as const).map((key, idx) => (
-                  <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-200">
-                        VAC-{idx + 1} (Value Added Course)
-                      </span>
-                      {renderStatusBadge(key)}
-                    </div>
-                    {(() => {
-                      const status = isFieldLocked(key);
-                      if (status.locked) {
-                        return <div className="text-sm font-semibold text-slate-300">{aedpChoices[key] || 'N/A'}</div>;
-                      }
-                      return (
-                        <select
-                          value={aedpChoices[key]}
-                          onChange={(e) => setAedpChoices({ ...aedpChoices, [key]: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="">-- Select VAC-{idx + 1} Paper --</option>
-                          {COMMON_VAC_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
-                  </div>
-                ))}
-
-                {/* Final Year Apprenticeship Badge */}
-                <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/30 flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-purple-300">Sem 5 & 6 (Final Year)</div>
-                    <div className="text-sm font-semibold text-slate-200 mt-0.5">
-                      1-Year Paid Industrial Apprenticeship & Industry Project
-                    </div>
-                  </div>
-                  <span className="text-xs font-extrabold text-purple-400 bg-purple-500/20 px-2.5 py-1 rounded border border-purple-500/40">
-                    Mandatory Stipendiary
-                  </span>
-                </div>
-              </div>
-            ) : (
-              // ==========================================
-              // REGULAR HONOURS PAPERS
-              // ==========================================
-              <div className="space-y-4">
-                {/* Major (Fixed) */}
-                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-slate-400">Core-I: Major Discipline (Honours)</div>
-                    <div className="text-base font-bold text-amber-400 mt-0.5">{student.department}</div>
-                  </div>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    <Shield className="w-3 h-3 mr-1" /> Admitted Major (Fixed)
-                  </span>
-                </div>
-
-                {/* Minor 1: Core-II (Minor-I) */}
-                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-slate-200">Core-II (Minor-I)</span>
-                      <span className="text-[11px] text-slate-400 ml-2">Taken during 1st to 4th Semesters</span>
-                    </div>
-                    {renderStatusBadge('minor1')}
-                  </div>
-                  {(() => {
-                    const status = isFieldLocked('minor1');
-                    if (status.locked) {
-                      return (
-                        <div className="text-sm font-semibold text-slate-300">
-                          {regularChoices.minor1 || 'N/A'}
-                        </div>
-                      );
-                    }
-                    return (
-                      <select
-                        value={regularChoices.minor1}
-                        onChange={(e) => setRegularChoices({ ...regularChoices, minor1: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                      >
-                        <option value="">-- Select Minor-I Subject --</option>
-                        {minorOptions.minor1.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                </div>
-
-                {/* Minor 2: Core-III (Minor-II) */}
-                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-slate-200">Core-III (Minor-II)</span>
-                      <span className="text-[11px] text-slate-400 ml-2">Taken during 5th to 6th Semesters</span>
-                    </div>
-                    {renderStatusBadge('minor2')}
-                  </div>
-                  {(() => {
-                    const status = isFieldLocked('minor2');
-                    if (status.locked) {
-                      return (
-                        <div className="text-sm font-semibold text-slate-300">
-                          {regularChoices.minor2 || 'N/A'}
-                        </div>
-                      );
-                    }
-                    return (
-                      <select
-                        value={regularChoices.minor2}
-                        onChange={(e) => setRegularChoices({ ...regularChoices, minor2: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                      >
-                        <option value="">-- Select Minor-II Subject --</option>
-                        {minorOptions.minor2.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                </div>
-
-                {/* SEC 1 (2nd Sem) */}
-                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-slate-200">SEC-1 (Skill Enhancement Course - 2nd Sem)</span>
-                    </div>
-                    {renderStatusBadge('sec1')}
-                  </div>
-                  {(() => {
-                    const status = isFieldLocked('sec1');
-                    if (status.locked) {
-                      return (
-                        <div className="text-sm font-semibold text-slate-300">
-                          {regularChoices.sec1 || 'N/A'}
-                        </div>
-                      );
-                    }
-                    return (
-                      <select
-                        value={regularChoices.sec1}
-                        onChange={(e) => setRegularChoices({ ...regularChoices, sec1: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                      >
-                        <option value="">-- Select SEC-1 Subject --</option>
-                        {secOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                </div>
-
-                {/* SEC 2 (5th Sem) */}
-                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
                       <span className="text-xs font-bold text-slate-200">SEC-2 (Skill Enhancement Course - 5th Sem)</span>
+                      {renderStatusBadge('sec2')}
                     </div>
-                    {renderStatusBadge('sec2')}
-                  </div>
-                  {(() => {
-                    const status = isFieldLocked('sec2');
-                    if (status.locked) {
+                    {(() => {
+                      const status = isFieldLocked('sec2');
+                      if (status.locked) {
+                        return <div className="text-sm font-semibold text-cyan-300">{regularChoices.sec2 || 'N/A'}</div>;
+                      }
                       return (
-                        <div className="text-sm font-semibold text-slate-300">
-                          {regularChoices.sec2 || 'N/A'}
-                        </div>
+                        <select
+                          value={regularChoices.sec2}
+                          onChange={(e) => setRegularChoices({ ...regularChoices, sec2: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                        >
+                          <option value="">-- Select SEC-2 Subject --</option>
+                          {secOptions.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
                       );
-                    }
-                    return (
-                      <select
-                        value={regularChoices.sec2}
-                        onChange={(e) => setRegularChoices({ ...regularChoices, sec2: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                      >
-                        <option value="">-- Select SEC-2 Subject --</option>
-                        {secOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                </div>
+                    })()}
+                  </div>
 
-                {/* SEC 3 (6th Sem) */}
-                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  {/* SEC 3 (6th Sem) */}
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-200">SEC-3 (Skill Enhancement Course - 6th Sem)</span>
+                      {renderStatusBadge('sec3')}
                     </div>
-                    {renderStatusBadge('sec3')}
-                  </div>
-                  {(() => {
-                    const status = isFieldLocked('sec3');
-                    if (status.locked) {
+                    {(() => {
+                      const status = isFieldLocked('sec3');
+                      if (status.locked) {
+                        return <div className="text-sm font-semibold text-cyan-300">{regularChoices.sec3 || 'N/A'}</div>;
+                      }
                       return (
-                        <div className="text-sm font-semibold text-slate-300">
-                          {regularChoices.sec3 || 'N/A'}
-                        </div>
+                        <select
+                          value={regularChoices.sec3}
+                          onChange={(e) => setRegularChoices({ ...regularChoices, sec3: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                        >
+                          <option value="">-- Select SEC-3 Subject --</option>
+                          {secOptions.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
                       );
-                    }
-                    return (
-                      <select
-                        value={regularChoices.sec3}
-                        onChange={(e) => setRegularChoices({ ...regularChoices, sec3: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                      >
-                        <option value="">-- Select SEC-3 Subject --</option>
-                        {secOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  })()}
+                    })()}
+                  </div>
+
+                  {/* MDC 1, MDC 2, MDC 3 */}
+                  {(['mdc1', 'mdc2', 'mdc3'] as const).map((key, idx) => (
+                    <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-200">
+                          MDC-{idx + 1} (Multidisciplinary Course - Sem {idx + 1})
+                        </span>
+                        {renderStatusBadge(key)}
+                      </div>
+                      {(() => {
+                        const status = isFieldLocked(key);
+                        if (status.locked) {
+                          return <div className="text-sm font-semibold text-slate-300">{regularChoices[key] || 'N/A'}</div>;
+                        }
+                        return (
+                          <select
+                            value={regularChoices[key]}
+                            onChange={(e) => setRegularChoices({ ...regularChoices, [key]: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                          >
+                            <option value="">-- Select MDC-{idx + 1} Paper --</option>
+                            {mdcOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  ))}
+
+                  {/* AEC 1 & AEC 2 */}
+                  {(['aec1', 'aec2'] as const).map((key, idx) => (
+                    <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-200">
+                          AEC-{idx + 1} (Ability Enhancement Course - Sem {idx + 1})
+                        </span>
+                        {renderStatusBadge(key)}
+                      </div>
+                      {(() => {
+                        const status = isFieldLocked(key);
+                        if (status.locked) {
+                          return <div className="text-sm font-semibold text-slate-300">{regularChoices[key] || 'N/A'}</div>;
+                        }
+                        return (
+                          <select
+                            value={regularChoices[key]}
+                            onChange={(e) => setRegularChoices({ ...regularChoices, [key]: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                          >
+                            <option value="">-- Select AEC-{idx + 1} Paper --</option>
+                            {aecOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  ))}
+
+                  {/* VAC 1 & VAC 2 */}
+                  {(['vac1', 'vac2'] as const).map((key, idx) => (
+                    <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-200">
+                          VAC-{idx + 1} (Value Added Course - Sem {idx === 0 ? 1 : 3})
+                        </span>
+                        {renderStatusBadge(key)}
+                      </div>
+                      {(() => {
+                        const status = isFieldLocked(key);
+                        if (status.locked) {
+                          return <div className="text-sm font-semibold text-slate-300">{regularChoices[key] || 'N/A'}</div>;
+                        }
+                        return (
+                          <select
+                            value={regularChoices[key]}
+                            onChange={(e) => setRegularChoices({ ...regularChoices, [key]: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                          >
+                            <option value="">-- Select VAC-{idx + 1} Paper --</option>
+                            {vacOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  ))}
                 </div>
-
-                {/* MDC 1, MDC 2, MDC 3 */}
-                {(['mdc1', 'mdc2', 'mdc3'] as const).map((key, idx) => (
-                  <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-200">
-                        MDC-{idx + 1} (Multidisciplinary Course - Sem {idx + 1})
-                      </span>
-                      {renderStatusBadge(key)}
-                    </div>
-                    {(() => {
-                      const status = isFieldLocked(key);
-                      if (status.locked) {
-                        return <div className="text-sm font-semibold text-slate-300">{regularChoices[key] || 'N/A'}</div>;
-                      }
-                      return (
-                        <select
-                          value={regularChoices[key]}
-                          onChange={(e) => setRegularChoices({ ...regularChoices, [key]: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="">-- Select MDC-{idx + 1} Paper --</option>
-                          {mdcOptions.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
-                  </div>
-                ))}
-
-                {/* AEC 1 & AEC 2 */}
-                {(['aec1', 'aec2'] as const).map((key, idx) => (
-                  <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-200">
-                        AEC-{idx + 1} (Ability Enhancement Course - Sem {idx + 1})
-                      </span>
-                      {renderStatusBadge(key)}
-                    </div>
-                    {(() => {
-                      const status = isFieldLocked(key);
-                      if (status.locked) {
-                        return <div className="text-sm font-semibold text-slate-300">{regularChoices[key] || 'N/A'}</div>;
-                      }
-                      return (
-                        <select
-                          value={regularChoices[key]}
-                          onChange={(e) => setRegularChoices({ ...regularChoices, [key]: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="">-- Select AEC-{idx + 1} Paper --</option>
-                          {COMMON_AEC_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
-                  </div>
-                ))}
-
-                {/* VAC 1 & VAC 2 */}
-                {(['vac1', 'vac2'] as const).map((key, idx) => (
-                  <div key={key} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-200">
-                        VAC-{idx + 1} (Value Added Course - Sem {idx === 0 ? 1 : 3})
-                      </span>
-                      {renderStatusBadge(key)}
-                    </div>
-                    {(() => {
-                      const status = isFieldLocked(key);
-                      if (status.locked) {
-                        return <div className="text-sm font-semibold text-slate-300">{regularChoices[key] || 'N/A'}</div>;
-                      }
-                      return (
-                        <select
-                          value={regularChoices[key]}
-                          onChange={(e) => setRegularChoices({ ...regularChoices, [key]: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="">-- Select VAC-{idx + 1} Paper --</option>
-                          {COMMON_VAC_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
-                  </div>
-                ))}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* SUB-VIEW 2: SEMESTER-WISE ROADMAP (SEM I - VI) */}
+      {activeSubTab === 'semester_roadmap' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center">
+                <Layers className="w-5 h-5 mr-2 text-amber-400" />
+                Comprehensive Semester Roadmap (NEP 2020 Structure)
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Full breakdown of all papers and credits scheduled across all 6 semesters for {student.name}.
+              </p>
+            </div>
+            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-slate-800 text-amber-300 border border-slate-700 self-start sm:self-auto">
+              Roll: {student.rollNo} • Univ: {univRollValue || 'Pending'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {semesterRoadmap.map((semBlock) => (
+              <div
+                key={semBlock.sem}
+                className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 space-y-3 relative hover:border-slate-700 transition"
+              >
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                  <div className="font-extrabold text-sm text-amber-400">{semBlock.sem}</div>
+                  <span className="text-[10px] text-slate-400 font-medium">{semBlock.title}</span>
+                </div>
+
+                <div className="space-y-2">
+                  {semBlock.papers.map((paper, pIdx) => {
+                    const isPending = isUnfilledOrNA(paper.name);
+                    return (
+                      <div
+                        key={pIdx}
+                        className={`p-2.5 rounded-lg border text-xs flex flex-col justify-between ${
+                          paper.highlight
+                            ? 'bg-purple-950/40 border-purple-500/40 text-purple-200'
+                            : paper.fixed
+                            ? 'bg-slate-900/80 border-slate-800 text-slate-300'
+                            : isPending
+                            ? 'bg-amber-500/5 border-amber-500/30 text-amber-200'
+                            : 'bg-slate-900 border-slate-800/90 text-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] uppercase font-bold text-slate-400">{paper.label}</span>
+                          {paper.fixed ? (
+                            <span className="text-[9px] font-semibold text-emerald-400 flex items-center">
+                              <Check className="w-2.5 h-2.5 mr-0.5" /> Core
+                            </span>
+                          ) : isPending ? (
+                            <span className="text-[9px] font-bold text-amber-400 flex items-center animate-pulse">
+                              <Unlock className="w-2.5 h-2.5 mr-0.5" /> Unfilled
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-semibold text-cyan-400 flex items-center">
+                              <Lock className="w-2.5 h-2.5 mr-0.5" /> Allotted
+                            </span>
+                          )}
+                        </div>
+                        <div className={`font-semibold text-xs truncate ${isPending ? 'italic text-amber-300/80' : 'text-slate-100'}`}>
+                          {paper.name}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div className="flex items-center space-x-2">
+              <Info className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                To modify any unfilled subject in your semester schedule, switch back to the <strong>Subject Counselling Allotment</strong> tab.
+              </span>
+            </div>
+            <button
+              onClick={() => setActiveSubTab('overview')}
+              className="text-amber-400 hover:text-amber-300 font-bold underline shrink-0 ml-4"
+            >
+              Go to Allotment Form &rarr;
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Modal Before Permanent Lock */}
       {showConfirmModal && (

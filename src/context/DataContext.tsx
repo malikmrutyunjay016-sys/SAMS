@@ -615,7 +615,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const data = d.data() as StudentCounsellingRecord;
               const key = data.studentId || data.id || d.id;
               if (key) {
-                next[key] = data;
+                const localRec = prev[key];
+                if (
+                  !localRec ||
+                  !localRec.updatedAt ||
+                  !data.updatedAt ||
+                  new Date(data.updatedAt).getTime() >= new Date(localRec.updatedAt).getTime()
+                ) {
+                  next[key] = data;
+                }
               }
             });
             return next;
@@ -623,21 +631,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           // If Firestore is empty on first load, sync any existing local counselling records to Firestore
           try {
-            const rawSaved = localStorage.getItem('sams_counsellingMap');
+            const rawSaved =
+              safeGetLocalStorage(LS_PREFIX + 'counsellingRecords') ||
+              safeGetLocalStorage('sams_counselling_records_v1');
             if (rawSaved) {
-              const saved = JSON.parse(rawSaved) as Record<string, StudentCounsellingRecord>;
-              const records: StudentCounsellingRecord[] = Object.values(saved);
-              const chunkSize = 400;
-              for (let i = 0; i < records.length; i += chunkSize) {
-                const chunk = records.slice(i, i + chunkSize);
-                const batch = writeBatch(db);
-                chunk.forEach((rec: StudentCounsellingRecord) => {
-                  const docId = String(rec.studentId || rec.id || '').replace(/\//g, '_');
-                  if (docId) {
-                    batch.set(doc(db, 'subjectCounselling', docId), rec);
-                  }
-                });
-                await batch.commit();
+              const saved = JSON.parse(rawSaved);
+              let recordsList: StudentCounsellingRecord[] = [];
+              if (Array.isArray(saved)) {
+                recordsList = saved;
+              } else if (saved && typeof saved === 'object') {
+                recordsList = Object.values(saved);
+              }
+              if (recordsList.length > 0) {
+                const chunkSize = 400;
+                for (let i = 0; i < recordsList.length; i += chunkSize) {
+                  const chunk = recordsList.slice(i, i + chunkSize);
+                  const batch = writeBatch(db);
+                  chunk.forEach((rec: StudentCounsellingRecord) => {
+                    const recKey = rec.studentId || rec.id;
+                    const docId = String(recKey || '').replace(/[^a-zA-Z0-9_\-]/g, '_');
+                    if (docId) {
+                      batch.set(doc(db, 'subjectCounselling', docId), rec);
+                    }
+                  });
+                  await batch.commit();
+                }
               }
             }
           } catch {
@@ -1528,7 +1546,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...prev,
       [key]: stamped,
     }));
-    safeSetDoc(doc(db, 'subjectCounselling', key), stamped);
+    const docId = String(key).replace(/[^a-zA-Z0-9_\-]/g, '_');
+    safeSetDoc(doc(db, 'subjectCounselling', docId), stamped);
 
     // Also sync University Roll No to student record if updated
     if (record.universityRollNo && record.universityRollNo !== 'N/A') {
@@ -1551,7 +1570,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ...r,
             id: key,
             studentId: key,
-            updatedAt: nowIso,
+            updatedAt: r.updatedAt || nowIso,
           };
         }
       });
@@ -1584,6 +1603,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTimeout(async () => {
       if (isFirestoreQuotaExceeded()) return;
       try {
+        if (replaceAll) {
+          const oldSnap = await getDocs(collection(db, 'subjectCounselling'));
+          if (!oldSnap.empty) {
+            const delChunkSize = 400;
+            for (let i = 0; i < oldSnap.docs.length; i += delChunkSize) {
+              const delChunk = oldSnap.docs.slice(i, i + delChunkSize);
+              const delBatch = writeBatch(db);
+              delChunk.forEach((d) => delBatch.delete(d.ref));
+              await delBatch.commit();
+            }
+          }
+        }
         const chunkSize = 350;
         for (let i = 0; i < records.length; i += chunkSize) {
           const chunk = records.slice(i, i + chunkSize);
@@ -1591,11 +1622,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           chunk.forEach((r) => {
             const key = r.studentId || r.id;
             if (key) {
-              batch.set(doc(db, 'subjectCounselling', key), {
+              const docId = String(key).replace(/[^a-zA-Z0-9_\-]/g, '_');
+              batch.set(doc(db, 'subjectCounselling', docId), {
                 ...r,
                 id: key,
                 studentId: key,
-                updatedAt: nowIso,
+                updatedAt: r.updatedAt || nowIso,
               });
             }
           });

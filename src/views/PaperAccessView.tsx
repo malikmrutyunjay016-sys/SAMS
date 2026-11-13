@@ -167,19 +167,19 @@ export const PaperAccessView: React.FC = () => {
         if (paperType === 'Minor') return reg.sem1.minor || reg.minor1 || null;
         if (paperType === 'MDC') return reg.sem1.mdc || reg.mdc1 || null;
         if (paperType === 'AEC') return reg.sem1.aec || reg.aec1 || null;
-        if (paperType === 'VAC') return reg.sem1.vac || reg.vac1 || null;
+        if (paperType === 'VAC') return reg.sem1.vac || reg.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
       }
       if (semester === 'Sem II' && reg.sem2) {
         if (paperType === 'Minor') return reg.sem2.minor || reg.minor2 || null;
         if (paperType === 'MDC') return reg.sem2.mdc || reg.mdc2 || null;
-        if (paperType === 'AEC') return reg.sem2.aec || reg.aec2 || null;
+        if (paperType === 'AEC') return reg.sem2.aec || reg.aec2 || 'ENGLISH';
         if (paperType === 'VAC') return null; // No VAC in 2nd semester for Regular Honours
         if (paperType === 'SEC') return reg.sem2.sec || reg.sec1 || null; // Filled from SEC 1 selected in Counselling Editor
       }
       if (semester === 'Sem III' && reg.sem3) {
         if (paperType === 'Minor') return reg.sem3.minor || reg.minor1 || null;
         if (paperType === 'MDC') return reg.sem3.mdc || reg.mdc3 || null;
-        if (paperType === 'VAC') return reg.sem3.vac || reg.vac2 || null;
+        if (paperType === 'VAC') return reg.sem3.vac || reg.vac2 || 'ETHICS AND VALUES';
         if (paperType === 'SEC') return reg.sec1 || null;
       }
       if (semester === 'Sem IV' && reg.sem4) {
@@ -188,12 +188,12 @@ export const PaperAccessView: React.FC = () => {
       if (semester === 'Sem V' && reg.sem5) {
         if (paperType === 'Minor') return reg.sem5.minor || reg.minor1 || null;
         if (paperType === 'SEC') return reg.sem5.sec || reg.sec2 || null;
-        if (paperType === 'VAC') return reg.sem5.vac || null;
+        if (paperType === 'VAC') return reg.sem5.vac || reg.vac3 || 'UNDERSTANDING ODISHA';
       }
       if (semester === 'Sem VI' && reg.sem6) {
         if (paperType === 'Minor') return reg.sem6.minor || reg.minor2 || null;
         if (paperType === 'SEC') return reg.sem6.sec || reg.sec3 || null;
-        if (paperType === 'VAC') return reg.sem6.vac || null;
+        if (paperType === 'VAC') return reg.sem6.vac || reg.vac4 || 'Creative Writing';
       }
     }
 

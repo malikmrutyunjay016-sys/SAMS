@@ -239,6 +239,8 @@ export interface RegularHonoursCounselling {
   aec2: string;
   vac1: string;
   vac2: string;
+  vac3?: string;
+  vac4?: string;
   sem1?: Semester1Regular;
   sem2?: Semester2Regular;
   sem3?: Semester3Regular;

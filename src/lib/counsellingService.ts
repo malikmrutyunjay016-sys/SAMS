@@ -193,17 +193,102 @@ export const REGULAR_MINOR_MAPPING: Record<string, { minor1: string[]; minor2: s
 /**
  * Generates an approved NEP 2020 Subject Counselling package for a student
  */
+export function sanitizeCounsellingForFirestore<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
+}
+
+export function normalizeSessionString(str?: string | null): string {
+  if (!str) return '';
+  const s = String(str).toLowerCase().trim();
+  // 1. Check explicit session range strings first
+  if (s.includes('2024-25') || s.includes('2024-2025') || s.includes('24-25')) return '2024-25';
+  if (s.includes('2025-26') || s.includes('2025-2026') || s.includes('25-26')) return '2025-26';
+  if (s.includes('2026-27') || s.includes('2026-2027') || s.includes('26-27')) return '2026-27';
+
+  // 2. Check 4-digit years
+  if (s.includes('2024')) return '2024-25';
+  if (s.includes('2025')) return '2025-26';
+  if (s.includes('2026')) return '2026-27';
+
+  // 3. Check year/semester descriptors
+  if (s.includes('3rd year') || s.includes('5th sem') || s.includes('6th sem')) return '2024-25';
+  if (s.includes('2nd year') || s.includes('2nd sem') || s.includes('3rd sem') || s.includes('4th sem')) return '2025-26';
+  if (s.includes('1st year') || s.includes('1st sem')) return '2026-27';
+
+  // 4. Check standalone 2-digit batch tokens (never matching after a hyphen like -26 or -25)
+  if (s.startsWith('24-') || /(?:^|[^0-9-])24(?:[^0-9-]|$)/.test(s)) return '2024-25';
+  if (s.startsWith('25-') || /(?:^|[^0-9-])25(?:[^0-9-]|$)/.test(s)) return '2025-26';
+  if (s.startsWith('26-') || /(?:^|[^0-9-])26(?:[^0-9-]|$)/.test(s)) return '2026-27';
+
+  if (/^\d{4}-\d{2}$/.test(s)) return s;
+  return '';
+}
+
+export function inferSessionFromStudent(
+  rawSession?: string | null,
+  matchedStudent?: Student,
+  rollNo?: string,
+  barcode?: string,
+  sheetName?: string,
+  defaultSession: string = '2026-27'
+): string {
+  const r = (rollNo || matchedStudent?.rollNo || '').toUpperCase();
+  const b = (barcode || matchedStudent?.samsRegNo || '').toUpperCase();
+
+  // 1. Authoritative roll number prefix (e.g. BA24-, BS25-, BC26-) or SAMS barcode prefix (24D, 25D, 26D)
+  if (r.includes('24-') || b.startsWith('24D')) return '2024-25';
+  if (r.includes('25-') || b.startsWith('25D')) return '2025-26';
+  if (r.includes('26-') || b.startsWith('26D')) return '2026-27';
+
+  // 2. Student master record academicYear
+  if (matchedStudent?.academicYear) {
+    const norm = normalizeSessionString(matchedStudent.academicYear);
+    if (norm) return norm;
+  }
+
+  // 3. Explicit rawSession string
+  if (rawSession) {
+    const norm = normalizeSessionString(rawSession);
+    if (norm) return norm;
+  }
+
+  // 4. Sheet name
+  if (sheetName) {
+    const sNorm = normalizeSessionString(sheetName);
+    if (sNorm) return sNorm;
+  }
+  return normalizeSessionString(defaultSession) || '2026-27';
+}
+
+/**
+ * Generates an approved NEP 2020 Subject Counselling package for a student
+ */
 export function generateDefaultCounselling(student: Student): StudentCounsellingRecord {
   const isAedp = Boolean(student.isAedp || student.department?.toLowerCase().includes('aedp'));
   const dept = (student.department || 'General').trim();
   const stream = student.stream || 'Arts';
-  const cleanSession = (student.academicYear || '2026-27').trim();
+  const cleanSession = inferSessionFromStudent(student.academicYear, student, student.rollNo, student.samsRegNo);
 
-  let regular: RegularHonoursCounselling | undefined = undefined;
-  let aedp: AedpCounselling | undefined = undefined;
+  const base: StudentCounsellingRecord = {
+    id: student.id,
+    studentId: student.id,
+    studentName: student.name,
+    rollNo: student.rollNo,
+    universityRollNo: student.universityRollNo || 'N/A',
+    samsRegNo: student.samsRegNo,
+    academicYear: cleanSession,
+    stream,
+    department: dept,
+    isAedp,
+    status: 'Pending',
+    allottedDate: '',
+    counselorName: 'Pending Admin/HOD Assignment',
+    remarks: 'Subject counselling not assigned. To be filled by Admin or HOD.',
+    updatedAt: new Date().toISOString(),
+  };
 
   if (isAedp) {
-    aedp = {
+    base.aedp = {
       major1: dept,
       major2: '',
       mdc1: '',
@@ -221,7 +306,7 @@ export function generateDefaultCounselling(student: Student): StudentCounselling
       sem5_6: { apprenticeship: 'APPRENTICESHIP' },
     };
   } else {
-    regular = {
+    base.regular = {
       major: dept,
       minor1: '',
       minor2: '',
@@ -232,37 +317,21 @@ export function generateDefaultCounselling(student: Student): StudentCounselling
       sec2: '',
       sec3: '',
       aec1: '',
-      aec2: '',
-      vac1: '',
-      vac2: '',
-      sem1: { major: dept, minor: '', mdc: '', aec: '', vac: '' },
-      sem2: { major: dept, minor: '', mdc: '', aec: '', sec: '' },
-      sem3: { major: dept, minor: '', mdc: '', vac: '' },
+      aec2: 'ENGLISH',
+      vac1: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT',
+      vac2: 'ETHICS AND VALUES',
+      vac3: 'UNDERSTANDING ODISHA',
+      vac4: 'Creative Writing',
+      sem1: { major: dept, minor: '', mdc: '', aec: '', vac: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT' },
+      sem2: { major: dept, minor: '', mdc: '', aec: 'ENGLISH', sec: '' },
+      sem3: { major: dept, minor: '', mdc: '', vac: 'ETHICS AND VALUES' },
       sem4: { major: dept, minor: '', activity: '' },
-      sem5: { major: dept, minor: '', sec: '', vac: '' },
-      sem6: { major: dept, minor: '', sec: '', vac: '' },
+      sem5: { major: dept, minor: '', sec: '', vac: 'UNDERSTANDING ODISHA' },
+      sem6: { major: dept, minor: '', sec: '', vac: 'Creative Writing' },
     };
   }
 
-  return {
-    id: student.id,
-    studentId: student.id,
-    studentName: student.name,
-    rollNo: student.rollNo,
-    universityRollNo: student.universityRollNo || 'N/A',
-    samsRegNo: student.samsRegNo,
-    academicYear: cleanSession,
-    stream,
-    department: dept,
-    isAedp,
-    status: 'Pending',
-    allottedDate: '',
-    counselorName: 'Pending Admin/HOD Assignment',
-    remarks: 'Subject counselling not assigned. To be filled by Admin or HOD.',
-    regular,
-    aedp,
-    updatedAt: new Date().toISOString(),
-  };
+  return base;
 }
 
 /**
@@ -363,15 +432,17 @@ export function generateSuggestedCounselling(student: Student): StudentCounselli
       sec2: '',
       sec3: '',
       aec1: '',
-      aec2: '',
-      vac1: '',
-      vac2: '',
-      sem1: { major: dept, minor: '', mdc: '', aec: '', vac: '' },
-      sem2: { major: dept, minor: '', mdc: '', aec: '', sec: '' },
-      sem3: { major: dept, minor: '', mdc: '', vac: '' },
+      aec2: 'ENGLISH',
+      vac1: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT',
+      vac2: 'ETHICS AND VALUES',
+      vac3: 'UNDERSTANDING ODISHA',
+      vac4: 'Creative Writing',
+      sem1: { major: dept, minor: '', mdc: '', aec: '', vac: 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT' },
+      sem2: { major: dept, minor: '', mdc: '', aec: 'ENGLISH', sec: '' },
+      sem3: { major: dept, minor: '', mdc: '', vac: 'ETHICS AND VALUES' },
       sem4: { major: dept, minor: '', activity: 'Internship / Community Engagement & Service / Field Work' },
-      sem5: { major: dept, minor: '', sec: '', vac: '' },
-      sem6: { major: dept, minor: '', sec: '', vac: '' },
+      sem5: { major: dept, minor: '', sec: '', vac: 'UNDERSTANDING ODISHA' },
+      sem6: { major: dept, minor: '', sec: '', vac: 'Creative Writing' },
     };
   }
 
@@ -479,9 +550,11 @@ export function exportCounsellingExcel(
         'SEC 2': reg.sec2,
         'SEC 3': reg.sec3,
         'AEC 1': reg.aec1,
-        'AEC 2': reg.aec2,
-        'VAC 1': reg.vac1,
-        'VAC 2': reg.vac2,
+        'AEC 2': reg.aec2 || 'ENGLISH',
+        'VAC 1': reg.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT',
+        'VAC 2': reg.vac2 || 'ETHICS AND VALUES',
+        'VAC 3': reg.vac3 || reg.sem5?.vac || 'UNDERSTANDING ODISHA',
+        'VAC 4': reg.vac4 || reg.sem6?.vac || 'Creative Writing',
         'Counselor': r.counselorName || 'Committee',
         'Allotment Date': r.allottedDate || '',
       };
@@ -526,9 +599,11 @@ export function exportCounsellingExcel(
         'SEC-2': reg.sec2,
         'SEC-3': reg.sec3,
         'AEC-1': reg.aec1,
-        'AEC-2': reg.aec2,
-        'VAC-1': reg.vac1,
-        'VAC-2': reg.vac2,
+        'AEC-2': reg.aec2 || 'ENGLISH',
+        'VAC-1': reg.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT',
+        'VAC-2': reg.vac2 || 'ETHICS AND VALUES',
+        'VAC-3': reg.vac3 || reg.sem5?.vac || 'UNDERSTANDING ODISHA',
+        'VAC-4': reg.vac4 || reg.sem6?.vac || 'Creative Writing',
         'Status': r.status,
       };
     });
@@ -665,10 +740,10 @@ export function extractSubjectAllocations(
         if (a1) result.push({ ...base, semester: 'Semester I', subjectName: a1, semesterTag: 'Sem I (AEC 1)' });
         if (a2) result.push({ ...base, semester: 'Semester II', subjectName: a2, semesterTag: 'Sem II (AEC 2)' });
       } else if (category === 'VAC') {
-        const v1 = reg.vac1 || reg.sem1?.vac;
-        const v2 = reg.vac2 || reg.sem3?.vac;
-        const v3 = reg.sem5?.vac || '';
-        const v4 = reg.sem6?.vac || '';
+        const v1 = reg.vac1 || reg.sem1?.vac || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
+        const v2 = reg.vac2 || reg.sem3?.vac || 'ETHICS AND VALUES';
+        const v3 = reg.vac3 || reg.sem5?.vac || 'UNDERSTANDING ODISHA';
+        const v4 = reg.vac4 || reg.sem6?.vac || 'Creative Writing';
         if (v1) result.push({ ...base, semester: 'Semester I', subjectName: v1, semesterTag: 'Sem I (VAC 1)' });
         if (v2) result.push({ ...base, semester: 'Semester III', subjectName: v2, semesterTag: 'Sem III (VAC 2)' });
         if (v3) result.push({ ...base, semester: 'Semester V', subjectName: v3, semesterTag: 'Sem V (VAC 3)' });
@@ -757,7 +832,7 @@ export interface CounsellingExcelImportResult {
   records: StudentCounsellingRecord[];
   matchedCount: number;
   unmatchedCount: number;
-  newStudentsToCreate: Omit<Student, 'id' | 'updatedAt'>[];
+  newStudentsToCreate: Student[];
   errors: string[];
   sheetNames: string[];
   detectedColumns?: Record<string, string>;
@@ -811,9 +886,11 @@ export function cleanSubjectValue(val: any): string {
 
   // Strip paper category prefixes if separated by colon or dash e.g.
   // "SEC -1 (Skill Enhancement Course) 2nd Sem: Communicative English"
+  // "SEC -1 (Skill Enhancement Course) 2nd Sem - Communicative English"
   // "Core-II (Minor-I): Political Science"
   // "Core-III (Minor-II): History"
-  s = s.replace(/^\s*(?:core|minor|sec|secc|mdc|aec|vac|major|skill\s*enhancement)[\w\s\-\.\(\)\/]{0,80}[:]\s*/i, '');
+  s = s.replace(/^\s*(?:core|minor|sec|secc|mdc|aec|vac|major|skill\s*enhancement)[\w\s\-\.\(\)\/]{0,80}\s*[:]\s*/i, '');
+  s = s.replace(/^\s*(?:core|minor|sec|secc|mdc|aec|vac|major|skill\s*enhancement)[\w\s\-\.\(\)\/]{0,80}\s*[-]\s*(?=[a-zA-Z])/i, '');
 
   // Or if separated by dash e.g. "Minor-I - Political Science" or "Core-II - Political Science"
   s = s.replace(/^\s*(?:core\s*[-:.\s]*(?:i|ii|iii|iv|1|2|3|4)\b(?:\s*\([^)]*\))?|minor\s*[-:.\s]*(?:i|ii|1|2)\b|sec(?:c)?\s*[-:.\s]*(?:i|ii|iii|1|2|3)\b(?:\s*\([^)]*\))?|mdc\s*[-:.\s]*(?:1|2|3)\b|aec\s*[-:.\s]*(?:1|2)\b|vac\s*[-:.\s]*(?:1|2|3|4)\b)\s*[-]\s*/i, '');
@@ -906,13 +983,47 @@ export function isMinor2Header(h: string): boolean {
 export function isSec1Header(h: string): boolean {
   const norm = normalizeHeaderStr(h).toLowerCase().replace(/[\u2010-\u2015\u2212]/g, '-');
   if (!isSecHeader(norm) && !norm.includes('skill enhancement')) return false;
+
+  // Immediate match for user's target: "SEC -1 (Skill Enhancement Course) 2nd Sem"
+  // and all direct SEC 1 / SEC -1 variations
+  if (
+    norm.includes('sec -1') ||
+    norm.includes('sec-1') ||
+    norm.includes('sec 1') ||
+    norm.includes('sec1') ||
+    norm.includes('sec - 1') ||
+    norm.includes('sec-i') ||
+    norm.includes('sec i') ||
+    norm.includes('secc 1') ||
+    norm.includes('secc-1') ||
+    norm.includes('secc1') ||
+    (norm.includes('skill enhancement') && (norm.includes(' 1') || norm.includes('-1') || norm.includes(' 2nd sem') || norm.includes('(2nd sem)')))
+  ) {
+    // Only reject if it explicitly names SEC 2 or SEC 3
+    if (
+      !/\bsec(?:c)?\s*[-:.\s]*(?:2|3|ii|iii)\b/i.test(norm)
+    ) {
+      return true;
+    }
+  }
+
   // Guard against sec 2 or sec 3 or 5th sem or 6th sem
-  if (/\b(?:sec(?:c)?\s*[-:.\s]*(?:ii|iii|2|3|2nd|3rd)|5th\s*sem|6th\s*sem)\b/i.test(norm)) {
+  if (
+    /\b(?:sec(?:c)?\s*[-:.\s]*(?:ii|iii|2|3)|5th\s*sem|6th\s*sem|sem(?:ester)?\s*[-:.\s]*(?:5|6|v|vi))\b/i.test(norm)
+  ) {
     return false;
   }
+
+  // 2nd Semester SEC is SEC 1 under NEP-2020
+  if (
+    (/\b2nd\s*sem\b/i.test(norm) || /\bsem(?:ester)?\s*[-:.\s]*(?:2|ii|2nd)\b/i.test(norm)) &&
+    (norm.includes('sec') || norm.includes('skill enhancement'))
+  ) {
+    return true;
+  }
+
   return (
-    /\b(?:sec(?:c)?\s*[-:.\s]*(?:i|1|1st)|skill\s*enhancement.*(?:1|i|1st|2nd\s*sem))\b/i.test(norm) ||
-    (/\b2nd\s*sem\b/i.test(norm) && (norm.includes('sec') || norm.includes('skill enhancement'))) ||
+    /\b(?:sec(?:c)?\s*[-:.\s]*(?:i|1|1st)\b|skill\s*enhancement.*(?:1|i|1st|2nd\s*sem))\b/i.test(norm) ||
     norm === 'sec 1' ||
     norm === 'sec-1' ||
     norm === 'sec-i' ||
@@ -925,7 +1036,13 @@ export function isSec2Header(h: string): boolean {
   const norm = normalizeHeaderStr(h).toLowerCase().replace(/[\u2010-\u2015\u2212]/g, '-');
   if (!isSecHeader(norm) && !norm.includes('skill enhancement')) return false;
   // Guard against sec 1 or sec 3 or 2nd sem or 6th sem
-  if (/\b(?:sec(?:c)?\s*[-:.\s]*(?:i|iii|1|3|1st|3rd)|2nd\s*sem|6th\s*sem)\b/i.test(norm)) {
+  if (
+    /\b(?:sec(?:c)?\s*[-:.\s]*(?:i|iii|1|3|1st|3rd)|2nd\s*sem|6th\s*sem|sem(?:ester)?\s*[-:.\s]*(?:2|6|ii|vi))\b/i.test(norm) ||
+    norm.includes('sec -1') ||
+    norm.includes('sec-1') ||
+    norm.includes('sec 1') ||
+    norm.includes('sec - 1')
+  ) {
     return false;
   }
   return (
@@ -943,7 +1060,17 @@ export function isSec3Header(h: string): boolean {
   const norm = normalizeHeaderStr(h).toLowerCase().replace(/[\u2010-\u2015\u2212]/g, '-');
   if (!isSecHeader(norm) && !norm.includes('skill enhancement')) return false;
   // Guard against sec 1 or sec 2 or 2nd sem or 5th sem
-  if (/\b(?:sec(?:c)?\s*[-:.\s]*(?:i|ii|1|2|1st|2nd)|2nd\s*sem|5th\s*sem)\b/i.test(norm)) {
+  if (
+    /\b(?:sec(?:c)?\s*[-:.\s]*(?:i|ii|1|2|1st|2nd)|2nd\s*sem|5th\s*sem|sem(?:ester)?\s*[-:.\s]*(?:2|5|ii|v))\b/i.test(norm) ||
+    norm.includes('sec -1') ||
+    norm.includes('sec-1') ||
+    norm.includes('sec 1') ||
+    norm.includes('sec - 1') ||
+    norm.includes('sec -2') ||
+    norm.includes('sec-2') ||
+    norm.includes('sec 2') ||
+    norm.includes('sec - 2')
+  ) {
     return false;
   }
   return (
@@ -976,9 +1103,9 @@ export function extractCategoryPaperIndex(
 
   if (category === 'sec') {
     if (!isSecHeader(norm) && !norm.includes('skill enhancement')) return null;
-    if (isSec3Header(norm)) return 3;
-    if (isSec2Header(norm)) return 2;
     if (isSec1Header(norm)) return 1;
+    if (isSec2Header(norm)) return 2;
+    if (isSec3Header(norm)) return 3;
     return extractPaperIndex(cleaned);
   }
 
@@ -1193,7 +1320,8 @@ export async function parseCounsellingExcelFile(
         });
 
         const parsedMap = new Map<string, StudentCounsellingRecord>();
-        const newStudentsToCreate: Omit<Student, 'id' | 'updatedAt'>[] = [];
+        const newStudentsToCreate: Student[] = [];
+        const unmatchedSeenSet = new Set<string>();
         let matchedCount = 0;
         let unmatchedCount = 0;
         let lastDetectedColumns: Record<string, string> = {};
@@ -1295,27 +1423,37 @@ export async function parseCounsellingExcelFile(
           // Carry forward category group headers in headerRowIdx if a sub-header row exists below
           // (Handles unmerged parent headers where Row 1 has "Minor" in col K, "" in col K+1, and Row 2 has "1" in col K, "2" in col K+1)
           const topRowCells: string[] = [];
+          const subHeaders: string[] = [];
           let lastGroupHeader = '';
           for (let c = 0; c < maxCols; c++) {
             const rawTop = normalizeHeaderStr(cleanCellStr(rows[headerRowIdx]?.[c]));
             const rawSub = hasSubHeaderBelow ? normalizeHeaderStr(cleanCellStr(rows[headerRowIdx + 1]?.[c])) : '';
+            subHeaders[c] = rawSub.toLowerCase();
+            const subAlreadyHasCategory =
+              isMinorHeader(rawSub) ||
+              isSecHeader(rawSub) ||
+              isMdcHeader(rawSub) ||
+              isAecHeader(rawSub) ||
+              isVacHeader(rawSub) ||
+              /\b(?:major|core|skill\s*enhancement)\b/i.test(rawSub);
+
             if (rawTop) {
               topRowCells[c] = rawTop;
               const lowTop = rawTop.toLowerCase();
+              // Do NOT carry forward 'sem' group headers across unmerged columns, as that pollutes 2nd Sem SEC-1 with 5th Sem / 6th Sem!
               if (
                 isMinorHeader(lowTop) ||
                 isSecHeader(lowTop) ||
                 isMdcHeader(lowTop) ||
                 isAecHeader(lowTop) ||
                 isVacHeader(lowTop) ||
-                lowTop.includes('major') ||
-                lowTop.includes('sem')
+                lowTop.includes('major')
               ) {
                 lastGroupHeader = rawTop;
               } else {
                 lastGroupHeader = '';
               }
-            } else if (hasSubHeaderBelow && rawSub && lastGroupHeader) {
+            } else if (hasSubHeaderBelow && rawSub && lastGroupHeader && !subAlreadyHasCategory) {
               topRowCells[c] = lastGroupHeader;
             } else {
               topRowCells[c] = '';
@@ -1358,12 +1496,20 @@ export async function parseCounsellingExcelFile(
               isVacHeader(mainH) ||
               /\b(?:major|core|roll|barcode|sams|name|stream|session)\b/i.test(mainH);
 
+            const subAlreadyHasCategory =
+              isMinorHeader(subH) ||
+              isSecHeader(subH) ||
+              isMdcHeader(subH) ||
+              isAecHeader(subH) ||
+              isVacHeader(subH) ||
+              /\b(?:major|core|skill\s*enhancement)\b/i.test(subH);
+
             const parts: string[] = [];
-            // Only prepend parent row above if the main header doesn't already specify its own category
-            if (pAbove && !mainAlreadyHasCategory && !mainH.toLowerCase().includes(pAbove.toLowerCase())) {
+            // Only prepend parent row above if neither mainH nor subH already specifies its own category
+            if (pAbove && !mainAlreadyHasCategory && !subAlreadyHasCategory && !mainH.toLowerCase().includes(pAbove.toLowerCase())) {
               parts.push(pAbove);
             }
-            if (mainH) {
+            if (mainH && !(subAlreadyHasCategory && /\bsem\b/i.test(mainH) && /\bsem\b/i.test(subH))) {
               parts.push(mainH);
             }
             if (subH && subH.toLowerCase() !== mainH.toLowerCase()) {
@@ -1385,13 +1531,16 @@ export async function parseCounsellingExcelFile(
             }
           }
 
-          // Map column indices: check primary header cell first, then combined header cell
+          // Map column indices: check primary header cell, sub-header cell, and combined header cell
           const findCol = (predicates: ((h: string, idx: number) => boolean)[], excludeIndices: number[] = []): number => {
             for (const pred of predicates) {
-              // First check primaryHeaders (when there is no sub-header row that refines paper index)
-              if (!hasSubHeaderBelow) {
-                const pIdx = primaryHeaders.findIndex((h, i) => h && !excludeIndices.includes(i) && pred(h, i));
-                if (pIdx !== -1) return pIdx;
+              const pIdx = primaryHeaders.findIndex((h, i) => h && !excludeIndices.includes(i) && pred(h, i));
+              if (pIdx !== -1 && (!hasSubHeaderBelow || !subHeaders[pIdx] || pred(rawHeaders[pIdx], pIdx) || pred(subHeaders[pIdx], pIdx))) {
+                return pIdx;
+              }
+              if (hasSubHeaderBelow) {
+                const sIdx = subHeaders.findIndex((h, i) => h && !excludeIndices.includes(i) && pred(h, i));
+                if (sIdx !== -1) return sIdx;
               }
               const idx = rawHeaders.findIndex((h, i) => h && !excludeIndices.includes(i) && pred(h, i));
               if (idx !== -1) return idx;
@@ -1577,7 +1726,37 @@ export async function parseCounsellingExcelFile(
           }
 
           // --- SEC 1 ("SEC -1 (Skill Enhancement Course) 2nd Sem"), SEC 2 ("SEC -2 ... 5th Sem"), SEC 3 ("SEC -3 ... 6th Sem") DETECTION ---
-          let colSec1 = findCol([
+          // Also scan top header rows directly for exact cell matches in case multi-row headers placed "SEC -1 (Skill Enhancement Course) 2nd Sem" in any header row
+          let directSec1Col = -1;
+          let directSec2Col = -1;
+          let directSec3Col = -1;
+          const headerScanLimit = Math.min(rows.length, Math.max(dataStartRowIdx, headerRowIdx + 2, 5));
+          for (let r = 0; r < headerScanLimit; r++) {
+            const rowArr = rows[r];
+            if (!Array.isArray(rowArr)) continue;
+            for (let c = 0; c < maxCols; c++) {
+              const cellText = normalizeHeaderStr(cleanCellStr(rowArr[c]));
+              if (!cellText) continue;
+              if (directSec1Col === -1 && isSec1Header(cellText)) directSec1Col = c;
+              if (directSec2Col === -1 && isSec2Header(cellText)) directSec2Col = c;
+              if (directSec3Col === -1 && isSec3Header(cellText)) directSec3Col = c;
+            }
+          }
+
+          let colSec1 = directSec1Col !== -1 ? directSec1Col : findCol([
+            // 0. Explicit top priority match for exact user header "SEC -1 (Skill Enhancement Course) 2nd Sem"
+            (h) => {
+              const low = normalizeHeaderStr(h).toLowerCase().replace(/[\u2010-\u2015\u2212]/g, '-');
+              return (
+                (low.includes('sec -1') || low.includes('sec-1') || low.includes('sec 1') || low.includes('sec - 1') || low.includes('sec1')) &&
+                !low.includes('sec 2') &&
+                !low.includes('sec-2') &&
+                !low.includes('sec -2') &&
+                !low.includes('sec 3') &&
+                !low.includes('sec-3') &&
+                !low.includes('sec -3')
+              );
+            },
             // 1. Direct match for exact user header "SEC -1 (Skill Enhancement Course) 2nd Sem" or "SEC -1" / "SEC-1" / "SEC 1" / "SEC-I"
             (h) => isSec1Header(h),
             // 2. Category paper index 1
@@ -1588,14 +1767,41 @@ export async function parseCounsellingExcelFile(
               !isSec2Header(h) &&
               !isSec3Header(h) &&
               (/\b(2nd|1st)\s*sem/i.test(h) || /\bsem(?:ester)?\s*[-:.\s]*(2|ii|2nd|1|i|1st)\b/i.test(h)),
-            // 4. Bare "sec" header
-            (h) => (h === 'sec' || h === 'secc' || h === 'sec subject' || h === 'skill enhancement course') && !isSec2Header(h) && !isSec3Header(h),
+            // 4. Bare "sec" header (only when the sheet isn't a secondary single-subject sheet after master records were already parsed)
+            (h) =>
+              parsedMap.size === 0 &&
+              (h === 'sec' || h === 'secc' || h === 'sec subject' || h === 'skill enhancement course') &&
+              !isSec2Header(h) &&
+              !isSec3Header(h),
           ]);
-          if (colSec1 === -1 && allSecCols.length >= 1) {
-            colSec1 = allSecCols[0];
+
+          const hasExplicitSec1Col = colSec1 !== -1 && (
+            directSec1Col !== -1 ||
+            isSec1Header(rawHeaders[colSec1] || '') ||
+            isSec1Header(primaryHeaders[colSec1] || '') ||
+            (hasSubHeaderBelow && isSec1Header(subHeaders[colSec1] || ''))
+          );
+
+          // CRITICAL GUARD: Never allow colSec1 fallback to pick a SEC 2 (5th Sem) or SEC 3 (6th Sem) column!
+          if (colSec1 === -1 && allSecCols.length >= 1 && parsedMap.size === 0) {
+            const safeSec1Candidate = allSecCols.find((idx) => {
+              const h = rawHeaders[idx] || '';
+              return (
+                !isSec2Header(h) &&
+                !isSec3Header(h) &&
+                idx !== directSec2Col &&
+                idx !== directSec3Col &&
+                extractCategoryPaperIndex(h, 'sec') !== 2 &&
+                extractCategoryPaperIndex(h, 'sec') !== 3 &&
+                !/\b(5th|6th)\s*sem/i.test(h)
+              );
+            });
+            if (safeSec1Candidate !== undefined) {
+              colSec1 = safeSec1Candidate;
+            }
           }
 
-          let colSec2 = findCol(
+          let colSec2 = (directSec2Col !== -1 && directSec2Col !== colSec1) ? directSec2Col : findCol(
             [
               // 1. Direct match for exact user header "SEC -2 (Skill Enhancement Course) 5th Sem" or "SEC -2" / "SEC-2" / "SEC 2" / "SEC-II"
               (h) => isSec2Header(h),
@@ -1611,7 +1817,7 @@ export async function parseCounsellingExcelFile(
             colSec1 !== -1 ? [colSec1] : []
           );
           if (colSec2 === -1 && allSecCols.length >= 2) {
-            const secondSec = allSecCols.find((idx) => idx !== colSec1);
+            const secondSec = allSecCols.find((idx) => idx !== colSec1 && !isSec3Header(rawHeaders[idx] || '') && idx !== directSec3Col);
             if (secondSec !== undefined) colSec2 = secondSec;
           }
           if (colSec2 === -1 && colSec1 !== -1 && rawHeaders[colSec1 + 1] === '') {
@@ -1621,7 +1827,7 @@ export async function parseCounsellingExcelFile(
             }
           }
 
-          let colSec3 = findCol(
+          let colSec3 = (directSec3Col !== -1 && directSec3Col !== colSec1 && directSec3Col !== colSec2) ? directSec3Col : findCol(
             [
               // 1. Direct match for exact user header "SEC -3 (Skill Enhancement Course) 6th Sem" or "SEC -3" / "SEC-3" / "SEC 3" / "SEC-III"
               (h) => isSec3Header(h),
@@ -1741,8 +1947,7 @@ export async function parseCounsellingExcelFile(
             return found ? found.label : `Col ${idx + 1}`;
           };
 
-          lastHeaders = displayHeaders;
-          lastColIndices = {
+          const currentSheetDetectedCols = {
             roll: colRoll,
             barcode: colBarcode,
             name: colName,
@@ -1760,21 +1965,29 @@ export async function parseCounsellingExcelFile(
             vac1: colVac1,
             vac2: colVac2,
           };
-          lastDetectedColumns = {
-            'Major': getColName(finalColMajor1),
-            'Minor 1': getColName(colMinor1),
-            'Minor 2': getColName(colMinor2),
-            'MDC 1': getColName(colMdc1),
-            'MDC 2': getColName(colMdc2),
-            'MDC 3': getColName(colMdc3),
-            'SEC 1': getColName(colSec1),
-            'SEC 2': getColName(colSec2),
-            'SEC 3': getColName(colSec3),
-            'AEC 1': getColName(colAec1),
-            'AEC 2': getColName(colAec2),
-            'VAC 1': getColName(colVac1),
-            'VAC 2': getColName(colVac2),
-          };
+          const currentFoundCount = Object.values(currentSheetDetectedCols).filter((idx) => idx !== -1).length;
+          const prevFoundCount = Object.values(lastColIndices).filter((idx) => idx !== undefined && idx !== -1).length;
+
+          // Keep the primary master sheet's detected columns for UI preview if a secondary sheet has fewer columns
+          if (lastHeaders.length === 0 || currentFoundCount >= prevFoundCount) {
+            lastHeaders = displayHeaders;
+            lastColIndices = currentSheetDetectedCols;
+            lastDetectedColumns = {
+              'Major': getColName(finalColMajor1),
+              'Minor 1': getColName(colMinor1),
+              'Minor 2': getColName(colMinor2),
+              'MDC 1': getColName(colMdc1),
+              'MDC 2': getColName(colMdc2),
+              'MDC 3': getColName(colMdc3),
+              'SEC 1': getColName(colSec1),
+              'SEC 2': getColName(colSec2),
+              'SEC 3': getColName(colSec3),
+              'AEC 1': getColName(colAec1),
+              'AEC 2': getColName(colAec2),
+              'VAC 1': getColName(colVac1),
+              'VAC 2': getColName(colVac2),
+            };
+          }
 
           const sheetIsAedp = sheetName.toLowerCase().includes('aedp');
 
@@ -1791,13 +2004,18 @@ export async function parseCounsellingExcelFile(
             const rawCourseType = colCourseType !== -1 ? cleanCellStr(row[colCourseType]) : '';
             const rawMajor1 = finalColMajor1 !== -1 ? cleanCellStr(row[finalColMajor1]) : '';
 
-            // Skip completely empty rows, repeated header rows, or summary rows
+            // Skip completely empty rows, repeated header rows, or summary rows (e.g. "712 students")
             if (!rawRoll && !rawBarcode && !rawName && !rawUnivRoll) continue;
             const lowName = rawName.toLowerCase();
             const lowRoll = rawRoll.toLowerCase();
             if (
               lowName.startsWith('total') ||
               lowRoll.startsWith('total') ||
+              lowName.includes('students') ||
+              lowRoll.includes('student') ||
+              /^\d+\s*students?\b/i.test(lowRoll) ||
+              /^\d+\s*students?\b/i.test(lowName) ||
+              (!rawName && !rawBarcode && !/^[a-z]{2}\d{2}/i.test(rawRoll.replace(/\s+/g, ''))) ||
               lowName === 'student name' ||
               lowName === 'name' ||
               lowRoll === 'roll number' ||
@@ -1806,6 +2024,16 @@ export async function parseCounsellingExcelFile(
             ) {
               continue;
             }
+
+            // Determine row's target session BEFORE name fallback matching so we never hijack a namesake from another batch
+            const rowExpectedSession = inferSessionFromStudent(
+              rawSession,
+              undefined,
+              rawRoll,
+              rawBarcode,
+              sheetName,
+              defaultSession
+            );
 
             // Match student from existingStudents
             let matchedStudent: Student | undefined;
@@ -1830,60 +2058,79 @@ export async function parseCounsellingExcelFile(
               const nKey = normalizeLookupKey(rawName);
               const dKey = normalizeLookupKey(rawMajor1);
               if (dKey && byNameDept.has(`${nKey}_${dKey}`)) {
-                matchedStudent = byNameDept.get(`${nKey}_${dKey}`);
-              } else if (byName.has(nKey)) {
-                const candidates = byName.get(nKey)!;
-                if (candidates.length === 1) {
-                  matchedStudent = candidates[0];
-                } else if (rawMajor1) {
+                const cand = byNameDept.get(`${nKey}_${dKey}`)!;
+                const candSession = normalizeSessionString(cand.academicYear) || '2026-27';
+                // Only match by name if the candidate belongs to the same admission batch (or if no roll/barcode batch conflict exists)
+                if (candSession === rowExpectedSession) {
+                  matchedStudent = cand;
+                }
+              }
+              if (!matchedStudent && byName.has(nKey)) {
+                const sameSessionCandidates = byName
+                  .get(nKey)!
+                  .filter((c) => (normalizeSessionString(c.academicYear) || '2026-27') === rowExpectedSession);
+                if (sameSessionCandidates.length === 1) {
+                  matchedStudent = sameSessionCandidates[0];
+                } else if (sameSessionCandidates.length > 1 && rawMajor1) {
                   matchedStudent =
-                    candidates.find(
+                    sameSessionCandidates.find(
                       (c) =>
                         c.department.toLowerCase().includes(rawMajor1.toLowerCase()) ||
                         rawMajor1.toLowerCase().includes(c.department.toLowerCase())
-                    ) || candidates[candSessionIndex(candidates, defaultSession)];
-                } else {
-                  matchedStudent = candidates[candSessionIndex(candidates, defaultSession)];
+                    ) || sameSessionCandidates[0];
                 }
               }
             }
 
-            const studentId = matchedStudent
-              ? matchedStudent.id
-              : `stu_counselling_${normalizeLookupKey(rawRoll || rawBarcode || rawName)}_${rIdx}`;
+            const cleanSession = inferSessionFromStudent(
+              rawSession,
+              matchedStudent,
+              rawRoll,
+              rawBarcode,
+              sheetName,
+              defaultSession
+            );
+            const cleanSams = (rawBarcode || '').trim();
+            const cleanRoll = (rawRoll || '').trim();
+            const cleanName = (rawName || '').trim();
 
-            if (matchedStudent) {
-              matchedCount++;
-            } else {
-              unmatchedCount++;
+            // STRICT MASTER DATABASE RULE:
+            // If a student in the uploaded Subject Counselling Excel is NOT in the student master database,
+            // do NOT create or save a Subject Counselling record for them.
+            if (!matchedStudent) {
+              const unmatchedKey =
+                cleanSams && cleanSams.toUpperCase() !== 'NA'
+                  ? `sams_${cleanSession}_${normalizeLookupKey(cleanSams)}`
+                  : cleanRoll && cleanRoll.toUpperCase() !== 'NA'
+                  ? `roll_${cleanSession}_${normalizeRollLookupKey(cleanRoll)}`
+                  : `name_${cleanSession}_${normalizeLookupKey(cleanName) || rIdx}`;
+              if (!unmatchedSeenSet.has(unmatchedKey)) {
+                unmatchedSeenSet.add(unmatchedKey);
+                unmatchedCount++;
+              }
+              continue;
             }
 
-            // Determine base record to merge with
+            const studentId = matchedStudent.id;
+            const alreadyInWorkbook = parsedMap.has(studentId);
+            if (!alreadyInWorkbook) {
+              matchedCount++;
+            }
+
+            // Determine base record to merge with (always anchored to the master student record)
             const baseRecord: StudentCounsellingRecord =
               parsedMap.get(studentId) ||
               existingMap[studentId] ||
-              (matchedStudent
-                ? generateDefaultCounselling(matchedStudent)
-                : {
-                    id: studentId,
-                    studentId,
-                    studentName: rawName || 'Unknown Student',
-                    rollNo: rawRoll || 'N/A',
-                    universityRollNo: rawUnivRoll || 'N/A',
-                    samsRegNo: rawBarcode || 'N/A',
-                    academicYear: rawSession || defaultSession,
-                    stream: (rawStream as StreamType) || 'Arts',
-                    department: rawMajor1 || 'General',
-                    isAedp:
-                      sheetIsAedp ||
-                      rawCourseType.toLowerCase().includes('aedp') ||
-                      rawMajor1.toLowerCase().includes('aedp'),
-                    status: 'Allotted',
-                    allottedDate: new Date().toISOString().slice(0, 10),
-                    counselorName: 'Admin Excel Import',
-                    remarks: 'Imported via Subject Counselling Excel',
-                    updatedAt: new Date().toISOString(),
-                  });
+              generateDefaultCounselling(matchedStudent);
+
+            baseRecord.id = matchedStudent.id;
+            baseRecord.studentId = matchedStudent.id;
+            baseRecord.studentName = matchedStudent.name;
+            baseRecord.rollNo = matchedStudent.rollNo;
+            baseRecord.samsRegNo = matchedStudent.samsRegNo;
+            baseRecord.stream = matchedStudent.stream;
+            baseRecord.department = matchedStudent.department;
+            baseRecord.academicYear = cleanSession;
 
             const m1Val = finalColMajor1 !== -1 ? cleanSubjectValue(row[finalColMajor1]) : '';
             const m2Val = colMajor2 !== -1 ? cleanSubjectValue(row[colMajor2]) : '';
@@ -1966,8 +2213,8 @@ export async function parseCounsellingExcelFile(
               const nextMdc2 = mdc2Val || prevAedp.mdc2;
               const nextAec1 = aec1Val || prevAedp.aec1;
               const nextAec2 = aec2Val || prevAedp.aec2;
-              const nextSec1 = sec1Val || prevAedp.sec1;
-              const nextSec2 = sec2Val || prevAedp.sec2;
+              const nextSec1 = (!alreadyInWorkbook && colSec1 !== -1) ? sec1Val : (sec1Val || prevAedp.sec1);
+              const nextSec2 = (!alreadyInWorkbook && colSec2 !== -1) ? sec2Val : (sec2Val || prevAedp.sec2);
               const nextVac1 = vac1Val || prevAedp.vac1;
               const nextVac2 = vac2Val || prevAedp.vac2;
 
@@ -2012,15 +2259,43 @@ export async function parseCounsellingExcelFile(
               const nextMdc1 = mdc1Val || prevReg.mdc1;
               const nextMdc2 = mdc2Val || prevReg.mdc2;
               const nextMdc3 = mdc3Val || prevReg.mdc3;
-              const nextSec1 = sec1Val || prevReg.sec1;
-              const nextSec2 = sec2Val || prevReg.sec2;
-              const nextSec3 = sec3Val || prevReg.sec3;
+              const nextSec2 = (!alreadyInWorkbook && colSec2 !== -1) ? sec2Val : (sec2Val || prevReg.sec2);
+              const nextSec3 = (!alreadyInWorkbook && colSec3 !== -1) ? sec3Val : (sec3Val || prevReg.sec3);
+
+              // Sanitize any previously corrupted sec1 from existingMap where sec1 was overwritten with sec2 ("YEL")
+              const cleanPrevSec1 =
+                !alreadyInWorkbook &&
+                prevReg.sec1 &&
+                nextSec2 &&
+                prevReg.sec1.toUpperCase() === nextSec2.toUpperCase() &&
+                nextMajor.toLowerCase() !== 'geography'
+                  ? ''
+                  : prevReg.sec1;
+
+              let nextSec1 = cleanPrevSec1;
+              if (!alreadyInWorkbook) {
+                // On the primary sheet for this student: if the sheet has a SEC 1 column, use its exact value (even if blank)
+                if (colSec1 !== -1) {
+                  nextSec1 = sec1Val;
+                }
+              } else {
+                // On a subsequent sheet in the same workbook: only allow updating sec1 if the sheet has an EXPLICIT SEC 1 column
+                // and it's not duplicating SEC 2
+                if (
+                  hasExplicitSec1Col &&
+                  sec1Val &&
+                  (!nextSec2 || sec1Val.toUpperCase() !== nextSec2.toUpperCase() || nextMajor.toLowerCase() === 'geography')
+                ) {
+                  nextSec1 = sec1Val;
+                }
+              }
+
               const nextAec1 = aec1Val || prevReg.aec1;
-              const nextAec2 = aec2Val || prevReg.aec2;
-              const nextVac1 = vac1Val || prevReg.vac1;
-              const nextVac2 = vac2Val || prevReg.vac2;
-              const nextVac3 = vac3Val || prevReg.sem5?.vac || '';
-              const nextVac4 = vac4Val || prevReg.sem6?.vac || '';
+              const nextAec2 = aec2Val || prevReg.aec2 || 'ENGLISH';
+              const nextVac1 = vac1Val || prevReg.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
+              const nextVac2 = vac2Val || prevReg.vac2 || 'ETHICS AND VALUES';
+              const nextVac3 = vac3Val || prevReg.vac3 || prevReg.sem5?.vac || 'UNDERSTANDING ODISHA';
+              const nextVac4 = vac4Val || prevReg.vac4 || prevReg.sem6?.vac || 'Creative Writing';
 
               baseRecord.isAedp = false;
               baseRecord.regular = {
@@ -2037,6 +2312,8 @@ export async function parseCounsellingExcelFile(
                 aec2: nextAec2,
                 vac1: nextVac1,
                 vac2: nextVac2,
+                vac3: nextVac3,
+                vac4: nextVac4,
                 sem1: { major: nextMajor, minor: nextMinor1, mdc: nextMdc1, aec: nextAec1, vac: nextVac1 },
                 sem2: { major: nextMajor, minor: nextMinor2, mdc: nextMdc2, aec: nextAec2, sec: nextSec1 },
                 sem3: { major: nextMajor, minor: nextMinor1, mdc: nextMdc3, vac: nextVac2 },
@@ -2049,9 +2326,7 @@ export async function parseCounsellingExcelFile(
             if (rawUnivRoll) {
               baseRecord.universityRollNo = rawUnivRoll;
             }
-            if (rawSession) {
-              baseRecord.academicYear = rawSession;
-            }
+            baseRecord.academicYear = cleanSession;
             baseRecord.status = 'Allotted';
             baseRecord.allottedDate = new Date().toISOString().slice(0, 10);
             baseRecord.updatedAt = new Date().toISOString();
@@ -2059,6 +2334,16 @@ export async function parseCounsellingExcelFile(
             parsedMap.set(studentId, baseRecord);
           }
         }
+
+        // For any student in the master database belonging to the target admission batch who was NOT in the uploaded Excel sheet,
+        // ensure a blank subject counselling record exists for them.
+        const targetBatchNorm = normalizeSessionString(defaultSession) || '2026-27';
+        existingStudents.forEach((stu) => {
+          const stuSession = inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo);
+          if (stuSession === targetBatchNorm && !parsedMap.has(stu.id)) {
+            parsedMap.set(stu.id, generateDefaultCounselling(stu));
+          }
+        });
 
         const finalRecords = Array.from(parsedMap.values());
         resolve({

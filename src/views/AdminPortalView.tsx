@@ -133,7 +133,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
 
   // Subject Counselling Admin Tab State
   const [counsellingImportSession, setCounsellingImportSession] = useState<string>('2026-27');
-  const [counsellingReplaceMode, setCounsellingReplaceMode] = useState<boolean>(false);
+  const [counsellingReplaceMode, setCounsellingReplaceMode] = useState<'merge' | 'replace-batch' | 'replace-all'>('merge');
   const [isCounsellingImporting, setIsCounsellingImporting] = useState<boolean>(false);
   const [counsellingImportStatus, setCounsellingImportStatus] = useState<string>('');
   const [counsellingImportResult, setCounsellingImportResult] = useState<CounsellingExcelImportResult | null>(null);
@@ -586,6 +586,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     const sKey = normalizeLookupKey(student.samsRegNo);
     const uKey = normalizeLookupKey(student.universityRollNo);
     const nKey = normalizeLookupKey(student.name);
+    const stuSession = student.academicYear || '2026-27';
 
     for (const rec of Object.values(counsellingMap)) {
       if (!rec) continue;
@@ -594,7 +595,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       if (rNorm && normalizeRollLookupKey(rec.rollNo) === rNorm) return rec;
       if (sKey && normalizeLookupKey(rec.samsRegNo) === sKey) return rec;
       if (uKey && uKey !== 'na' && normalizeLookupKey(rec.universityRollNo) === uKey) return rec;
-      if (nKey && normalizeLookupKey(rec.studentName) === nKey) return rec;
+      if (nKey && (rec.academicYear || '2026-27') === stuSession && normalizeLookupKey(rec.studentName) === nKey) return rec;
     }
     return generateDefaultCounselling(student);
   };
@@ -618,13 +619,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       }
 
       if (res.success && res.records.length > 0) {
-        bulkSaveCounsellingRecords(res.records, counsellingReplaceMode);
+        bulkSaveCounsellingRecords(res.records, counsellingReplaceMode, counsellingImportSession);
         showToast(
           'success',
-          `Successfully updated subject counselling for ${res.records.length} students (${res.matchedCount} matched in DB) from "${file.name}"! Reflected live in Menu -> Subject Counselling.`
+          `Successfully updated subject counselling for ${res.matchedCount} matched students from "${file.name}"! Reflected live in Menu -> Subject Counselling.`
         );
         setCounsellingImportStatus(
-          `Updated ${res.records.length} student subject counselling records (${res.matchedCount} matched to Student DB) across ${res.sheetNames.length} sheet(s).`
+          `Updated subject counselling for ${res.matchedCount} matched students in batch ${counsellingImportSession}${res.unmatchedCount > 0 ? ` (${res.unmatchedCount} names not in student database were skipped from master DB)` : ''}.`
         );
       } else {
         const errMsg = res.errors?.[0] || 'Could not extract subject counselling records from the uploaded file.';
@@ -659,13 +660,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       setCounsellingImportResult(res);
 
       if (res.success && res.records.length > 0) {
-        bulkSaveCounsellingRecords(res.records, counsellingReplaceMode);
+        bulkSaveCounsellingRecords(res.records, counsellingReplaceMode, counsellingImportSession);
         showToast(
           'success',
-          `Re-imported ${res.records.length} student subject records using updated column mappings!`
+          `Re-imported subject counselling for ${res.matchedCount} matched students in batch ${counsellingImportSession}!`
         );
         setCounsellingImportStatus(
-          `Re-applied column mappings and updated ${res.records.length} student subject counselling records (${res.matchedCount} matched to Student DB).`
+          `Re-applied column mappings for ${res.matchedCount} matched students in batch ${counsellingImportSession}${res.unmatchedCount > 0 ? ` (${res.unmatchedCount} names not in student database were skipped from master DB)` : ''}.`
         );
       }
     } catch (err: any) {
@@ -1980,40 +1981,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       {/* ========================================================= */}
       {activeAdminTab === 'subject-counselling' && (() => {
         const q = counsellingAdminSearch.trim().toLowerCase();
-        const activeIds = new Set(activeStudents.map((s) => s.id));
-        const activeRolls = new Set(activeStudents.map((s) => normalizeRollLookupKey(s.rollNo)));
-
-        const extraStudentsFromCounselling: Student[] = [];
-        Object.values(counsellingMap).forEach((rec) => {
-          if (!rec) return;
-          const recNormRoll = normalizeRollLookupKey(rec.rollNo);
-          const recId = rec.studentId || rec.id;
-          if (!activeIds.has(recId) && !activeIds.has(rec.id) && (!recNormRoll || !activeRolls.has(recNormRoll))) {
-            extraStudentsFromCounselling.push({
-              id: recId,
-              name: rec.studentName || 'Student',
-              rollNo: rec.rollNo || 'N/A',
-              universityRollNo: rec.universityRollNo || 'N/A',
-              samsRegNo: rec.samsRegNo || 'N/A',
-              academicYear: rec.academicYear || '2026-27',
-              stream: rec.stream || 'Arts',
-              department: rec.department || (rec.regular?.major) || 'General',
-              isAedp: rec.isAedp,
-              status: 'Admitted',
-              parentName: '',
-              motherName: '',
-              mobileNumber: '',
-              gender: 'Other',
-              category: 'GEN',
-              marksPercentage: 0,
-              admissionDate: rec.allottedDate || new Date().toISOString().slice(0, 10),
-              updatedAt: rec.updatedAt,
-            });
-          }
-        });
-
-        const allCounsellingPool = [...activeStudents, ...extraStudentsFromCounselling];
-        const filteredCounsellingStudents = allCounsellingPool.filter((s) => {
+        const filteredCounsellingStudents = activeStudents.filter((s) => {
           const matchesSession =
             counsellingAdminSessionFilter === 'ALL' ||
             (s.academicYear || '2026-27') === counsellingAdminSessionFilter;
@@ -2130,12 +2098,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                         2. Subject Update Mode:
                       </label>
                       <select
-                        value={counsellingReplaceMode ? 'replace' : 'merge'}
-                        onChange={(e) => setCounsellingReplaceMode(e.target.value === 'replace')}
+                        value={counsellingReplaceMode}
+                        onChange={(e) => setCounsellingReplaceMode(e.target.value as 'merge' | 'replace-batch' | 'replace-all')}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-semibold focus:outline-none focus:border-amber-500"
                       >
-                        <option value="merge">Update & Merge Matched Students (Recommended)</option>
-                        <option value="replace">Replace All Existing Counselling Records</option>
+                        <option value="merge">Update & Merge Matched Students in this Batch (Recommended)</option>
+                        <option value="replace-batch">Replace Records for Selected Batch ({counsellingImportSession})</option>
+                        <option value="replace-all">Replace Entire Counselling Database (All Batches)</option>
                       </select>
                     </div>
                   </div>
@@ -2199,7 +2168,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
                       <span className="text-emerald-300 font-bold block">SEC 1, SEC 2 & SEC 3:</span>
                       <span className="text-slate-400 text-[10px]">
-                        SEC -1 (2nd Sem) → SEC 1, SEC -2 (5th Sem) → SEC 2, SEC -3 (6th Sem) → SEC 3
+                        SEC -1 (Skill Enhancement Course) 2nd Sem → SEC 1, SEC -2 (5th Sem) → SEC 2, SEC -3 (6th Sem) → SEC 3
                       </span>
                     </div>
                     <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 col-span-2">
@@ -2260,7 +2229,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                           { key: 'major1', label: 'Major / Honours', highlight: false },
                           { key: 'minor1', label: 'Minor 1', highlight: true },
                           { key: 'minor2', label: 'Minor 2', highlight: true },
-                          { key: 'sec1', label: 'SEC 1 (Sem II)', highlight: true },
+                          { key: 'sec1', label: 'SEC 1 (SEC -1 2nd Sem)', highlight: true },
                           { key: 'sec2', label: 'SEC 2 (Sem V)', highlight: true },
                           { key: 'sec3', label: 'SEC 3 (Sem VI)', highlight: true },
                           { key: 'mdc1', label: 'MDC 1', highlight: false },

@@ -24,7 +24,12 @@ import {
   DEFAULT_FAQS,
   generate1100Students,
 } from '../lib/defaultData';
-import { generateDefaultCounselling } from '../lib/counsellingService';
+import {
+  generateDefaultCounselling,
+  sanitizeCounsellingForFirestore,
+  normalizeSessionString,
+  inferSessionFromStudent,
+} from '../lib/counsellingService';
 import { TRANSLATIONS, Language } from '../lib/translations';
 import { normalizeDepartmentAndStream, compareRollNumbers } from '../lib/excelParser';
 import {
@@ -62,7 +67,11 @@ interface DataContextType {
   isQuotaExceeded: boolean;
   counsellingMap: Record<string, StudentCounsellingRecord>;
   saveCounsellingRecord: (record: StudentCounsellingRecord) => void;
-  bulkSaveCounsellingRecords: (records: StudentCounsellingRecord[], replaceAll?: boolean) => void;
+  bulkSaveCounsellingRecords: (
+    records: StudentCounsellingRecord[],
+    mode?: 'merge' | 'replace-batch' | 'replace-all' | boolean,
+    targetAcademicYear?: string
+  ) => void;
   clearCounsellingRecords: () => void;
 
   // Student Actions
@@ -349,12 +358,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const map: Record<string, StudentCounsellingRecord> = {};
           parsed.forEach((r: StudentCounsellingRecord) => {
             if (r && (r.studentId || r.id)) {
-              map[r.studentId || r.id] = r;
+              const key = r.studentId || r.id;
+              map[key] = {
+                ...r,
+                academicYear: inferSessionFromStudent(r.academicYear, undefined, r.rollNo, r.samsRegNo),
+              };
             }
           });
           return map;
         } else if (parsed && typeof parsed === 'object') {
-          return parsed;
+          const map: Record<string, StudentCounsellingRecord> = {};
+          Object.entries(parsed).forEach(([k, v]) => {
+            const r = v as StudentCounsellingRecord;
+            if (r) {
+              map[k] = {
+                ...r,
+                academicYear: inferSessionFromStudent(r.academicYear, undefined, r.rollNo, r.samsRegNo),
+              };
+            }
+          });
+          return map;
         }
       } catch {}
     }
@@ -400,6 +423,75 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeSaveLocalStorage(LS_PREFIX + 'counsellingRecords', JSON.stringify(list));
     safeSaveLocalStorage('sams_counselling_records_v1', JSON.stringify(list));
   }, [counsellingMap]);
+
+  // Keep Subject Counselling strictly synchronized with the Student Master Database:
+  // 1) Remove any counselling record whose student is NOT in the master student database.
+  // 2) Create a blank counselling record for any student in the master student database who is not yet in subjectCounselling.
+  useEffect(() => {
+    if (students.length === 0) return;
+
+    const studentMapById = new Map<string, Student>();
+    students.forEach((s) => {
+      if (s && s.id) studentMapById.set(s.id, s);
+    });
+
+    setCounsellingMap((prev) => {
+      let changed = false;
+      const next: Record<string, StudentCounsellingRecord> = {};
+      const orphanKeysToDelete: string[] = [];
+      const missingBlankRecords: StudentCounsellingRecord[] = [];
+
+      // Retain only records belonging to students in the master database
+      Object.entries(prev).forEach(([key, rec]) => {
+        const stu = studentMapById.get(key) || (rec?.studentId ? studentMapById.get(rec.studentId) : undefined);
+        if (!stu) {
+          changed = true;
+          orphanKeysToDelete.push(key);
+        } else {
+          next[stu.id] = {
+            ...rec,
+            id: stu.id,
+            studentId: stu.id,
+            studentName: stu.name,
+            rollNo: stu.rollNo,
+            samsRegNo: stu.samsRegNo,
+            academicYear: inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo),
+            stream: stu.stream,
+            department: stu.department,
+          };
+          if (key !== stu.id || rec.studentName !== stu.name || rec.rollNo !== stu.rollNo) {
+            changed = true;
+          }
+        }
+      });
+
+      // Ensure every student in the master database has a counselling record (blank if not yet assigned)
+      students.forEach((stu) => {
+        if (!next[stu.id]) {
+          const blankRec = generateDefaultCounselling(stu);
+          next[stu.id] = blankRec;
+          missingBlankRecords.push(blankRec);
+          changed = true;
+        }
+      });
+
+      if (orphanKeysToDelete.length > 0) {
+        orphanKeysToDelete.forEach((k) => {
+          const docId = String(k).replace(/[^a-zA-Z0-9_\-]/g, '_');
+          safeDeleteDoc(doc(db, 'subjectCounselling', docId));
+        });
+      }
+
+      if (missingBlankRecords.length > 0) {
+        missingBlankRecords.forEach((blankRec) => {
+          const docId = String(blankRec.id).replace(/[^a-zA-Z0-9_\-]/g, '_');
+          safeSetDoc(doc(db, 'subjectCounselling', docId), sanitizeCounsellingForFirestore(blankRec));
+        });
+      }
+
+      return changed ? next : prev;
+    });
+  }, [students]);
 
   useEffect(() => {
     safeSaveLocalStorage(LS_PREFIX + 'hodAccounts', JSON.stringify(hodAccounts));
@@ -612,7 +704,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCounsellingMap((prev) => {
             const next = { ...prev };
             snapshot.docs.forEach((d) => {
-              const data = d.data() as StudentCounsellingRecord;
+              const rawData = d.data() as StudentCounsellingRecord;
+              const data: StudentCounsellingRecord = {
+                ...rawData,
+                academicYear: inferSessionFromStudent(
+                  rawData.academicYear,
+                  undefined,
+                  rawData.rollNo,
+                  rawData.samsRegNo
+                ),
+              };
               const key = data.studentId || data.id || d.id;
               if (key) {
                 const localRec = prev[key];
@@ -708,6 +809,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     setStudents((prev) => [newStudent, ...prev]);
     safeSetDoc(doc(db, 'students', newStudent.id), newStudent);
+    const blankCounselling = generateDefaultCounselling(newStudent);
+    setCounsellingMap((prev) => ({ ...prev, [newStudent.id]: blankCounselling }));
+    safeSetDoc(
+      doc(db, 'subjectCounselling', newStudent.id.replace(/[^a-zA-Z0-9_\-]/g, '_')),
+      sanitizeCounsellingForFirestore(blankCounselling)
+    );
     addAuditLog(
       'STUDENT_ADDED',
       `New student added: ${newStudent.name} (${newStudent.rollNo || newStudent.samsRegNo})`
@@ -1533,13 +1640,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ==========================================
   // SUBJECT COUNSELLING ACTIONS
   // ==========================================
+  // ==========================================
+  // SUBJECT COUNSELLING ACTIONS
+  // ==========================================
   const saveCounsellingRecord = (record: StudentCounsellingRecord) => {
     const key = record.studentId || record.id;
     if (!key) return;
+    const session = normalizeSessionString(record.academicYear) || '2026-27';
     const stamped: StudentCounsellingRecord = {
       ...record,
       id: key,
       studentId: key,
+      academicYear: session,
       updatedAt: new Date().toISOString(),
     };
     setCounsellingMap((prev) => ({
@@ -1547,7 +1659,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       [key]: stamped,
     }));
     const docId = String(key).replace(/[^a-zA-Z0-9_\-]/g, '_');
-    safeSetDoc(doc(db, 'subjectCounselling', docId), stamped);
+    safeSetDoc(doc(db, 'subjectCounselling', docId), sanitizeCounsellingForFirestore(stamped));
 
     // Also sync University Roll No to student record if updated
     if (record.universityRollNo && record.universityRollNo !== 'N/A') {
@@ -1558,55 +1670,166 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const bulkSaveCounsellingRecords = (records: StudentCounsellingRecord[], replaceAll = false) => {
+  const bulkSaveCounsellingRecords = (
+    records: StudentCounsellingRecord[],
+    mode: 'merge' | 'replace-batch' | 'replace-all' | boolean = 'merge',
+    targetAcademicYear?: string
+  ) => {
     if (!records || records.length === 0) return;
     const nowIso = new Date().toISOString();
+
+    const resolvedMode: 'merge' | 'replace-batch' | 'replace-all' =
+      mode === 'replace-all'
+        ? 'replace-all'
+        : mode === 'replace-batch'
+        ? 'replace-batch'
+        : mode === true
+        ? 'replace-all'
+        : 'merge';
+
+    const defaultSession =
+      normalizeSessionString(targetAcademicYear) ||
+      normalizeSessionString(records[0]?.academicYear) ||
+      '2026-27';
+
+    const masterStudentById = new Map<string, Student>();
+    students.forEach((s) => {
+      if (s && s.id) masterStudentById.set(s.id, s);
+    });
+
+    // Filter incoming records strictly to students present in the master student database
+    const validRecords = records.filter((r) => {
+      const key = r.studentId || r.id;
+      return Boolean(key && masterStudentById.has(key));
+    });
+
+    // 1. Immediately update React state and LocalStorage for zero latency
     setCounsellingMap((prev) => {
-      const next: Record<string, StudentCounsellingRecord> = replaceAll ? {} : { ...prev };
-      records.forEach((r) => {
+      let next: Record<string, StudentCounsellingRecord>;
+      if (resolvedMode === 'replace-all') {
+        next = {};
+      } else if (resolvedMode === 'replace-batch') {
+        next = {};
+        // Preserve records belonging to other academic batches (only for valid master students)!
+        Object.entries(prev).forEach(([k, rec]) => {
+          if (
+            rec &&
+            masterStudentById.has(k) &&
+            normalizeSessionString(rec.academicYear) !== defaultSession
+          ) {
+            next[k] = rec;
+          }
+        });
+      } else {
+        // 'merge': retain existing records from all batches for valid master students
+        next = {};
+        Object.entries(prev).forEach(([k, rec]) => {
+          if (rec && masterStudentById.has(k)) {
+            next[k] = rec;
+          }
+        });
+      }
+
+      validRecords.forEach((r) => {
         const key = r.studentId || r.id;
-        if (key) {
+        const stu = key ? masterStudentById.get(key) : undefined;
+        if (key && stu) {
+          const recSession = inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo);
           next[key] = {
             ...r,
-            id: key,
-            studentId: key,
+            id: stu.id,
+            studentId: stu.id,
+            studentName: stu.name,
+            rollNo: stu.rollNo,
+            samsRegNo: stu.samsRegNo,
+            stream: stu.stream,
+            department: stu.department,
+            academicYear: recSession,
             updatedAt: r.updatedAt || nowIso,
           };
         }
       });
+
+      // Ensure every student in the master database has at least a blank counselling record
+      students.forEach((stu) => {
+        if (!next[stu.id]) {
+          next[stu.id] = generateDefaultCounselling(stu);
+        }
+      });
+
+      const list = Object.values(next);
+      safeSaveLocalStorage(LS_PREFIX + 'counsellingRecords', JSON.stringify(list.slice(0, 5000)));
+      safeSaveLocalStorage('sams_counselling_records_v1', JSON.stringify(list.slice(0, 5000)));
+
       return next;
     });
 
-    // Also sync University Roll No to students in memory if provided in Excel
-    const univRollUpdates = new Map<string, string>();
-    records.forEach((r) => {
+    // 2. Sync University Roll No and Academic Batch to students in memory & Firestore
+    const studentUpdates = new Map<string, { universityRollNo?: string; academicYear?: string }>();
+    validRecords.forEach((r) => {
       const key = r.studentId || r.id;
-      if (key && r.universityRollNo && r.universityRollNo !== 'N/A') {
-        univRollUpdates.set(key, r.universityRollNo);
+      if (!key) return;
+      const updates: { universityRollNo?: string; academicYear?: string } = {};
+      if (r.universityRollNo && r.universityRollNo !== 'N/A') {
+        updates.universityRollNo = r.universityRollNo;
+      }
+      const stu = masterStudentById.get(key);
+      const recSession = inferSessionFromStudent(
+        stu?.academicYear || r.academicYear,
+        stu,
+        stu?.rollNo || r.rollNo,
+        stu?.samsRegNo || r.samsRegNo,
+        undefined,
+        defaultSession
+      );
+      if (recSession) {
+        updates.academicYear = recSession;
+      }
+      if (Object.keys(updates).length > 0) {
+        studentUpdates.set(key, updates);
       }
     });
-    if (univRollUpdates.size > 0) {
-      setStudents((prev) =>
-        prev.map((s) => {
-          const newURoll = univRollUpdates.get(s.id);
-          if (newURoll && s.universityRollNo !== newURoll) {
-            const updatedStu = { ...s, universityRollNo: newURoll, updatedAt: nowIso };
-            safeSetDoc(doc(db, 'students', s.id), updatedStu);
-            return updatedStu;
+
+    if (studentUpdates.size > 0) {
+      setStudents((prev) => {
+        let changed = false;
+        const updated = prev.map((s) => {
+          const upd = studentUpdates.get(s.id);
+          if (upd) {
+            let sChanged = false;
+            const newStu = { ...s };
+            if (upd.universityRollNo && s.universityRollNo !== upd.universityRollNo) {
+              newStu.universityRollNo = upd.universityRollNo;
+              sChanged = true;
+            }
+            if (upd.academicYear && s.academicYear !== upd.academicYear) {
+              newStu.academicYear = upd.academicYear;
+              sChanged = true;
+            }
+            if (sChanged) {
+              changed = true;
+              newStu.updatedAt = nowIso;
+              safeSetDoc(doc(db, 'students', s.id), sanitizeCounsellingForFirestore(newStu));
+              return newStu;
+            }
           }
           return s;
-        })
-      );
+        });
+        if (changed) {
+          safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(updated.slice(0, 10000)));
+        }
+        return changed ? updated : prev;
+      });
     }
 
-    // Persist to Firestore in background batches of 350
+    // 3. Persist to Firestore in background batches with sanitization
     setTimeout(async () => {
       if (isFirestoreQuotaExceeded()) return;
       try {
-        if (replaceAll) {
+        if (resolvedMode === 'replace-all') {
           const oldSnap = await getDocs(collection(db, 'subjectCounselling'));
           if (!oldSnap.empty) {
-            const delChunkSize = 400;
+            const delChunkSize = 250;
             for (let i = 0; i < oldSnap.docs.length; i += delChunkSize) {
               const delChunk = oldSnap.docs.slice(i, i + delChunkSize);
               const delBatch = writeBatch(db);
@@ -1614,21 +1837,57 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
               await delBatch.commit();
             }
           }
+        } else if (resolvedMode === 'replace-batch') {
+          // Delete docs belonging to defaultSession or any orphan docs not in master student DB
+          const oldSnap = await getDocs(collection(db, 'subjectCounselling'));
+          if (!oldSnap.empty) {
+            const batchDocsToDelete = oldSnap.docs.filter((d) => {
+              const data = d.data();
+              const stuId = data.studentId || data.id || d.id;
+              return !masterStudentById.has(stuId) || normalizeSessionString(data.academicYear) === defaultSession;
+            });
+            if (batchDocsToDelete.length > 0) {
+              const delChunkSize = 250;
+              for (let i = 0; i < batchDocsToDelete.length; i += delChunkSize) {
+                const delChunk = batchDocsToDelete.slice(i, i + delChunkSize);
+                const delBatch = writeBatch(db);
+                delChunk.forEach((d) => delBatch.delete(d.ref));
+                await delBatch.commit();
+              }
+            }
+          }
         }
-        const chunkSize = 350;
-        for (let i = 0; i < records.length; i += chunkSize) {
-          const chunk = records.slice(i, i + chunkSize);
+
+        const chunkSize = 200;
+        for (let i = 0; i < validRecords.length; i += chunkSize) {
+          const chunk = validRecords.slice(i, i + chunkSize);
           const batch = writeBatch(db);
           chunk.forEach((r) => {
             const key = r.studentId || r.id;
-            if (key) {
+            const stu = key ? masterStudentById.get(key) : undefined;
+            if (key && stu) {
               const docId = String(key).replace(/[^a-zA-Z0-9_\-]/g, '_');
-              batch.set(doc(db, 'subjectCounselling', docId), {
+              const recSession = inferSessionFromStudent(
+                stu.academicYear || r.academicYear,
+                stu,
+                stu.rollNo || r.rollNo,
+                stu.samsRegNo || r.samsRegNo,
+                undefined,
+                defaultSession
+              );
+              const cleanRec = sanitizeCounsellingForFirestore({
                 ...r,
-                id: key,
-                studentId: key,
+                id: stu.id,
+                studentId: stu.id,
+                studentName: stu.name,
+                rollNo: stu.rollNo,
+                samsRegNo: stu.samsRegNo,
+                stream: stu.stream,
+                department: stu.department,
+                academicYear: recSession,
                 updatedAt: r.updatedAt || nowIso,
               });
+              batch.set(doc(db, 'subjectCounselling', docId), cleanRec);
             }
           });
           await batch.commit();
@@ -1636,11 +1895,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (e) {
         console.warn('Firestore bulk counselling sync caught:', e);
       }
-    }, 50);
+    }, 20);
 
     addAuditLog(
       'SUBJECT_COUNSELLING_IMPORT',
-      `Updated subject counselling records for ${records.length} students via Excel / Admin Suite.`
+      `Updated subject counselling records for ${records.length} students in batch ${defaultSession} (Mode: ${resolvedMode}).`
     );
   };
 

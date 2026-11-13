@@ -10,6 +10,8 @@ import {
   SubjectAllocationEntry,
   normalizeRollLookupKey,
   normalizeLookupKey,
+  normalizeSessionString,
+  inferSessionFromStudent,
 } from '../lib/counsellingService';
 import { compareRollNumbers, compareStudentsByStreamDeptRoll } from '../lib/excelParser';
 import {
@@ -57,7 +59,7 @@ export const CounsellingView: React.FC = () => {
   const [excelSheet, setExcelSheet] = useState<'regular' | 'aedp'>('regular');
   const [activeCategoryTab, setActiveCategoryTab] = useState<'MINOR' | 'MDC' | 'AEC' | 'VAC' | 'SEC'>('MDC');
 
-  // Secondary lookup index by Roll No, SAMS Barcode, Univ Roll, and Name in case records were imported by Roll/Barcode
+  // Secondary lookup index by Roll No, SAMS Barcode, Univ Roll, and session-scoped Name in case records were imported by Roll/Barcode
   const counsellingByRollOrBarcode = useMemo(() => {
     const map: Record<string, StudentCounsellingRecord> = {};
     Object.values(counsellingMap).forEach((rec) => {
@@ -71,7 +73,10 @@ export const CounsellingView: React.FC = () => {
       const uKey = normalizeLookupKey(rec.universityRollNo);
       if (uKey && uKey !== 'na') map[`univ_${uKey}`] = rec;
       const nKey = normalizeLookupKey(rec.studentName);
-      if (nKey) map[`name_${nKey}`] = rec;
+      const sessKey = inferSessionFromStudent(rec.academicYear, undefined, rec.rollNo, rec.samsRegNo);
+      if (nKey) {
+        map[`name_${sessKey}_${nKey}`] = rec;
+      }
     });
     return map;
   }, [counsellingMap]);
@@ -109,9 +114,11 @@ export const CounsellingView: React.FC = () => {
       if (record.regular.mdc2) entries.push({ category: 'MDC', paperName: record.regular.mdc2 });
       if (record.regular.mdc3) entries.push({ category: 'MDC', paperName: record.regular.mdc3 });
       if (record.regular.aec1) entries.push({ category: 'AEC', paperName: record.regular.aec1 });
-      if (record.regular.aec2) entries.push({ category: 'AEC', paperName: record.regular.aec2 });
-      if (record.regular.vac1) entries.push({ category: 'VAC', paperName: record.regular.vac1 });
-      if (record.regular.vac2) entries.push({ category: 'VAC', paperName: record.regular.vac2 });
+      entries.push({ category: 'AEC', paperName: record.regular.aec2 || 'ENGLISH' });
+      entries.push({ category: 'VAC', paperName: record.regular.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT' });
+      entries.push({ category: 'VAC', paperName: record.regular.vac2 || 'ETHICS AND VALUES' });
+      entries.push({ category: 'VAC', paperName: record.regular.vac3 || record.regular.sem5?.vac || 'UNDERSTANDING ODISHA' });
+      entries.push({ category: 'VAC', paperName: record.regular.vac4 || record.regular.sem6?.vac || 'Creative Writing' });
       if (record.regular.sec1) entries.push({ category: 'SEC', paperName: record.regular.sec1 });
       if (record.regular.sec2) entries.push({ category: 'SEC', paperName: record.regular.sec2 });
       if (record.regular.sec3) entries.push({ category: 'SEC', paperName: record.regular.sec3 });
@@ -173,38 +180,69 @@ export const CounsellingView: React.FC = () => {
     return false;
   }
 
-  // Helper to get counselling record with O(1) Map lookup (by student.id, rollNo, samsRegNo, univRoll, or name)
+  // Helper to get counselling record with O(1) Map lookup (strictly anchored to master student database)
   function getRecordForStudent(student: Student): StudentCounsellingRecord {
-    if (counsellingMap[student.id]) {
-      return counsellingMap[student.id];
+    const stuSession = inferSessionFromStudent(student.academicYear, student, student.rollNo, student.samsRegNo);
+    let found: StudentCounsellingRecord | undefined = counsellingMap[student.id];
+
+    if (!found) {
+      const rKey = normalizeLookupKey(student.rollNo);
+      if (rKey && counsellingByRollOrBarcode[`roll_${rKey}`]) {
+        found = counsellingByRollOrBarcode[`roll_${rKey}`];
+      }
     }
-    const rKey = normalizeLookupKey(student.rollNo);
-    if (rKey && counsellingByRollOrBarcode[`roll_${rKey}`]) {
-      return counsellingByRollOrBarcode[`roll_${rKey}`];
+    if (!found) {
+      const rNorm = normalizeRollLookupKey(student.rollNo);
+      if (rNorm && counsellingByRollOrBarcode[`rollnorm_${rNorm}`]) {
+        found = counsellingByRollOrBarcode[`rollnorm_${rNorm}`];
+      }
     }
-    const rNorm = normalizeRollLookupKey(student.rollNo);
-    if (rNorm && counsellingByRollOrBarcode[`rollnorm_${rNorm}`]) {
-      return counsellingByRollOrBarcode[`rollnorm_${rNorm}`];
+    if (!found) {
+      const sKey = normalizeLookupKey(student.samsRegNo);
+      if (sKey && counsellingByRollOrBarcode[`sams_${sKey}`]) {
+        found = counsellingByRollOrBarcode[`sams_${sKey}`];
+      }
     }
-    const sKey = normalizeLookupKey(student.samsRegNo);
-    if (sKey && counsellingByRollOrBarcode[`sams_${sKey}`]) {
-      return counsellingByRollOrBarcode[`sams_${sKey}`];
+    if (!found) {
+      const uKey = normalizeLookupKey(student.universityRollNo);
+      if (uKey && uKey !== 'na' && counsellingByRollOrBarcode[`univ_${uKey}`]) {
+        found = counsellingByRollOrBarcode[`univ_${uKey}`];
+      }
     }
-    const uKey = normalizeLookupKey(student.universityRollNo);
-    if (uKey && uKey !== 'na' && counsellingByRollOrBarcode[`univ_${uKey}`]) {
-      return counsellingByRollOrBarcode[`univ_${uKey}`];
+    if (!found) {
+      const nKey = normalizeLookupKey(student.name);
+      if (nKey && counsellingByRollOrBarcode[`name_${stuSession}_${nKey}`]) {
+        found = counsellingByRollOrBarcode[`name_${stuSession}_${nKey}`];
+      }
     }
-    const nKey = normalizeLookupKey(student.name);
-    if (nKey && counsellingByRollOrBarcode[`name_${nKey}`]) {
-      return counsellingByRollOrBarcode[`name_${nKey}`];
+
+    if (found) {
+      return {
+        ...found,
+        id: student.id,
+        studentId: student.id,
+        studentName: student.name,
+        rollNo: student.rollNo,
+        samsRegNo: student.samsRegNo,
+        academicYear: stuSession,
+        stream: student.stream,
+        department: student.department,
+      };
     }
+
+    // Student is in master database but not in subject counselling: return a blank subject counselling record
     return generateDefaultCounselling(student);
   }
+
+  // Strictly display ONLY students available in the student master database
+  const allDisplayStudents = useMemo(() => {
+    return students;
+  }, [students]);
 
   // Extract all unique paper names across the entire student counselling database
   const allUniquePaperNames = useMemo(() => {
     const set = new Set<string>();
-    students.forEach((s) => {
+    allDisplayStudents.forEach((s) => {
       const rec = getRecordForStudent(s);
       const entries = getStudentPaperEntries(rec);
       entries.forEach((e) => {
@@ -214,7 +252,7 @@ export const CounsellingView: React.FC = () => {
       });
     });
     return Array.from(set).sort();
-  }, [students, counsellingMap, selectedPaperCategory]);
+  }, [allDisplayStudents, counsellingMap, selectedPaperCategory]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -234,11 +272,18 @@ export const CounsellingView: React.FC = () => {
   // Memoized filtered students list searching across student info and complete subject counselling database
   const filteredStudents = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return students.filter((s) => {
+    return allDisplayStudents.filter((s) => {
       if (role === 'HOD' && hodDeptName) {
         if (!isStudentInHodDept(s, hodDeptName)) return false;
       }
-      const matchesSession = selectedSession === 'ALL' || (s.academicYear || '2026-27') === selectedSession;
+      const record = getRecordForStudent(s);
+      const studentSession = inferSessionFromStudent(
+        s.academicYear || record?.academicYear || '',
+        s,
+        s.rollNo || record?.rollNo,
+        s.samsRegNo || record?.samsRegNo
+      );
+      const matchesSession = selectedSession === 'ALL' || studentSession === selectedSession;
       const matchesStream =
         selectedStream === 'ALL' ||
         s.stream === selectedStream ||
@@ -256,7 +301,6 @@ export const CounsellingView: React.FC = () => {
 
       if (!matchesSession || !matchesStream || !matchesDept || !matchesCourseType) return false;
 
-      const record = getRecordForStudent(s);
       const paperEntries = getStudentPaperEntries(record);
 
       // Paper Category filter
@@ -291,7 +335,7 @@ export const CounsellingView: React.FC = () => {
       return matchesStudentInfo || matchesPaperName;
     }).sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
   }, [
-    students,
+    allDisplayStudents,
     selectedSession,
     selectedStream,
     selectedCourseType,
@@ -384,14 +428,24 @@ export const CounsellingView: React.FC = () => {
     let formToSave = { ...editForm };
     if (formToSave.regular) {
       const reg = formToSave.regular;
+      const a2 = reg.aec2 || 'ENGLISH';
+      const v1 = reg.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
+      const v2 = reg.vac2 || 'ETHICS AND VALUES';
+      const v3 = reg.vac3 || reg.sem5?.vac || 'UNDERSTANDING ODISHA';
+      const v4 = reg.vac4 || reg.sem6?.vac || 'Creative Writing';
       formToSave.regular = {
         ...reg,
-        sem1: { major: reg.major, minor: reg.minor1, mdc: reg.mdc1, aec: reg.aec1, vac: reg.vac1 },
-        sem2: { major: reg.major, minor: reg.minor2, mdc: reg.mdc2, aec: reg.aec2, sec: reg.sec1 || reg.sem2?.sec || '' },
-        sem3: { major: reg.major, minor: reg.minor1, mdc: reg.mdc3, vac: reg.vac2 },
+        aec2: a2,
+        vac1: v1,
+        vac2: v2,
+        vac3: v3,
+        vac4: v4,
+        sem1: { major: reg.major, minor: reg.minor1, mdc: reg.mdc1, aec: reg.aec1, vac: v1 },
+        sem2: { major: reg.major, minor: reg.minor2, mdc: reg.mdc2, aec: a2, sec: reg.sec1 || reg.sem2?.sec || '' },
+        sem3: { major: reg.major, minor: reg.minor1, mdc: reg.mdc3, vac: v2 },
         sem4: reg.sem4 || { major: reg.major, minor: reg.minor2, activity: 'Internship / Community Engagement & Service / Field Work' },
-        sem5: { major: reg.major, minor: reg.minor1, sec: reg.sec2, vac: reg.sem5?.vac || '' },
-        sem6: { major: reg.major, minor: reg.minor2, sec: reg.sec3, vac: reg.sem6?.vac || '' },
+        sem5: { major: reg.major, minor: reg.minor1, sec: reg.sec2, vac: v3 },
+        sem6: { major: reg.major, minor: reg.minor2, sec: reg.sec3, vac: v4 },
       };
     }
 
@@ -791,7 +845,7 @@ export const CounsellingView: React.FC = () => {
                     <th className="py-2.5 px-3 border-r border-slate-800">MDC 1 / 2 / 3</th>
                     <th className="py-2.5 px-3 border-r border-slate-800">SEC 1 / 2 / 3</th>
                     <th className="py-2.5 px-3 border-r border-slate-800">AEC 1 / 2</th>
-                    <th className="py-2.5 px-3 border-r border-slate-800">VAC 1 / 2</th>
+                    <th className="py-2.5 px-3 border-r border-slate-800">VAC 1 / 2 / 3 / 4</th>
                     <th className="py-2.5 px-3 border-r border-slate-800">Sem I</th>
                     <th className="py-2.5 px-3 border-r border-slate-800">Sem II</th>
                     <th className="py-2.5 px-3 border-r border-slate-800">Sem III</th>
@@ -821,9 +875,11 @@ export const CounsellingView: React.FC = () => {
                       const sec2 = reg?.sec2 || reg?.sem5?.sec || '-';
                       const sec3 = reg?.sec3 || reg?.sem6?.sec || '-';
                       const aec1 = reg?.aec1 || reg?.sem1?.aec || '-';
-                      const aec2 = reg?.aec2 || reg?.sem2?.aec || '-';
-                      const vac1 = reg?.vac1 || reg?.sem1?.vac || '-';
-                      const vac2 = reg?.vac2 || reg?.sem3?.vac || '-';
+                      const aec2 = reg?.aec2 || reg?.sem2?.aec || 'ENGLISH';
+                      const vac1 = reg?.vac1 || reg?.sem1?.vac || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT';
+                      const vac2 = reg?.vac2 || reg?.sem3?.vac || 'ETHICS AND VALUES';
+                      const vac3 = reg?.vac3 || reg?.sem5?.vac || 'UNDERSTANDING ODISHA';
+                      const vac4 = reg?.vac4 || reg?.sem6?.vac || 'Creative Writing';
 
                       return (
                         <tr key={s.id} className="hover:bg-slate-800/60 transition">
@@ -846,7 +902,7 @@ export const CounsellingView: React.FC = () => {
                             {`${aec1} | ${aec2}`}
                           </td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
-                            {`${vac1} | ${vac2}`}
+                            {`${vac1} | ${vac2} | ${vac3} | ${vac4}`}
                           </td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
                             {`Minor:${min1} | MDC:${mdc1} | AEC:${aec1} | VAC:${vac1}`}
@@ -861,10 +917,10 @@ export const CounsellingView: React.FC = () => {
                             {`Minor:${min2} | Act:${reg?.sem4?.activity || 'Internship / Community Engagement'}`}
                           </td>
                           <td className="py-2 px-3 border-r border-slate-800 text-slate-300 text-[10px]">
-                            {`Minor:${min1} | SEC:${sec2} | VAC:${reg?.sem5?.vac || '-'}`}
+                            {`Minor:${min1} | SEC:${sec2} | VAC:${vac3}`}
                           </td>
                           <td className="py-2 px-3 text-slate-300 text-[10px]">
-                            {`Minor:${min2} | SEC:${sec3} | VAC:${reg?.sem6?.vac || '-'}`}
+                            {`Minor:${min2} | SEC:${sec3} | VAC:${vac4}`}
                           </td>
                         </tr>
                       );
@@ -995,7 +1051,7 @@ export const CounsellingView: React.FC = () => {
                         </td>
                         <td className="py-3 px-3">
                           <div className="font-semibold text-purple-300">{s.stream}</div>
-                          <div className="text-[10px] font-mono text-slate-400">Batch: {s.academicYear || '2026-27'}</div>
+                          <div className="text-[10px] font-mono text-slate-400">Batch: {inferSessionFromStudent(s.academicYear || record.academicYear || '', s, s.rollNo || record.rollNo, s.samsRegNo || record.samsRegNo)}</div>
                         </td>
                         <td className="py-3 px-3">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-block mb-1 ${
@@ -1054,22 +1110,22 @@ export const CounsellingView: React.FC = () => {
                                 <span>SEC 3: <strong className="text-white">{record.regular.sec3 || record.regular.sem6?.sec || '-'}</strong></span>
                               </div>
                               <div className="text-slate-300">
-                                <span className="text-amber-300 font-semibold font-mono">Sem I:</span> Minor: {record.regular.sem1?.minor || record.regular.minor1 || '-'} | MDC: {record.regular.sem1?.mdc || record.regular.mdc1 || '-'} | AEC: {record.regular.sem1?.aec || record.regular.aec1 || '-'} | VAC: {record.regular.sem1?.vac || record.regular.vac1 || '-'}
+                                <span className="text-amber-300 font-semibold font-mono">Sem I:</span> Minor: {record.regular.sem1?.minor || record.regular.minor1 || '-'} | MDC: {record.regular.sem1?.mdc || record.regular.mdc1 || '-'} | AEC: {record.regular.sem1?.aec || record.regular.aec1 || '-'} | VAC: {record.regular.sem1?.vac || record.regular.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT'}
                               </div>
                               <div className="text-slate-300">
-                                <span className="text-amber-300 font-semibold font-mono">Sem II:</span> Minor: {record.regular.sem2?.minor || record.regular.minor2 || '-'} | MDC: {record.regular.sem2?.mdc || record.regular.mdc2 || '-'} | AEC: {record.regular.sem2?.aec || record.regular.aec2 || '-'} | SEC: {record.regular.sem2?.sec || record.regular.sec1 || '-'}
+                                <span className="text-amber-300 font-semibold font-mono">Sem II:</span> Minor: {record.regular.sem2?.minor || record.regular.minor2 || '-'} | MDC: {record.regular.sem2?.mdc || record.regular.mdc2 || '-'} | AEC: {record.regular.sem2?.aec || record.regular.aec2 || 'ENGLISH'} | SEC: {record.regular.sem2?.sec || record.regular.sec1 || '-'}
                               </div>
                               <div className="text-slate-300">
-                                <span className="text-amber-300 font-semibold font-mono">Sem III:</span> Minor: {record.regular.sem3?.minor || record.regular.minor1 || '-'} | MDC: {record.regular.sem3?.mdc || record.regular.mdc3 || '-'} | VAC: {record.regular.sem3?.vac || record.regular.vac2 || '-'}
+                                <span className="text-amber-300 font-semibold font-mono">Sem III:</span> Minor: {record.regular.sem3?.minor || record.regular.minor1 || '-'} | MDC: {record.regular.sem3?.mdc || record.regular.mdc3 || '-'} | VAC: {record.regular.sem3?.vac || record.regular.vac2 || 'ETHICS AND VALUES'}
                               </div>
                               <div className="text-slate-300">
                                 <span className="text-amber-300 font-semibold font-mono">Sem IV:</span> Minor: {record.regular.sem4?.minor || record.regular.minor2 || '-'} | Activity: {record.regular.sem4?.activity || 'Internship / Community Engagement'}
                               </div>
                               <div className="text-slate-300">
-                                <span className="text-amber-300 font-semibold font-mono">Sem V:</span> Minor: {record.regular.sem5?.minor || record.regular.minor1 || '-'} | SEC: {record.regular.sem5?.sec || record.regular.sec2 || '-'} | VAC: {record.regular.sem5?.vac || '-'}
+                                <span className="text-amber-300 font-semibold font-mono">Sem V:</span> Minor: {record.regular.sem5?.minor || record.regular.minor1 || '-'} | SEC: {record.regular.sem5?.sec || record.regular.sec2 || '-'} | VAC: {record.regular.sem5?.vac || record.regular.vac3 || 'UNDERSTANDING ODISHA'}
                               </div>
                               <div className="text-slate-300">
-                                <span className="text-amber-300 font-semibold font-mono">Sem VI:</span> Minor: {record.regular.sem6?.minor || record.regular.minor2 || '-'} | SEC: {record.regular.sem6?.sec || record.regular.sec3 || '-'} | VAC: {record.regular.sem6?.vac || '-'}
+                                <span className="text-amber-300 font-semibold font-mono">Sem VI:</span> Minor: {record.regular.sem6?.minor || record.regular.minor2 || '-'} | SEC: {record.regular.sem6?.sec || record.regular.sec3 || '-'} | VAC: {record.regular.sem6?.vac || record.regular.vac4 || 'Creative Writing'}
                               </div>
                             </div>
                           ) : null}
@@ -1476,7 +1532,7 @@ export const CounsellingView: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                     <div>
                       <label className="block text-slate-300 font-semibold mb-1">AEC 1</label>
                       <input
@@ -1488,52 +1544,90 @@ export const CounsellingView: React.FC = () => {
                             regular: { ...editForm.regular!, aec1: e.target.value },
                           })
                         }
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono text-xs"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">AEC 2</label>
+                      <label className="block text-slate-300 font-semibold mb-1">AEC 2 (Sem 2)</label>
                       <input
                         type="text"
-                        value={editForm.regular.aec2}
+                        value={editForm.regular.aec2 || 'ENGLISH'}
                         onChange={(e) =>
                           setEditForm({
                             ...editForm,
                             regular: { ...editForm.regular!, aec2: e.target.value },
                           })
                         }
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono text-xs"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">VAC 1</label>
+                      <label className="block text-slate-300 font-semibold mb-1">VAC 1 (Sem 1)</label>
                       <input
                         type="text"
-                        value={editForm.regular.vac1}
+                        value={editForm.regular.vac1 || 'ENVIRONMENT STUDIES AND DISASTER MANAGEMENT'}
                         onChange={(e) =>
                           setEditForm({
                             ...editForm,
                             regular: { ...editForm.regular!, vac1: e.target.value },
                           })
                         }
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono text-xs"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">VAC 2</label>
+                      <label className="block text-slate-300 font-semibold mb-1">VAC 2 (Sem 3)</label>
                       <input
                         type="text"
-                        value={editForm.regular.vac2}
+                        value={editForm.regular.vac2 || 'ETHICS AND VALUES'}
                         onChange={(e) =>
                           setEditForm({
                             ...editForm,
                             regular: { ...editForm.regular!, vac2: e.target.value },
                           })
                         }
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">VAC 3 (Sem 5)</label>
+                      <input
+                        type="text"
+                        value={editForm.regular.vac3 || editForm.regular.sem5?.vac || 'UNDERSTANDING ODISHA'}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            regular: {
+                              ...editForm.regular!,
+                              vac3: e.target.value,
+                              sem5: { ...(editForm.regular?.sem5 || { major: editForm.regular?.major || '', minor: editForm.regular?.minor1 || '', sec: editForm.regular?.sec2 || '' }), vac: e.target.value },
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">VAC 4 (Sem 6)</label>
+                      <input
+                        type="text"
+                        value={editForm.regular.vac4 || editForm.regular.sem6?.vac || 'Creative Writing'}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            regular: {
+                              ...editForm.regular!,
+                              vac4: e.target.value,
+                              sem6: { ...(editForm.regular?.sem6 || { major: editForm.regular?.major || '', minor: editForm.regular?.minor2 || '', sec: editForm.regular?.sec3 || '' }), vac: e.target.value },
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono text-xs"
                       />
                     </div>
                   </div>

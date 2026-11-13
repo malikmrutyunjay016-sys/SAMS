@@ -172,7 +172,7 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
           <div className="bg-slate-950/80 border border-emerald-500/20 p-3 rounded-xl space-y-1">
             <span className="text-[10px] uppercase font-mono font-bold text-emerald-400 block">2. Monthly Stipend</span>
             <p className="text-[11px] text-slate-300 leading-normal">
-              Enrolled scholars receive a monthly stipend during their apprenticeship under NAPS / industry partnership norms.
+              Enrolled scholars receive a monthly stipend during their apprenticeship under NATS / industry partnership norms.
             </p>
           </div>
           <div className="bg-slate-950/80 border border-emerald-500/20 p-3 rounded-xl space-y-1">

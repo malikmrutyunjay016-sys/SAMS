@@ -12,7 +12,9 @@ import {
   normalizeLookupKey,
   normalizeSessionString,
   inferSessionFromStudent,
+  isStudentInHodDept,
 } from '../lib/counsellingService';
+import { DEPARTMENTS_LIST } from '../lib/defaultData';
 import { compareRollNumbers, compareStudentsByStreamDeptRoll } from '../lib/excelParser';
 import {
   GraduationCap,
@@ -30,13 +32,11 @@ import {
   Building2,
   X,
   User,
-  Users,
   FileSpreadsheet,
   ChevronLeft,
   ChevronRight,
   Layers,
 } from 'lucide-react';
-import { BatchCorrectionModal } from '../components/BatchCorrectionModal';
 
 const LS_COUNSELLING_KEY = 'SAMS_BARAGADA_V4_counsellingRecords';
 
@@ -99,7 +99,6 @@ export const CounsellingView: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<StudentCounsellingRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editForm, setEditForm] = useState<StudentCounsellingRecord | null>(null);
-  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -141,59 +140,13 @@ export const CounsellingView: React.FC = () => {
     return entries.filter((e) => Boolean(e.paperName && e.paperName.trim() && e.paperName !== '-'));
   }
 
-  // Helper to check if student department matches HOD department or corresponding AEDP course
-  function isStudentInHodDept(student: Student, hodDept: string): boolean {
-    if (!hodDept) return false;
-    const h = hodDept.toLowerCase().trim();
-    const sDept = (student.department || '').toLowerCase().trim();
-
-    // Exact or substring match
-    if (sDept === h || sDept.includes(h) || h.includes(sDept)) return true;
-
-    // Mapping between parent department and corresponding AEDP specializations
-    if ((h.includes('commerce') || h.includes('comm') || h.includes('b.com')) && 
-        (sDept.includes('commerce') || sDept.includes('bank') || sDept.includes('finance') || sDept.includes('insurance') || sDept.includes('bfsi'))) {
-      return true;
+  // Keep department filter synced when HOD role or department changes
+  useEffect(() => {
+    if (role === 'HOD') {
+      setSelectedDeptFilter(hodDeptName || '');
+      setSelectedStream('ALL');
     }
-    if ((h.includes('english') || h.includes('eng')) && 
-        (sDept.includes('english') || sDept.includes('translation') || sDept.includes('digital humanities'))) {
-      return true;
-    }
-    if ((h.includes('econ') || h.includes('economics')) && 
-        (sDept.includes('econ') || sDept.includes('data analytics'))) {
-      return true;
-    }
-    if ((h.includes('chem') || h.includes('chemistry')) && 
-        (sDept.includes('chem') || sDept.includes('industrial process'))) {
-      return true;
-    }
-    if ((h.includes('math') || h.includes('comput')) && 
-        (sDept.includes('math') || sDept.includes('comput') || sDept.includes('algorithm'))) {
-      return true;
-    }
-    if ((h.includes('botan') || h.includes('botany')) && 
-        (sDept.includes('botan') || sDept.includes('tissue culture') || sDept.includes('agri'))) {
-      return true;
-    }
-    if ((h.includes('zool') || h.includes('zoology')) && 
-        (sDept.includes('zool') || sDept.includes('biomedical'))) {
-      return true;
-    }
-    if ((h.includes('hist') || h.includes('history')) && 
-        (sDept.includes('hist') || sDept.includes('tourism') || sDept.includes('heritage'))) {
-      return true;
-    }
-
-    // Also check student's counselling record Major 1 / Major 2 if present
-    const record = counsellingMap[student.id];
-    if (record?.aedp) {
-      const m1 = (record.aedp.major1 || '').toLowerCase();
-      const m2 = (record.aedp.major2 || '').toLowerCase();
-      if (m1.includes(h) || m2.includes(h) || h.includes(m2)) return true;
-    }
-
-    return false;
-  }
+  }, [role, hodDeptName]);
 
   // Helper to get counselling record with O(1) Map lookup (strictly anchored to master student database)
   function getRecordForStudent(student: Student): StudentCounsellingRecord {
@@ -249,10 +202,36 @@ export const CounsellingView: React.FC = () => {
     return generateDefaultCounselling(student);
   }
 
-  // Strictly display ONLY students available in the student master database
+  // Strictly display ONLY students available in the student master database,
+  // and strictly scope to the logged-in HOD's department when role === 'HOD'
   const allDisplayStudents = useMemo(() => {
-    return students;
-  }, [students]);
+    if (role === 'HOD') {
+      if (!hodDeptName) return [];
+      return students.filter((s) => isStudentInHodDept(s, hodDeptName, counsellingMap[s.id]));
+    }
+    if (role === 'SUPER_ADMIN') {
+      return students;
+    }
+    return [];
+  }, [students, role, hodDeptName, counsellingMap]);
+
+  const hodDeptMeta = useMemo(() => {
+    if (role !== 'HOD' || !hodDeptName) {
+      return { streams: [] as string[], hasAedp: true };
+    }
+    const h = hodDeptName.toLowerCase().trim();
+    const matchingDepts = DEPARTMENTS_LIST.filter((d) => {
+      const dn = d.name.toLowerCase();
+      return dn === h || (h.length >= 3 && dn.includes(h) && !(h === 'mathematics' && dn.includes('computer')));
+    });
+    const streamSet = new Set<string>();
+    matchingDepts.forEach((d) => streamSet.add(d.stream));
+    allDisplayStudents.forEach((s) => {
+      if (s.stream) streamSet.add(s.stream);
+    });
+    const hasAedp = matchingDepts.some((d) => d.isAedp) || allDisplayStudents.some((s) => s.isAedp);
+    return { streams: Array.from(streamSet), hasAedp };
+  }, [role, hodDeptName, allDisplayStudents]);
 
   // Extract all unique paper names across the entire student counselling database
   const allUniquePaperNames = useMemo(() => {
@@ -331,8 +310,8 @@ export const CounsellingView: React.FC = () => {
   const filteredStudents = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return allDisplayStudents.filter((s) => {
-      if (role === 'HOD' && hodDeptName) {
-        if (!isStudentInHodDept(s, hodDeptName)) return false;
+      if (role === 'HOD' && (!hodDeptName || !isStudentInHodDept(s, hodDeptName, counsellingMap[s.id]))) {
+        return false;
       }
       const record = getRecordForStudent(s);
       const studentSession = inferSessionFromStudent(
@@ -460,8 +439,8 @@ export const CounsellingView: React.FC = () => {
   const totalPages = Math.ceil(activeStudentList.length / pageSize) || 1;
 
   const handleOpenEdit = (student: Student) => {
-    if (role === 'HOD' && hodDeptName && !isStudentInHodDept(student, hodDeptName)) {
-      showToast(`Access Denied: HOD can only access/edit students from ${hodDeptName} and corresponding AEDP courses.`);
+    if (role === 'HOD' && (!hodDeptName || !isStudentInHodDept(student, hodDeptName, counsellingMap[student.id]))) {
+      showToast(`Access Denied: HOD can only access/edit students from ${hodDeptName || 'their assigned department'}.`);
       return;
     }
     let counselling = getRecordForStudent(student);
@@ -476,6 +455,14 @@ export const CounsellingView: React.FC = () => {
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editForm) return;
+
+    if (role === 'HOD') {
+      const targetStudent = students.find((s) => s.id === editForm.studentId || s.id === editForm.id);
+      if (!hodDeptName || !targetStudent || !isStudentInHodDept(targetStudent, hodDeptName, editForm)) {
+        showToast(`Access Denied: HOD can only save subject counselling for ${hodDeptName || 'their assigned department'}.`);
+        return;
+      }
+    }
 
     let formToSave = { ...editForm };
     if (formToSave.regular) {
@@ -525,8 +512,8 @@ export const CounsellingView: React.FC = () => {
     const results: DefaulterStudentEntry[] = [];
 
     activeList.forEach((s) => {
-      if (role === 'HOD' && hodDeptName) {
-        if (!isStudentInHodDept(s, hodDeptName)) return;
+      if (role === 'HOD' && (!hodDeptName || !isStudentInHodDept(s, hodDeptName, counsellingMap[s.id]))) {
+        return;
       }
 
       const rec = getRecordForStudent(s);
@@ -713,7 +700,7 @@ export const CounsellingView: React.FC = () => {
     allDisplayStudents
       .filter((s) => {
         if (s.isClcTaken || s.status === 'CLC Taken') return false;
-        if (role === 'HOD' && hodDeptName && !isStudentInHodDept(s, hodDeptName)) return false;
+        if (role === 'HOD' && (!hodDeptName || !isStudentInHodDept(s, hodDeptName, counsellingMap[s.id]))) return false;
         const rec = getRecordForStudent(s);
         const batch = inferSessionFromStudent(s.academicYear || rec.academicYear || '', s, s.rollNo || rec.rollNo, s.samsRegNo || rec.samsRegNo);
         if (selectedSession !== 'ALL' && batch !== selectedSession) return false;
@@ -773,22 +760,42 @@ export const CounsellingView: React.FC = () => {
   const handleDirectCounsellingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (role !== 'SUPER_ADMIN' && (role !== 'HOD' || !hodDeptName)) {
+      showToast('Access Denied: Only Super Admin or an authorized Department HOD can upload counselling Excel.');
+      e.target.value = '';
+      return;
+    }
     setIsUploadingCounsellingExcel(true);
     try {
       const targetSess = selectedSession === 'ALL' ? '2026-27' : selectedSession;
-      const res = await parseCounsellingExcelFile(file, students, counsellingMap, targetSess);
+      const scopedStudents = role === 'HOD' ? allDisplayStudents : students;
+      const res = await parseCounsellingExcelFile(file, scopedStudents, counsellingMap, targetSess);
       setIsUploadingCounsellingExcel(false);
-      if (res.success && res.records.length > 0) {
-        const detectedBatch = res.records[0]?.academicYear || targetSess;
-        bulkSaveCounsellingRecords(res.records, 'merge', detectedBatch);
+      const allowedRecords =
+        role === 'HOD' && hodDeptName
+          ? res.records.filter((r) => {
+              const matchedStu = scopedStudents.find((s) => s.id === r.studentId || s.id === r.id);
+              return Boolean(matchedStu && isStudentInHodDept(matchedStu, hodDeptName, r));
+            })
+          : res.records;
+
+      if (res.success && allowedRecords.length > 0) {
+        const detectedBatch = allowedRecords[0]?.academicYear || targetSess;
+        bulkSaveCounsellingRecords(allowedRecords, 'merge', detectedBatch);
         if (selectedSession !== 'ALL' && detectedBatch && detectedBatch !== selectedSession) {
           setSelectedSession(detectedBatch);
         }
         showToast(
-          `Updated & fixed subject counselling for ${res.matchedCount} matched students in batch ${detectedBatch}!`
+          role === 'HOD'
+            ? `Updated subject counselling for ${allowedRecords.length} student(s) in Department of ${hodDeptName} (batch ${detectedBatch})!`
+            : `Updated & fixed subject counselling for ${allowedRecords.length} matched students in batch ${detectedBatch}!`
         );
       } else {
-        showToast(res.errors?.[0] || 'No matching student records found in the uploaded Excel file.');
+        showToast(
+          role === 'HOD'
+            ? `No matching students found in Department of ${hodDeptName}. HOD can only update subject counselling for their own department.`
+            : res.errors?.[0] || 'No matching student records found in the uploaded Excel file.'
+        );
       }
     } catch (err: any) {
       setIsUploadingCounsellingExcel(false);
@@ -803,6 +810,22 @@ export const CounsellingView: React.FC = () => {
     showToast(`Successfully exported ${allRecords.length} student subject counselling records to Excel!`);
   };
 
+  if ((role !== 'SUPER_ADMIN' && role !== 'HOD') || (role === 'HOD' && !hodDeptName)) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto my-12 shadow-2xl space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+          <ShieldCheck className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-white font-serif">
+          Restricted Access: Subject Counselling
+        </h2>
+        <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+          Subject Counselling &amp; Course Allotment records are accessible only to Super Admin or a logged-in Departmental HOD (restricted strictly to their own department).
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-12">
       {/* Toast Notification */}
@@ -816,15 +839,23 @@ export const CounsellingView: React.FC = () => {
       {/* Title Banner */}
       <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div>
-          <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono mb-1">
+          <div className="flex flex-wrap items-center gap-2 text-amber-400 text-xs font-mono mb-1">
             <GraduationCap className="w-4 h-4" />
             <span>{lang === 'or' ? 'ଏନ.ଇ.ପି. (NEP) ୨୦୨୦ • ଛାତ୍ର ବିଷୟ କାଉନସେଲିଂ ମ୍ୟାଟ୍ରିକ୍ସ' : 'NEP 2020 FRAMEWORK • STUDENT SUBJECT COUNSELLING & COURSE ALLOTMENT'}</span>
+            {role === 'HOD' && hodDeptName && (
+              <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold inline-flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Department Scope: {hodDeptName} Only
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-serif tracking-tight">
             {lang === 'or' ? 'ଛାତ୍ର ବିଷୟ କାଉନସେଲିଂ ଓ ପାଠ୍ୟକ୍ରମ ବଣ୍ଟନ' : 'Student Subject Counselling & Course Allotment'}
           </h1>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-            {lang === 'or'
+            {role === 'HOD' && hodDeptName
+              ? `Viewing and managing subject counselling strictly for Department of ${hodDeptName}${hodDeptMeta.hasAedp ? ' & its AEDP specialization' : ''} only.`
+              : lang === 'or'
               ? 'ଅଧିବେଶନ-ୱାର୍ଜ ଛାତ୍ରଛାତ୍ରୀଙ୍କ ନିୟମିତ ଅନର୍ସ (Major, Minor 1, Minor 2, MDC, SEC, AEC, VAC) ଏବଂ AEDP ସ୍ୱତନ୍ତ୍ର ପାଠ୍ୟକ୍ରମର ବିଷୟ ବଣ୍ଟନ।'
               : 'Year-wise student subject counselling records. Regular Honours include Major, Minor 1/2, MDC 1-3, SEC 1-3, AEC, VAC 1-2. AEDP courses include Major 1/2, MDC 1-2, AEC 1-2, SEC 1-2, VAC 1-2.'}
           </p>
@@ -916,16 +947,6 @@ export const CounsellingView: React.FC = () => {
                 </span>
               </button>
             ))}
-
-            <button
-              type="button"
-              onClick={() => setIsBatchModalOpen(true)}
-              className="px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 font-mono font-bold transition flex items-center gap-1.5"
-              title="View admission batch counts and correct student counts in batches"
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>{canEdit ? 'View / Correct Batch Count' : 'View Batch Counts'}</span>
-            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -972,18 +993,31 @@ export const CounsellingView: React.FC = () => {
           </div>
 
           {/* Stream Filter */}
-          <select
-            value={selectedStream}
-            onChange={(e) => setSelectedStream(e.target.value)}
-            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-mono"
-          >
-            <option value="ALL">{lang === 'or' ? 'ସମସ୍ତ ଶାଖା (Stream: ALL)' : 'Stream: All Streams'}</option>
-            <option value="Arts">Arts</option>
-            <option value="Physical Science">Physical Science</option>
-            <option value="Biological Science">Biological Science</option>
-            <option value="Commerce">Commerce</option>
-            <option value="Self Financing">Self Financing</option>
-          </select>
+          {role === 'HOD' ? (
+            <select
+              value="ALL"
+              disabled
+              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none disabled:opacity-60 font-mono"
+              title="Stream is automatically locked to your HOD department"
+            >
+              <option value="ALL">
+                Stream: {hodDeptMeta.streams.length > 0 ? hodDeptMeta.streams.join(' / ') : 'Department Only'}
+              </option>
+            </select>
+          ) : (
+            <select
+              value={selectedStream}
+              onChange={(e) => setSelectedStream(e.target.value)}
+              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-mono"
+            >
+              <option value="ALL">{lang === 'or' ? 'ସମସ୍ତ ଶାଖା (Stream: ALL)' : 'Stream: All Streams'}</option>
+              <option value="Arts">Arts</option>
+              <option value="Physical Science">Physical Science</option>
+              <option value="Biological Science">Biological Science</option>
+              <option value="Commerce">Commerce</option>
+              <option value="Self Financing">Self Financing</option>
+            </select>
+          )}
 
           {/* Department Filter */}
           <select
@@ -993,7 +1027,9 @@ export const CounsellingView: React.FC = () => {
             className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 disabled:opacity-60 font-mono"
           >
             {role === 'HOD' ? (
-              <option value={hodDeptName || ''}>Department: {hodDeptName} & Specializations</option>
+              <option value={hodDeptName || ''}>
+                Department: {hodDeptName}{hodDeptMeta.hasAedp ? ' & AEDP' : ' Only'}
+              </option>
             ) : (
               <>
                 <option value="ALL">{lang === 'or' ? 'ସମସ୍ତ ବିଭାଗ (Dept: ALL)' : 'Department: All Departments'}</option>
@@ -1590,7 +1626,7 @@ export const CounsellingView: React.FC = () => {
                   <tr>
                     <td colSpan={canEdit ? 7 : 6} className="py-12 text-center text-slate-400 space-y-3">
                       <p>{lang === 'or' ? 'କୌଣସି ଛାତ୍ରଛାତ୍ରୀ ରେକର୍ଡ ମିଳିଲା ନାହିଁ।' : 'No student subject counselling records found. Load sample student roster to view counselling allocations.'}</p>
-                      {students.length === 0 && (
+                      {students.length === 0 && role === 'SUPER_ADMIN' && (
                         <button
                           onClick={loadSampleStudents}
                           className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shadow hover:bg-amber-600 transition"
@@ -2229,14 +2265,6 @@ export const CounsellingView: React.FC = () => {
           </div>
         </div>
       )}
-      <BatchCorrectionModal
-        isOpen={isBatchModalOpen}
-        onClose={() => setIsBatchModalOpen(false)}
-        initialBatch={selectedSession}
-        canEdit={canEdit}
-        scopedDeptName={role === 'HOD' ? hodDeptName : null}
-        onSaved={(_count, msg) => showToast(msg)}
-      />
     </div>
   );
 };

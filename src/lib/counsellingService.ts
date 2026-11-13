@@ -2529,4 +2529,113 @@ function candSessionIndex(candidates: Student[], defaultSession: string): number
   return idx !== -1 ? idx : 0;
 }
 
+/**
+ * Strictly checks whether a student belongs to an HOD's department (including its AEDP specialization, if any).
+ * Prevents empty-string substring false positives and prevents cross-matching distinct departments like Mathematics vs Computer Science.
+ */
+export function isStudentInHodDept(
+  student: Student,
+  hodDept?: string | null,
+  counsellingRecord?: StudentCounsellingRecord
+): boolean {
+  const h = (hodDept || '').toLowerCase().trim();
+  if (!h || h === '__none__') return false;
+
+  const sDept = (student.department || '').toLowerCase().trim();
+
+  if (sDept) {
+    // 1. Exact match
+    if (sDept === h) return true;
+
+    // 2. Student department contains the full HOD department name (covers AEDP variants like
+    //    "B.A in Economics and data analytics (AEDP)" for "Economics", etc.)
+    //    Guard against matching "Computer Science" for anything unrelated, or "Science" substrings.
+    if (h.length >= 3 && sDept.includes(h)) {
+      return true;
+    }
+
+    // 3. Specific safe department <-> AEDP / abbreviation mappings
+    if (
+      (h === 'commerce' || h.includes('commerce') || h.includes('b.com')) &&
+      (sDept.includes('commerce') ||
+        sDept.includes('b.com') ||
+        sDept.includes('banking') ||
+        sDept.includes('bfsi') ||
+        sDept.includes('financial services'))
+    ) {
+      return true;
+    }
+    if (
+      h === 'english' &&
+      (sDept.includes('english') || sDept.includes('translation') || sDept.includes('digital humanities'))
+    ) {
+      return true;
+    }
+    if (
+      h === 'economics' &&
+      (sDept.includes('economics') || sDept.includes('econ') || sDept.includes('data analytics'))
+    ) {
+      return true;
+    }
+    if (
+      h === 'chemistry' &&
+      (sDept.includes('chemistry') || sDept.includes('industrial process') || sDept.includes('industrial chemistry'))
+    ) {
+      return true;
+    }
+    if (
+      h === 'mathematics' &&
+      !sDept.includes('computer') &&
+      (sDept.includes('mathematics') || /\bmath\b/.test(sDept))
+    ) {
+      return true;
+    }
+    if (
+      h === 'computer science' &&
+      (sDept.includes('computer science') || sDept.includes('comp. sc') || sDept.includes('comp sc'))
+    ) {
+      return true;
+    }
+    if (
+      h === 'botany' &&
+      (sDept.includes('botany') || sDept.includes('tissue culture') || sDept.includes('vertical gardening'))
+    ) {
+      return true;
+    }
+    if (
+      h === 'zoology' &&
+      (sDept.includes('zoology') || sDept.includes('integrative bioscience') || sDept.includes('biomedical'))
+    ) {
+      return true;
+    }
+    if (
+      h === 'history' &&
+      (sDept.includes('history') || sDept.includes('tourism and hospitality') || sDept.includes('heritage'))
+    ) {
+      return true;
+    }
+    if (
+      h === 'political science' &&
+      (sDept.includes('political science') || sDept.includes('pol. sc') || sDept.includes('pol sc'))
+    ) {
+      return true;
+    }
+  }
+
+  // 4. Fallback for AEDP records where student.department might be abbreviated/missing,
+  //    but counsellingRecord.aedp.major1 / major2 explicitly names the parent department.
+  //    Never check h.includes(m2) on empty/short strings to avoid leaking across departments.
+  if (counsellingRecord?.aedp && (!sDept || sDept.includes('aedp'))) {
+    const m1 = (counsellingRecord.aedp.major1 || '').toLowerCase().trim();
+    const m2 = (counsellingRecord.aedp.major2 || '').toLowerCase().trim();
+    if (h.length >= 3) {
+      if (m1 && m1.includes(h) && !(h === 'mathematics' && m1.includes('computer'))) return true;
+      if (m2 && m2.includes(h) && !(h === 'mathematics' && m2.includes('computer'))) return true;
+    }
+  }
+
+  return false;
+}
+
+
 

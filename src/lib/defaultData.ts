@@ -124,6 +124,7 @@ export const DEFAULT_HOD_ACCOUNTS: HodAccount[] = [
   { id: 'arts_sanskrit', deptName: 'Sanskrit', username: 'hod_sanskrit', password: 'Sans@baragada2026', hodName: 'Dr. Banita Padhi', phone: '9437123414', email: 'hod.sans@baragada.edu.in', updatedAt: new Date().toISOString() },
   { id: 'arts_psychology', deptName: 'Psychology', username: 'hod_psychology', password: 'Psych@baragada2026', hodName: 'Dr. Rashmi Rekha Kar', phone: '9437123415', email: 'hod.psych@baragada.edu.in', updatedAt: new Date().toISOString() },
   { id: 'arts_hindi', deptName: 'Hindi', username: 'hod_hindi', password: 'Hindi@baragada2026', hodName: 'Prof. Vijay Prasad Sharma', phone: '9437123416', email: 'hod.hindi@baragada.edu.in', updatedAt: new Date().toISOString() },
+  { id: 'faculty', deptName: 'Faculty', username: 'faculty', password: 'Faculty@baragada2026', hodName: 'Faculty Coordinator', phone: '9437123421', email: 'faculty@baragada.edu.in', updatedAt: new Date().toISOString() },
 ];
 
 export const DEFAULT_FACULTY: FacultyMember[] = [];

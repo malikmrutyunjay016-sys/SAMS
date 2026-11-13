@@ -6,6 +6,7 @@ import {
   generateDefaultCounselling,
   normalizeRollLookupKey,
   normalizeLookupKey,
+  isStudentInHodDept,
 } from '../lib/counsellingService';
 import { compareRollNumbers, compareStudentsByStreamDeptRoll } from '../lib/excelParser';
 import {
@@ -31,7 +32,11 @@ import * as XLSX from 'xlsx';
 
 export const PaperAccessView: React.FC = () => {
   const { students, seatMatrix, counsellingMap, t, lang } = useData();
-  const { role, hodDeptName, isHod, isAdmin } = useAuth();
+  const { role, hodDeptId, hodDeptName, isHod, isAdmin } = useAuth();
+  const isFacultyAccount = Boolean(
+    (isHod || role === 'HOD') &&
+      (hodDeptId === 'faculty' || (hodDeptName || '').toLowerCase().trim() === 'faculty')
+  );
 
   // Compulsory Filter States
   const [selectedYear, setSelectedYear] = useState<string>('');
@@ -59,8 +64,8 @@ export const PaperAccessView: React.FC = () => {
   // Course Types
   const courseTypeOptions = ['Regular NEP', 'AEDP'];
 
-  // Permission check for 'Major' paper type access (HOD of department or Admin)
-  const canAccessMajor = Boolean(isHod || isAdmin || role === 'HOD' || role === 'SUPER_ADMIN');
+  // Permission check for 'Major' paper type access (Department HOD or Admin, not general 'faculty' account)
+  const canAccessMajor = Boolean((isAdmin || role === 'SUPER_ADMIN') || ((isHod || role === 'HOD') && !isFacultyAccount));
 
   // Paper Types
   const paperTypeOptions = useMemo(() => {
@@ -124,24 +129,7 @@ export const PaperAccessView: React.FC = () => {
     return generateDefaultCounselling(student);
   };
 
-  // Helper to check if student belongs to HOD department or corresponding AEDP
-  const isStudentInHodDept = (student: Student, hodDept: string): boolean => {
-    if (!hodDept) return false;
-    const h = hodDept.toLowerCase().trim();
-    const sDept = (student.department || '').toLowerCase().trim();
-    if (sDept === h || sDept.includes(h) || h.includes(sDept)) return true;
-    if ((h.includes('commerce') || h.includes('comm') || h.includes('b.com')) &&
-        (sDept.includes('commerce') || sDept.includes('bank') || sDept.includes('finance') || sDept.includes('insurance') || sDept.includes('bfsi'))) return true;
-    if ((h.includes('english') || h.includes('eng')) &&
-        (sDept.includes('english') || sDept.includes('translation') || sDept.includes('digital humanities'))) return true;
-    if ((h.includes('econ') || h.includes('economics')) && (sDept.includes('econ') || sDept.includes('data analytics'))) return true;
-    if ((h.includes('chem') || h.includes('chemistry')) && (sDept.includes('chem') || sDept.includes('industrial process'))) return true;
-    if ((h.includes('math') || h.includes('comput')) && (sDept.includes('math') || sDept.includes('comput') || sDept.includes('algorithm'))) return true;
-    if ((h.includes('botan') || h.includes('botany')) && (sDept.includes('botan') || sDept.includes('tissue culture') || sDept.includes('agri'))) return true;
-    if ((h.includes('zool') || h.includes('zoology')) && (sDept.includes('zool') || sDept.includes('biomedical'))) return true;
-    if ((h.includes('hist') || h.includes('history')) && (sDept.includes('hist') || sDept.includes('tourism') || sDept.includes('heritage'))) return true;
-    return false;
-  };
+
 
   // Helper to extract paper for a student based on Course Type, Semester, and Paper Type
   const getStudentPaperForType = (
@@ -237,8 +225,8 @@ export const PaperAccessView: React.FC = () => {
       if (s.isClcTaken || s.status === 'CLC Taken') return;
       if (selectedYear && (s.academicYear || '2026-27') !== selectedYear) return;
 
-      if (role === 'HOD' && hodDeptName) {
-        if (!isStudentInHodDept(s, hodDeptName)) return;
+      if (role === 'HOD' && !isFacultyAccount) {
+        if (!hodDeptName || !isStudentInHodDept(s, hodDeptName, counsellingMap[s.id])) return;
       }
 
       const isAedp = Boolean(s.isAedp || s.department.toLowerCase().includes('aedp'));
@@ -252,7 +240,7 @@ export const PaperAccessView: React.FC = () => {
     });
 
     return Array.from(set).sort();
-  }, [selectedYear, selectedCourseType, selectedSemester, selectedPaperType, students, counsellingMap, role, hodDeptName]);
+  }, [selectedYear, selectedCourseType, selectedSemester, selectedPaperType, students, counsellingMap, role, hodDeptName, isFacultyAccount]);
 
   // Check if all compulsory fields are selected
   const isAllCompulsorySelected = Boolean(
@@ -270,8 +258,8 @@ export const PaperAccessView: React.FC = () => {
     return students.filter((s) => {
       if (s.isClcTaken || s.status === 'CLC Taken') return false;
 
-      if (role === 'HOD' && hodDeptName) {
-        if (!isStudentInHodDept(s, hodDeptName)) return false;
+      if (role === 'HOD' && !isFacultyAccount) {
+        if (!hodDeptName || !isStudentInHodDept(s, hodDeptName, counsellingMap[s.id])) return false;
       }
 
       const sYear = s.academicYear || '2026-27';
@@ -311,6 +299,7 @@ export const PaperAccessView: React.FC = () => {
     searchQuery,
     role,
     hodDeptName,
+    isFacultyAccount,
     counsellingMap,
   ]);
 
@@ -752,6 +741,22 @@ export const PaperAccessView: React.FC = () => {
     window.print();
   };
 
+  if (!isHod && !isAdmin && role !== 'HOD' && role !== 'SUPER_ADMIN') {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto my-12 shadow-2xl space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+          <BookCheck className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-white font-serif">
+          Restricted Access: HOD / Faculty Login Required
+        </h2>
+        <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+          Access to Minor, MDC, AEC, VAC, SEC &amp; Major paper rosters, attendance registers, and mark foils is restricted strictly to authorized HOD / Faculty accounts.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-12">
       {/* Title Banner */}
@@ -759,10 +764,14 @@ export const PaperAccessView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2 text-emerald-400 text-xs font-mono mb-1">
             <BookCheck className="w-4 h-4" />
-            <span>NEP 2020 SUBJECT ALLOTMENT MATRIX • MINOR, MDC, AEC, VAC, SEC INQUIRY</span>
+            <span>
+              {canAccessMajor
+                ? 'NEP 2020 SUBJECT ALLOTMENT MATRIX • MAJOR, MINOR, MDC, AEC, VAC, SEC INQUIRY'
+                : 'NEP 2020 SUBJECT ALLOTMENT MATRIX • MINOR, MDC, AEC, VAC, SEC INQUIRY'}
+            </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-serif tracking-tight">
-            Access Minor, MDC, AEC, VAC, SEC
+            {canAccessMajor ? 'Access Major, Minor, MDC, AEC, VAC, SEC' : 'Access Minor, MDC, AEC, VAC, SEC'}
           </h1>
           <p className="text-xs text-slate-400 mt-1 max-w-3xl">
             Select compulsory parameters (Session, Semester, Course Type, Paper Type, and Paper Name) to inspect paper allotments, generate student attendance registers, or produce official mark foils.

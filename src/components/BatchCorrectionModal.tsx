@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext';
 import {
   inferSessionFromStudent,
   inferRollBarcodeSession,
+  isStudentInHodDept,
 } from '../lib/counsellingService';
 import { compareRollNumbers } from '../lib/excelParser';
 import {
@@ -75,13 +76,17 @@ export const BatchCorrectionModal: React.FC<BatchCorrectionModalProps> = ({
 
   // Scope to HOD department if scopedDeptName is provided
   const scopedStudents = useMemo(() => {
-    if (!scopedDeptName) return students;
-    const h = scopedDeptName.toLowerCase().trim();
-    return students.filter((s) => {
-      const d = (s.department || '').toLowerCase().trim();
-      return d === h || d.includes(h) || h.includes(d);
-    });
+    if (scopedDeptName === null || scopedDeptName === undefined) return students;
+    return students.filter((s) => isStudentInHodDept(s, scopedDeptName));
   }, [students, scopedDeptName]);
+
+  const availableStreams = useMemo(() => {
+    const set = new Set<string>();
+    scopedStudents.forEach((s) => {
+      if (s.stream) set.add(s.stream);
+    });
+    return Array.from(set).sort();
+  }, [scopedStudents]);
 
   // Helper to resolve current vs staged batch & CLC status for each student
   const getOriginalBatch = (s: Student) =>
@@ -517,11 +522,21 @@ export const BatchCorrectionModal: React.FC<BatchCorrectionModalProps> = ({
             className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500"
           >
             <option value="ALL">All Streams</option>
-            <option value="Arts">Arts</option>
-            <option value="Physical Science">Physical Science</option>
-            <option value="Biological Science">Biological Science</option>
-            <option value="Commerce">Commerce</option>
-            <option value="Self Financing">Self Financing</option>
+            {scopedDeptName ? (
+              availableStreams.map((st) => (
+                <option key={st} value={st}>
+                  {st}
+                </option>
+              ))
+            ) : (
+              <>
+                <option value="Arts">Arts</option>
+                <option value="Physical Science">Physical Science</option>
+                <option value="Biological Science">Biological Science</option>
+                <option value="Commerce">Commerce</option>
+                <option value="Self Financing">Self Financing</option>
+              </>
+            )}
           </select>
 
           <select

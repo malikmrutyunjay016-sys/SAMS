@@ -321,7 +321,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [hodAccounts, setHodAccounts] = useState<HodAccount[]>(() => {
     const saved = safeGetLocalStorage(LS_PREFIX + 'hodAccounts');
-    return saved ? JSON.parse(saved) : DEFAULT_HOD_ACCOUNTS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as HodAccount[];
+        if (Array.isArray(parsed)) {
+          const hasFaculty = parsed.some((h) => h.id === 'faculty' || h.username === 'faculty');
+          const facultyDeleted = safeGetLocalStorage(LS_PREFIX + 'faculty_hod_deleted') === 'true';
+          if (!hasFaculty && !facultyDeleted) {
+            const facultyAcc = DEFAULT_HOD_ACCOUNTS.find((h) => h.id === 'faculty');
+            if (facultyAcc) return [...parsed, facultyAcc];
+          }
+          return parsed;
+        }
+      } catch {}
+    }
+    return DEFAULT_HOD_ACCOUNTS;
   });
 
   const [systemSettings, setSystemSettings] = useState<SystemSettings>(() => {
@@ -635,6 +649,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (snapshot) => {
         if (!snapshot.empty) {
           const docs = snapshot.docs.map((d) => d.data() as HodAccount);
+          const hasFaculty = docs.some((h) => h.id === 'faculty' || h.username === 'faculty');
+          const facultyDeleted = safeGetLocalStorage(LS_PREFIX + 'faculty_hod_deleted') === 'true';
+          if (!hasFaculty && !facultyDeleted) {
+            const facultyAcc = DEFAULT_HOD_ACCOUNTS.find((h) => h.id === 'faculty');
+            if (facultyAcc) {
+              setHodAccounts([...docs, facultyAcc]);
+              return;
+            }
+          }
           setHodAccounts(docs);
         } else {
           setHodAccounts(DEFAULT_HOD_ACCOUNTS);
@@ -1588,6 +1611,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteHodAccount = (id: string) => {
+    if (id === 'faculty') {
+      safeSaveLocalStorage(LS_PREFIX + 'faculty_hod_deleted', 'true');
+    }
     setHodAccounts((prev) => prev.filter((acc) => acc.id !== id));
     safeDeleteDoc(doc(db, 'hodAccounts', id));
     addAuditLog('HOD_ACCOUNT_DELETED', `Deleted HOD account ${id}.`);

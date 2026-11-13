@@ -419,14 +419,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [auditLogs]);
 
   useEffect(() => {
-    const list = Object.values(counsellingMap);
-    safeSaveLocalStorage(LS_PREFIX + 'counsellingRecords', JSON.stringify(list));
-    safeSaveLocalStorage('sams_counselling_records_v1', JSON.stringify(list));
+    // Only persist non-default (Allotted or edited) records to LocalStorage to stay well below the 5MB browser quota across all 3 batches,
+    // and remove the legacy duplicate key so it never causes QuotaExceededError.
+    try {
+      window.localStorage.removeItem('sams_counselling_records_v1');
+    } catch {}
+    const allottedList = Object.values(counsellingMap).filter(
+      (r) => r && (r.status === 'Allotted' || (r.updatedAt && r.updatedAt !== '1970-01-01T00:00:00.000Z'))
+    );
+    safeSaveLocalStorage(LS_PREFIX + 'counsellingRecords', JSON.stringify(allottedList));
   }, [counsellingMap]);
 
-  // Keep Subject Counselling strictly synchronized with the Student Master Database:
+  // Keep Subject Counselling strictly synchronized with the Student Master Database in memory:
   // 1) Remove any counselling record whose student is NOT in the master student database.
-  // 2) Create a blank counselling record for any student in the master student database who is not yet in subjectCounselling.
+  // 2) Provide a blank default counselling record in memory (with epoch updatedAt) for any master student not yet in counsellingMap.
+  // CRITICAL: Never overwrite Firestore with blank Pending records on page load!
   useEffect(() => {
     if (students.length === 0) return;
 
@@ -438,16 +445,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCounsellingMap((prev) => {
       let changed = false;
       const next: Record<string, StudentCounsellingRecord> = {};
-      const orphanKeysToDelete: string[] = [];
-      const missingBlankRecords: StudentCounsellingRecord[] = [];
 
       // Retain only records belonging to students in the master database
       Object.entries(prev).forEach(([key, rec]) => {
         const stu = studentMapById.get(key) || (rec?.studentId ? studentMapById.get(rec.studentId) : undefined);
         if (!stu) {
           changed = true;
-          orphanKeysToDelete.push(key);
         } else {
+          const trueBatch = inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo);
           next[stu.id] = {
             ...rec,
             id: stu.id,
@@ -455,39 +460,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             studentName: stu.name,
             rollNo: stu.rollNo,
             samsRegNo: stu.samsRegNo,
-            academicYear: inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo),
+            academicYear: trueBatch,
             stream: stu.stream,
             department: stu.department,
           };
-          if (key !== stu.id || rec.studentName !== stu.name || rec.rollNo !== stu.rollNo) {
+          if (
+            key !== stu.id ||
+            rec.studentName !== stu.name ||
+            rec.rollNo !== stu.rollNo ||
+            rec.academicYear !== trueBatch
+          ) {
             changed = true;
           }
         }
       });
 
-      // Ensure every student in the master database has a counselling record (blank if not yet assigned)
+      // Ensure every student in the master database has a counselling record in memory (blank if not yet assigned)
       students.forEach((stu) => {
         if (!next[stu.id]) {
-          const blankRec = generateDefaultCounselling(stu);
-          next[stu.id] = blankRec;
-          missingBlankRecords.push(blankRec);
+          next[stu.id] = generateDefaultCounselling(stu);
           changed = true;
         }
       });
-
-      if (orphanKeysToDelete.length > 0) {
-        orphanKeysToDelete.forEach((k) => {
-          const docId = String(k).replace(/[^a-zA-Z0-9_\-]/g, '_');
-          safeDeleteDoc(doc(db, 'subjectCounselling', docId));
-        });
-      }
-
-      if (missingBlankRecords.length > 0) {
-        missingBlankRecords.forEach((blankRec) => {
-          const docId = String(blankRec.id).replace(/[^a-zA-Z0-9_\-]/g, '_');
-          safeSetDoc(doc(db, 'subjectCounselling', docId), sanitizeCounsellingForFirestore(blankRec));
-        });
-      }
 
       return changed ? next : prev;
     });
@@ -717,13 +711,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const key = data.studentId || data.id || d.id;
               if (key) {
                 const localRec = prev[key];
-                if (
+                const isLocalBlank =
                   !localRec ||
+                  localRec.status === 'Pending' ||
+                  localRec.updatedAt === '1970-01-01T00:00:00.000Z';
+                const isRemoteAllotted = data.status === 'Allotted';
+
+                if (
+                  isLocalBlank ||
+                  (isRemoteAllotted && localRec?.status !== 'Allotted') ||
                   !localRec.updatedAt ||
                   !data.updatedAt ||
                   new Date(data.updatedAt).getTime() >= new Date(localRec.updatedAt).getTime()
                 ) {
-                  next[key] = data;
+                  // Only overwrite an Allotted localRec if the remote doc is also Allotted or newer
+                  if (!isLocalBlank && localRec?.status === 'Allotted' && data.status === 'Pending') {
+                    // Keep the Allotted localRec over a stale Pending doc
+                  } else {
+                    next[key] = data;
+                  }
                 }
               }
             });
@@ -1687,11 +1693,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? 'replace-all'
         : 'merge';
 
-    const defaultSession =
-      normalizeSessionString(targetAcademicYear) ||
-      normalizeSessionString(records[0]?.academicYear) ||
-      '2026-27';
-
     const masterStudentById = new Map<string, Student>();
     students.forEach((s) => {
       if (s && s.id) masterStudentById.set(s.id, s);
@@ -1703,6 +1704,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return Boolean(key && masterStudentById.has(key));
     });
 
+    // Determine the actual batch(es) present in the uploaded records first so even if the user left the batch dropdown
+    // on a different year, we update the exact batch from the Excel file!
+    const detectedRecordBatch =
+      normalizeSessionString(validRecords[0]?.academicYear) ||
+      normalizeSessionString(records[0]?.academicYear);
+    const defaultSession =
+      detectedRecordBatch ||
+      normalizeSessionString(targetAcademicYear) ||
+      '2026-27';
+
     // 1. Immediately update React state and LocalStorage for zero latency
     setCounsellingMap((prev) => {
       let next: Record<string, StudentCounsellingRecord>;
@@ -1712,12 +1723,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         next = {};
         // Preserve records belonging to other academic batches (only for valid master students)!
         Object.entries(prev).forEach(([k, rec]) => {
-          if (
-            rec &&
-            masterStudentById.has(k) &&
-            normalizeSessionString(rec.academicYear) !== defaultSession
-          ) {
-            next[k] = rec;
+          const stu = masterStudentById.get(k);
+          if (rec && stu) {
+            const stuBatch = inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo);
+            if (stuBatch !== defaultSession) {
+              next[k] = rec;
+            }
           }
         });
       } else {
@@ -1745,7 +1756,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             stream: stu.stream,
             department: stu.department,
             academicYear: recSession,
-            updatedAt: r.updatedAt || nowIso,
+            updatedAt: nowIso,
           };
         }
       });
@@ -1757,9 +1768,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      const list = Object.values(next);
-      safeSaveLocalStorage(LS_PREFIX + 'counsellingRecords', JSON.stringify(list.slice(0, 5000)));
-      safeSaveLocalStorage('sams_counselling_records_v1', JSON.stringify(list.slice(0, 5000)));
+      try {
+        window.localStorage.removeItem('sams_counselling_records_v1');
+      } catch {}
+      const allottedList = Object.values(next).filter(
+        (r) => r && (r.status === 'Allotted' || (r.updatedAt && r.updatedAt !== '1970-01-01T00:00:00.000Z'))
+      );
+      safeSaveLocalStorage(LS_PREFIX + 'counsellingRecords', JSON.stringify(allottedList));
 
       return next;
     });

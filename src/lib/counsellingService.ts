@@ -284,7 +284,7 @@ export function generateDefaultCounselling(student: Student): StudentCounselling
     allottedDate: '',
     counselorName: 'Pending Admin/HOD Assignment',
     remarks: 'Subject counselling not assigned. To be filled by Admin or HOD.',
-    updatedAt: new Date().toISOString(),
+    updatedAt: '1970-01-01T00:00:00.000Z',
   };
 
   if (isAedp) {
@@ -652,6 +652,100 @@ export function exportCounsellingExcel(
 
   const cleanYear = academicYear.replace(/[^a-zA-Z0-9]/g, '_');
   XLSX.writeFile(wb, `SAMS_PCB_Subject_Counselling_${cleanYear}.xlsx`);
+}
+
+export interface DefaulterStudentEntry {
+  student: Student;
+  record: StudentCounsellingRecord;
+  batch: string;
+  missingUnivRoll: boolean;
+  missingCounselling: boolean;
+  missingFields: string[];
+}
+
+export function exportDefaulterListExcel(
+  entries: DefaulterStudentEntry[],
+  sessionLabel: string = 'All_Batches',
+  deptLabel: string = 'All_Departments'
+) {
+  const wb = XLSX.utils.book_new();
+
+  // Group by department for summary
+  const deptStatsMap = new Map<
+    string,
+    {
+      stream: string;
+      department: string;
+      totalDefaulters: number;
+      missingUnivRoll: number;
+      missingCounselling: number;
+      missingBoth: number;
+    }
+  >();
+
+  entries.forEach((e) => {
+    const dept = e.student.department || 'General';
+    const cur = deptStatsMap.get(dept) || {
+      stream: e.student.stream || 'Arts',
+      department: dept,
+      totalDefaulters: 0,
+      missingUnivRoll: 0,
+      missingCounselling: 0,
+      missingBoth: 0,
+    };
+    cur.totalDefaulters++;
+    if (e.missingUnivRoll) cur.missingUnivRoll++;
+    if (e.missingCounselling) cur.missingCounselling++;
+    if (e.missingUnivRoll && e.missingCounselling) cur.missingBoth++;
+    deptStatsMap.set(dept, cur);
+  });
+
+  const summaryRows = Array.from(deptStatsMap.values())
+    .sort((a, b) => a.department.localeCompare(b.department))
+    .map((d, i) => ({
+      'Sl No': i + 1,
+      Stream: d.stream,
+      'Department / Honours': d.department,
+      'Total Defaulters': d.totalDefaulters,
+      'Univ Roll No Not Filled': d.missingUnivRoll,
+      'Subject Counselling Not Filled': d.missingCounselling,
+      'Both Univ Roll & Counselling Pending': d.missingBoth,
+    }));
+
+  if (summaryRows.length > 0) {
+    const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Department_Summary');
+  }
+
+  const detailRows = entries.map((e, idx) => {
+    const uRoll = (e.student.universityRollNo || e.record.universityRollNo || '').trim();
+    const cleanUniv = uRoll && uRoll !== 'N/A' && uRoll !== 'NA' && uRoll !== '-' ? uRoll : 'NOT FILLED';
+    return {
+      'Sl No': idx + 1,
+      'Admission Batch': e.batch,
+      Stream: e.student.stream,
+      'Department / Honours': e.student.department,
+      'College Roll No': e.student.rollNo,
+      'SAMS Barcode': e.student.samsRegNo,
+      'Student Name': e.student.name,
+      "Father's Name": e.student.parentName || 'N/A',
+      'University Roll No': cleanUniv,
+      'University Roll Status': e.missingUnivRoll ? 'Pending / Not Filled' : 'Filled',
+      'Subject Counselling Status': e.missingCounselling ? 'Pending / Not Filled' : 'Completed',
+      'Missing Counselling Papers': e.missingCounselling ? e.missingFields.join(', ') : 'None',
+    };
+  });
+
+  const wsDetails = XLSX.utils.json_to_sheet(
+    detailRows.length > 0
+      ? detailRows
+      : [{ Info: 'No defaulting students found for the selected filters.' }]
+  );
+  XLSX.utils.book_append_sheet(wb, wsDetails, 'Defaulter_List');
+
+  const safeDept = deptLabel.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 25);
+  const safeSess = sessionLabel.replace(/[^a-zA-Z0-9_-]/g, '_');
+  XLSX.writeFile(wb, `SAMS_Defaulter_List_${safeSess}_${safeDept}.xlsx`);
 }
 
 export interface SubjectAllocationEntry {
@@ -1311,13 +1405,19 @@ export async function parseCounsellingExcelFile(
 
           const nKey = normalizeLookupKey(stu.name);
           const dKey = normalizeLookupKey(stu.department);
+          const stuSess = inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo);
           if (nKey) {
-            if (dKey) byNameDept.set(`${nKey}_${dKey}`, stu);
+            if (dKey) {
+              byNameDept.set(`${stuSess}_${nKey}_${dKey}`, stu);
+              byNameDept.set(`${nKey}_${dKey}`, stu);
+            }
             const arr = byName.get(nKey) || [];
             arr.push(stu);
             byName.set(nKey, arr);
           }
         });
+
+        const fileSessionHint = normalizeSessionString(file.name);
 
         const parsedMap = new Map<string, StudentCounsellingRecord>();
         const newStudentsToCreate: Student[] = [];
@@ -1991,6 +2091,24 @@ export async function parseCounsellingExcelFile(
 
           const sheetIsAedp = sheetName.toLowerCase().includes('aedp');
 
+          // Pre-scan first 40 data rows of this sheet to auto-detect the batch from Roll No / Barcode / Session column
+          const sheetSessionCounts: Record<string, number> = { '2024-25': 0, '2025-26': 0, '2026-27': 0 };
+          for (let sIdx = dataStartRowIdx; sIdx < Math.min(rows.length, dataStartRowIdx + 40); sIdx++) {
+            const sRow = rows[sIdx];
+            if (!Array.isArray(sRow)) continue;
+            const sRoll = (colRoll !== -1 ? cleanCellStr(sRow[colRoll]) : '').toUpperCase();
+            const sBar = (colBarcode !== -1 ? cleanCellStr(sRow[colBarcode]) : '').toUpperCase();
+            const sSess = colSession !== -1 ? normalizeSessionString(cleanCellStr(sRow[colSession])) : '';
+            if (sRoll.includes('24-') || sBar.startsWith('24D') || sSess === '2024-25') sheetSessionCounts['2024-25']++;
+            else if (sRoll.includes('25-') || sBar.startsWith('25D') || sSess === '2025-26') sheetSessionCounts['2025-26']++;
+            else if (sRoll.includes('26-') || sBar.startsWith('26D') || sSess === '2026-27') sheetSessionCounts['2026-27']++;
+          }
+          let detectedSheetBatch = normalizeSessionString(sheetName) || fileSessionHint || normalizeSessionString(defaultSession) || '2026-27';
+          const topDetected = Object.entries(sheetSessionCounts).sort((a, b) => b[1] - a[1])[0];
+          if (topDetected && topDetected[1] >= 2) {
+            detectedSheetBatch = topDetected[0];
+          }
+
           for (let rIdx = dataStartRowIdx; rIdx < rows.length; rIdx++) {
             const row = rows[rIdx];
             if (!Array.isArray(row)) continue;
@@ -2032,7 +2150,7 @@ export async function parseCounsellingExcelFile(
               rawRoll,
               rawBarcode,
               sheetName,
-              defaultSession
+              detectedSheetBatch
             );
 
             // Match student from existingStudents
@@ -2057,10 +2175,11 @@ export async function parseCounsellingExcelFile(
             if (!matchedStudent && rawName) {
               const nKey = normalizeLookupKey(rawName);
               const dKey = normalizeLookupKey(rawMajor1);
-              if (dKey && byNameDept.has(`${nKey}_${dKey}`)) {
+              if (dKey && byNameDept.has(`${rowExpectedSession}_${nKey}_${dKey}`)) {
+                matchedStudent = byNameDept.get(`${rowExpectedSession}_${nKey}_${dKey}`);
+              } else if (dKey && byNameDept.has(`${nKey}_${dKey}`)) {
                 const cand = byNameDept.get(`${nKey}_${dKey}`)!;
-                const candSession = normalizeSessionString(cand.academicYear) || '2026-27';
-                // Only match by name if the candidate belongs to the same admission batch (or if no roll/barcode batch conflict exists)
+                const candSession = inferSessionFromStudent(cand.academicYear, cand, cand.rollNo, cand.samsRegNo);
                 if (candSession === rowExpectedSession) {
                   matchedStudent = cand;
                 }
@@ -2068,7 +2187,10 @@ export async function parseCounsellingExcelFile(
               if (!matchedStudent && byName.has(nKey)) {
                 const sameSessionCandidates = byName
                   .get(nKey)!
-                  .filter((c) => (normalizeSessionString(c.academicYear) || '2026-27') === rowExpectedSession);
+                  .filter(
+                    (c) =>
+                      inferSessionFromStudent(c.academicYear, c, c.rollNo, c.samsRegNo) === rowExpectedSession
+                  );
                 if (sameSessionCandidates.length === 1) {
                   matchedStudent = sameSessionCandidates[0];
                 } else if (sameSessionCandidates.length > 1 && rawMajor1) {
@@ -2088,7 +2210,7 @@ export async function parseCounsellingExcelFile(
               rawRoll,
               rawBarcode,
               sheetName,
-              defaultSession
+              detectedSheetBatch
             );
             const cleanSams = (rawBarcode || '').trim();
             const cleanRoll = (rawRoll || '').trim();
@@ -2117,11 +2239,18 @@ export async function parseCounsellingExcelFile(
               matchedCount++;
             }
 
-            // Determine base record to merge with (always anchored to the master student record)
+            // Determine base record to merge with:
+            // On the first sheet in the uploaded workbook (!alreadyInWorkbook), start from a clean default record
+            // for matchedStudent (preserving existing universityRollNo if not provided in this sheet) so that
+            // uploading an Excel sheet cleanly fixes all subject columns for that student.
+            const prevExistingUnivRoll = existingMap[studentId]?.universityRollNo;
+            const freshDefault = generateDefaultCounselling(matchedStudent);
+            if (prevExistingUnivRoll && prevExistingUnivRoll !== 'N/A') {
+              freshDefault.universityRollNo = prevExistingUnivRoll;
+            }
+
             const baseRecord: StudentCounsellingRecord =
-              parsedMap.get(studentId) ||
-              existingMap[studentId] ||
-              generateDefaultCounselling(matchedStudent);
+              parsedMap.get(studentId) || freshDefault;
 
             baseRecord.id = matchedStudent.id;
             baseRecord.studentId = matchedStudent.id;
@@ -2334,16 +2463,6 @@ export async function parseCounsellingExcelFile(
             parsedMap.set(studentId, baseRecord);
           }
         }
-
-        // For any student in the master database belonging to the target admission batch who was NOT in the uploaded Excel sheet,
-        // ensure a blank subject counselling record exists for them.
-        const targetBatchNorm = normalizeSessionString(defaultSession) || '2026-27';
-        existingStudents.forEach((stu) => {
-          const stuSession = inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo);
-          if (stuSession === targetBatchNorm && !parsedMap.has(stu.id)) {
-            parsedMap.set(stu.id, generateDefaultCounselling(stu));
-          }
-        });
 
         const finalRecords = Array.from(parsedMap.values());
         resolve({

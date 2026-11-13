@@ -619,13 +619,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       }
 
       if (res.success && res.records.length > 0) {
-        bulkSaveCounsellingRecords(res.records, counsellingReplaceMode, counsellingImportSession);
+        const detectedBatch = res.records[0]?.academicYear || counsellingImportSession;
+        setCounsellingImportSession(detectedBatch);
+        setCounsellingAdminSessionFilter(detectedBatch);
+        bulkSaveCounsellingRecords(res.records, counsellingReplaceMode, detectedBatch);
         showToast(
           'success',
-          `Successfully updated subject counselling for ${res.matchedCount} matched students from "${file.name}"! Reflected live in Menu -> Subject Counselling.`
+          `Successfully updated & fixed subject counselling for ${res.matchedCount} matched students in batch ${detectedBatch} from "${file.name}"! Reflected live in Menu -> Subject Counselling.`
         );
         setCounsellingImportStatus(
-          `Updated subject counselling for ${res.matchedCount} matched students in batch ${counsellingImportSession}${res.unmatchedCount > 0 ? ` (${res.unmatchedCount} names not in student database were skipped from master DB)` : ''}.`
+          `Updated & fixed subject counselling for ${res.matchedCount} matched students in batch ${detectedBatch}${res.unmatchedCount > 0 ? ` (${res.unmatchedCount} names not in student database were skipped from master DB)` : ''}.`
         );
       } else {
         const errMsg = res.errors?.[0] || 'Could not extract subject counselling records from the uploaded file.';
@@ -660,13 +663,16 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       setCounsellingImportResult(res);
 
       if (res.success && res.records.length > 0) {
-        bulkSaveCounsellingRecords(res.records, counsellingReplaceMode, counsellingImportSession);
+        const detectedBatch = res.records[0]?.academicYear || counsellingImportSession;
+        setCounsellingImportSession(detectedBatch);
+        setCounsellingAdminSessionFilter(detectedBatch);
+        bulkSaveCounsellingRecords(res.records, counsellingReplaceMode, detectedBatch);
         showToast(
           'success',
-          `Re-imported subject counselling for ${res.matchedCount} matched students in batch ${counsellingImportSession}!`
+          `Re-imported & fixed subject counselling for ${res.matchedCount} matched students in batch ${detectedBatch}!`
         );
         setCounsellingImportStatus(
-          `Re-applied column mappings for ${res.matchedCount} matched students in batch ${counsellingImportSession}${res.unmatchedCount > 0 ? ` (${res.unmatchedCount} names not in student database were skipped from master DB)` : ''}.`
+          `Re-applied column mappings for ${res.matchedCount} matched students in batch ${detectedBatch}${res.unmatchedCount > 0 ? ` (${res.unmatchedCount} names not in student database were skipped from master DB)` : ''}.`
         );
       }
     } catch (err: any) {

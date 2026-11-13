@@ -5,9 +5,9 @@ import { Student, StudentCounsellingRecord, StreamType } from '../types';
 import {
   generateDefaultCounselling,
   exportCounsellingExcel,
-  exportCategorySubjectExcel,
-  extractSubjectAllocations,
-  SubjectAllocationEntry,
+  exportDefaulterListExcel,
+  DefaulterStudentEntry,
+  parseCounsellingExcelFile,
   normalizeRollLookupKey,
   normalizeLookupKey,
   normalizeSessionString,
@@ -17,10 +17,12 @@ import { compareRollNumbers, compareStudentsByStreamDeptRoll } from '../lib/exce
 import {
   GraduationCap,
   Download,
+  Upload,
   Search,
   Filter,
   Edit2,
   CheckCircle2,
+  AlertTriangle,
   BookOpen,
   Award,
   Sparkles,
@@ -37,7 +39,16 @@ import {
 const LS_COUNSELLING_KEY = 'SAMS_BARAGADA_V4_counsellingRecords';
 
 export const CounsellingView: React.FC = () => {
-  const { students, seatMatrix, loadSampleStudents, counsellingMap, saveCounsellingRecord, t, lang } = useData();
+  const {
+    students,
+    seatMatrix,
+    loadSampleStudents,
+    counsellingMap,
+    saveCounsellingRecord,
+    bulkSaveCounsellingRecords,
+    t,
+    lang,
+  } = useData();
   const { role, hodDeptName } = useAuth();
   const canEdit = role === 'SUPER_ADMIN' || role === 'HOD';
 
@@ -55,9 +66,10 @@ export const CounsellingView: React.FC = () => {
   // Pagination & View Mode state
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 25;
-  const [viewMode, setViewMode] = useState<'table' | 'excel' | 'subject_details'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'excel' | 'defaulter_list'>('table');
   const [excelSheet, setExcelSheet] = useState<'regular' | 'aedp'>('regular');
-  const [activeCategoryTab, setActiveCategoryTab] = useState<'MINOR' | 'MDC' | 'AEC' | 'VAC' | 'SEC'>('MDC');
+  const [defaulterFilterType, setDefaulterFilterType] = useState<'all' | 'both' | 'univ_roll' | 'counselling'>('all');
+  const [isUploadingCounsellingExcel, setIsUploadingCounsellingExcel] = useState(false);
 
   // Secondary lookup index by Roll No, SAMS Barcode, Univ Roll, and session-scoped Name in case records were imported by Roll/Barcode
   const counsellingByRollOrBarcode = useMemo(() => {
@@ -381,32 +393,6 @@ export const CounsellingView: React.FC = () => {
 
   const totalPages = Math.ceil(activeStudentList.length / pageSize) || 1;
 
-  // Memoized category allocations for Minor, MDC, AEC, VAC, SEC Details tab (exclude CLC Taken students)
-  const categoryAllocations = useMemo(() => {
-    const allRecords = filteredStudents
-      .filter((s) => !s.isClcTaken && s.status !== 'CLC Taken')
-      .map((s) => getRecordForStudent(s));
-    const raw = extractSubjectAllocations(allRecords, activeCategoryTab);
-    const list = selectedSemester === 'ALL'
-      ? raw
-      : raw.filter(
-          (a) => a.semester === selectedSemester || a.semesterTag.toLowerCase().includes(selectedSemester.toLowerCase())
-        );
-    return list.sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
-  }, [filteredStudents, activeCategoryTab, selectedSemester, counsellingMap]);
-
-  const uniqueSubjectsCount = useMemo(() => {
-    return new Set(categoryAllocations.map((a) => a.subjectName)).size;
-  }, [categoryAllocations]);
-
-  const handleDownloadCategoryExcel = (cat: 'MINOR' | 'MDC' | 'AEC' | 'VAC' | 'SEC') => {
-    const allRecords = filteredStudents
-      .filter((s) => !s.isClcTaken && s.status !== 'CLC Taken')
-      .map((s) => getRecordForStudent(s));
-    exportCategorySubjectExcel(allRecords, cat, `${selectedSession}_${selectedSemester}`);
-    showToast(`Successfully downloaded ${cat} subject roster details for ${selectedSession} (${selectedSemester})!`);
-  };
-
   const handleOpenEdit = (student: Student) => {
     if (role === 'HOD' && hodDeptName && !isStudentInHodDept(student, hodDeptName)) {
       showToast(`Access Denied: HOD can only access/edit students from ${hodDeptName} and corresponding AEDP courses.`);
@@ -455,6 +441,140 @@ export const CounsellingView: React.FC = () => {
     showToast(`Successfully updated subject counselling record for ${editForm.studentName}!`);
   };
 
+  // Defaulter evaluation helpers (University Roll Number + Subject Counselling)
+  const allDefaulterCandidates = useMemo<DefaulterStudentEntry[]>(() => {
+    const activeList = filteredStudents.filter((s) => !s.isClcTaken && s.status !== 'CLC Taken');
+    const results: DefaulterStudentEntry[] = [];
+
+    activeList.forEach((s) => {
+      const rec = getRecordForStudent(s);
+      const batch = inferSessionFromStudent(
+        s.academicYear || rec.academicYear || '',
+        s,
+        s.rollNo || rec.rollNo,
+        s.samsRegNo || rec.samsRegNo
+      );
+      const rawUniv = (s.universityRollNo || rec.universityRollNo || '').trim();
+      const missingUnivRoll =
+        !rawUniv ||
+        rawUniv.toUpperCase() === 'N/A' ||
+        rawUniv.toUpperCase() === 'NA' ||
+        rawUniv === '-' ||
+        rawUniv.toUpperCase() === 'PENDING';
+
+      const missingFields: string[] = [];
+      if (rec.isAedp) {
+        const a = rec.aedp;
+        if (!a?.major2?.trim() || a.major2.trim() === '-') missingFields.push('Major 2');
+        if (!a?.mdc1?.trim() || a.mdc1.trim() === '-') missingFields.push('MDC 1');
+        if (!a?.aec1?.trim() || a.aec1.trim() === '-') missingFields.push('AEC 1');
+        if (!a?.sec1?.trim() || a.sec1.trim() === '-') missingFields.push('SEC 1');
+      } else {
+        const r = rec.regular;
+        if (!r?.minor1?.trim() || r.minor1.trim() === '-') missingFields.push('Minor 1');
+        if (!r?.minor2?.trim() || r.minor2.trim() === '-') missingFields.push('Minor 2');
+        if (!r?.mdc1?.trim() || r.mdc1.trim() === '-') missingFields.push('MDC 1');
+        if (!r?.aec1?.trim() || r.aec1.trim() === '-') missingFields.push('AEC 1');
+        if (!r?.sec1?.trim() || r.sec1.trim() === '-') missingFields.push('SEC 1');
+      }
+
+      const missingCounselling = rec.status === 'Pending' || missingFields.length > 0;
+
+      if (missingUnivRoll || missingCounselling) {
+        results.push({
+          student: s,
+          record: rec,
+          batch,
+          missingUnivRoll,
+          missingCounselling,
+          missingFields: missingFields.length > 0 ? missingFields : ['Subject Counselling Not Assigned'],
+        });
+      }
+    });
+
+    return results;
+  }, [filteredStudents, counsellingMap]);
+
+  const filteredDefaulters = useMemo(() => {
+    return allDefaulterCandidates.filter((d) => {
+      if (defaulterFilterType === 'both') return d.missingUnivRoll && d.missingCounselling;
+      if (defaulterFilterType === 'univ_roll') return d.missingUnivRoll;
+      if (defaulterFilterType === 'counselling') return d.missingCounselling;
+      return d.missingUnivRoll || d.missingCounselling;
+    });
+  }, [allDefaulterCandidates, defaulterFilterType]);
+
+  // Group defaulters department-wise
+  const departmentWiseDefaulters = useMemo(() => {
+    const deptTotals = new Map<string, number>();
+    filteredStudents
+      .filter((s) => !s.isClcTaken && s.status !== 'CLC Taken')
+      .forEach((s) => {
+        const dept = s.department || 'General';
+        deptTotals.set(dept, (deptTotals.get(dept) || 0) + 1);
+      });
+
+    const groups = new Map<
+      string,
+      {
+        department: string;
+        stream: string;
+        totalDeptStudents: number;
+        missingUnivRollCount: number;
+        missingCounsellingCount: number;
+        missingBothCount: number;
+        items: DefaulterStudentEntry[];
+      }
+    >();
+
+    filteredDefaulters.forEach((entry) => {
+      const dept = entry.student.department || 'General';
+      const existing = groups.get(dept) || {
+        department: dept,
+        stream: entry.student.stream || 'Arts',
+        totalDeptStudents: deptTotals.get(dept) || 0,
+        missingUnivRollCount: 0,
+        missingCounsellingCount: 0,
+        missingBothCount: 0,
+        items: [],
+      };
+      if (entry.missingUnivRoll) existing.missingUnivRollCount++;
+      if (entry.missingCounselling) existing.missingCounsellingCount++;
+      if (entry.missingUnivRoll && entry.missingCounselling) existing.missingBothCount++;
+      existing.items.push(entry);
+      groups.set(dept, existing);
+    });
+
+    return Array.from(groups.values()).sort((a, b) => a.department.localeCompare(b.department));
+  }, [filteredDefaulters, filteredStudents]);
+
+  const handleDirectCounsellingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingCounsellingExcel(true);
+    try {
+      const targetSess = selectedSession === 'ALL' ? '2026-27' : selectedSession;
+      const res = await parseCounsellingExcelFile(file, students, counsellingMap, targetSess);
+      setIsUploadingCounsellingExcel(false);
+      if (res.success && res.records.length > 0) {
+        const detectedBatch = res.records[0]?.academicYear || targetSess;
+        bulkSaveCounsellingRecords(res.records, 'merge', detectedBatch);
+        if (selectedSession !== 'ALL' && detectedBatch && detectedBatch !== selectedSession) {
+          setSelectedSession(detectedBatch);
+        }
+        showToast(
+          `Updated & fixed subject counselling for ${res.matchedCount} matched students in batch ${detectedBatch}!`
+        );
+      } else {
+        showToast(res.errors?.[0] || 'No matching student records found in the uploaded Excel file.');
+      }
+    } catch (err: any) {
+      setIsUploadingCounsellingExcel(false);
+      showToast(err?.message || 'Error parsing Subject Counselling Excel file.');
+    }
+    e.target.value = '';
+  };
+
   const handleExportAll = () => {
     const allRecords = filteredStudents.map((s) => getRecordForStudent(s));
     exportCounsellingExcel(allRecords, selectedSession);
@@ -489,7 +609,7 @@ export const CounsellingView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center space-x-1">
+          <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex flex-wrap items-center gap-1">
             <button
               onClick={() => setViewMode('table')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
@@ -507,15 +627,30 @@ export const CounsellingView: React.FC = () => {
               Excel Matrix View
             </button>
             <button
-              onClick={() => setViewMode('subject_details')}
+              onClick={() => setViewMode('defaulter_list')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center ${
-                viewMode === 'subject_details' ? 'bg-purple-500 text-slate-950 shadow' : 'text-purple-300 hover:text-white'
+                viewMode === 'defaulter_list'
+                  ? 'bg-rose-500 text-white shadow'
+                  : 'text-rose-300 hover:text-white bg-rose-500/10 border border-rose-500/30'
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5 mr-1.5" />
-              Access Minor, MDC, AEC, VAC, SEC Details
+              <AlertTriangle className="w-3.5 h-3.5 mr-1.5" />
+              Defaulter List ({allDefaulterCandidates.length})
             </button>
           </div>
+
+          {canEdit && (
+            <label className="px-3.5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center shadow-lg transition cursor-pointer">
+              <Upload className="w-4 h-4 mr-1.5" />
+              <span>{isUploadingCounsellingExcel ? 'Updating...' : 'Upload Counselling Excel'}</span>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleDirectCounsellingUpload}
+                className="hidden"
+              />
+            </label>
+          )}
 
           <button
             onClick={handleExportAll}
@@ -683,118 +818,8 @@ export const CounsellingView: React.FC = () => {
         </div>
       </div>
 
-      {/* Subject Details View vs Excel Matrix View vs Table View */}
-      {viewMode === 'subject_details' ? (
-        <div className="space-y-6">
-          {/* Interactive Subject Roster Table by Category */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-slate-400 text-xs font-mono font-bold mr-1">Select Category:</span>
-                {[
-                  { id: 'MINOR', label: 'Minor Subjects' },
-                  { id: 'MDC', label: 'MDC (Multidisciplinary)' },
-                  { id: 'AEC', label: 'AEC (Ability Enhancement)' },
-                  { id: 'VAC', label: 'VAC (Value Added)' },
-                  { id: 'SEC', label: 'SEC (Skill Enhancement)' },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveCategoryTab(tab.id as any)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border ${
-                      activeCategoryTab === tab.id
-                        ? 'bg-purple-500 text-slate-950 border-purple-400 shadow-md'
-                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={() => handleDownloadCategoryExcel(activeCategoryTab)}
-                className="px-4 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center shadow transition"
-              >
-                <Download className="w-4 h-4 mr-1.5" />
-                Download {activeCategoryTab} Excel
-              </button>
-            </div>
-
-            {/* Summary KPI stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 font-mono text-xs">
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex justify-between items-center">
-                <span className="text-slate-400">Total Allocations:</span>
-                <strong className="text-purple-300 text-sm font-bold">{categoryAllocations.length}</strong>
-              </div>
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex justify-between items-center">
-                <span className="text-slate-400">Unique Subjects:</span>
-                <strong className="text-amber-300 text-sm font-bold">{uniqueSubjectsCount}</strong>
-              </div>
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex justify-between items-center">
-                <span className="text-slate-400">Course Year / Batch:</span>
-                <strong className="text-emerald-300 text-sm font-bold">{selectedSession}</strong>
-              </div>
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex justify-between items-center">
-                <span className="text-slate-400">Filtered Semester:</span>
-                <strong className="text-cyan-300 text-sm font-bold">{selectedSemester}</strong>
-              </div>
-            </div>
-
-            {/* Detailed Table */}
-            <div className="overflow-x-auto max-h-[60vh] rounded-2xl border border-slate-800">
-              <table className="w-full text-left text-xs text-slate-200 border-collapse font-mono">
-                <thead className="bg-slate-950 text-purple-300 uppercase text-[10px] sticky top-0 z-10 border-b border-slate-800">
-                  <tr>
-                    <th className="py-3 px-3">Sl</th>
-                    <th className="py-3 px-3">Session</th>
-                    <th className="py-3 px-3">Roll & Univ Roll</th>
-                    <th className="py-3 px-3">Student Name</th>
-                    <th className="py-3 px-3">Dept & Stream</th>
-                    <th className="py-3 px-3">Course Type</th>
-                    <th className="py-3 px-3">Allocated Subject Name</th>
-                    <th className="py-3 px-3">Semester / Module</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-[11px]">
-                  {categoryAllocations.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400 font-sans">
-                        No subject allocations found for category <strong>{activeCategoryTab}</strong> under session {selectedSession}.
-                      </td>
-                    </tr>
-                  ) : (
-                    categoryAllocations.map((entry, idx) => (
-                      <tr key={`${entry.studentId}-${entry.subjectName}-${idx}`} className="hover:bg-slate-800/40 transition">
-                        <td className="py-2.5 px-3 text-slate-400">{idx + 1}</td>
-                        <td className="py-2.5 px-3 text-emerald-300 font-bold">
-                          <div>{entry.academicYear}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{entry.yearLabel}</div>
-                        </td>
-                        <td className="py-2.5 px-3 font-bold">
-                          <div className="text-amber-300">{entry.rollNo}</div>
-                          <div className="text-cyan-300 text-[10px]">{entry.universityRollNo}</div>
-                        </td>
-                        <td className="py-2.5 px-3 font-sans font-bold text-white">{entry.studentName}</td>
-                        <td className="py-2.5 px-3">
-                          <div className="text-slate-200 font-sans">{entry.department}</div>
-                          <div className="text-purple-300 text-[10px]">{entry.stream}</div>
-                        </td>
-                        <td className="py-2.5 px-3 text-slate-300">{entry.courseType}</td>
-                        <td className="py-2.5 px-3 font-bold text-amber-200">{entry.subjectName}</td>
-                        <td className="py-2.5 px-3">
-                          <div className="text-cyan-300 font-bold">{entry.semester}</div>
-                          <div className="text-slate-400 text-[10px]">{entry.semesterTag}</div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      ) : viewMode === 'excel' ? (
+      {/* Excel Matrix View vs Defaulter List View vs Table View */}
+      {viewMode === 'excel' ? (
         <div className="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl space-y-4">
           {/* Excel Sheet Selection Tabs */}
           <div className="bg-slate-950 px-4 pt-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -994,6 +1019,262 @@ export const CounsellingView: React.FC = () => {
             )}
           </div>
         </div>
+      ) : viewMode === 'defaulter_list' ? (
+        <div className="space-y-6">
+          {/* Defaulter List Header & Summary Card */}
+          <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <div className="flex items-center space-x-2 text-rose-400 text-xs font-mono font-bold mb-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>DEPARTMENT-WISE DEFAULTER ROSTER ({selectedSession})</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-extrabold text-white font-serif">
+                  Department-Wise Students Pending University Roll Number &amp; Subject Counselling
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Lists all admitted students grouped by department who have not filled their University Roll Number and/or NEP 2020 Subject Counselling.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  exportDefaulterListExcel(filteredDefaulters, selectedSession, selectedDeptFilter);
+                  showToast(`Exported ${filteredDefaulters.length} department-wise defaulter records to Excel!`);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold flex items-center shadow-lg transition shrink-0"
+              >
+                <Download className="w-4 h-4 mr-1.5" />
+                Export Department-Wise Defaulter List (Excel)
+              </button>
+            </div>
+
+            {/* Defaulter Filter Pills */}
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-slate-400 font-mono font-bold">Filter Defaulters By:</span>
+                {[
+                  {
+                    id: 'all',
+                    label: `All Defaulters (${allDefaulterCandidates.length})`,
+                  },
+                  {
+                    id: 'both',
+                    label: `Both Univ Roll & Counselling Not Filled (${
+                      allDefaulterCandidates.filter((d) => d.missingUnivRoll && d.missingCounselling).length
+                    })`,
+                  },
+                  {
+                    id: 'univ_roll',
+                    label: `University Roll No. Not Filled (${
+                      allDefaulterCandidates.filter((d) => d.missingUnivRoll).length
+                    })`,
+                  },
+                  {
+                    id: 'counselling',
+                    label: `Subject Counselling Not Filled (${
+                      allDefaulterCandidates.filter((d) => d.missingCounselling).length
+                    })`,
+                  },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setDefaulterFilterType(tab.id as any)}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition border ${
+                      defaulterFilterType === tab.id
+                        ? 'bg-rose-500 text-white border-rose-400 shadow'
+                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {selectedDeptFilter !== 'ALL' && role !== 'HOD' && (
+                <button
+                  onClick={() => setSelectedDeptFilter('ALL')}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-mono font-bold"
+                >
+                  Show All Departments
+                </button>
+              )}
+            </div>
+
+            {/* Department-Wise Quick Summary Grid */}
+            {departmentWiseDefaulters.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+                {departmentWiseDefaulters.map((deptGroup) => (
+                  <button
+                    key={deptGroup.department}
+                    onClick={() => {
+                      if (role !== 'HOD') {
+                        setSelectedDeptFilter(
+                          selectedDeptFilter === deptGroup.department ? 'ALL' : deptGroup.department
+                        );
+                      }
+                    }}
+                    className={`text-left p-3.5 rounded-2xl border transition ${
+                      selectedDeptFilter === deptGroup.department
+                        ? 'bg-rose-500/15 border-rose-500/60 shadow-lg'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                        {deptGroup.stream}
+                      </span>
+                      <span className="text-xs font-mono font-extrabold text-rose-400">
+                        {deptGroup.items.length} / {deptGroup.totalDeptStudents} Pending
+                      </span>
+                    </div>
+                    <div className="font-bold text-white text-sm mt-2 truncate" title={deptGroup.department}>
+                      {deptGroup.department}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono mt-2 pt-2 border-t border-slate-900">
+                      <span>Univ Roll: <strong className="text-amber-300">{deptGroup.missingUnivRollCount}</strong></span>
+                      <span>Counselling: <strong className="text-rose-300">{deptGroup.missingCounsellingCount}</strong></span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Department-Wise Defaulter Tables */}
+          {departmentWiseDefaulters.length === 0 ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center space-y-2">
+              <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+              <div className="text-base font-bold text-white">
+                No Defaulters Found for the Selected Filters!
+              </div>
+              <p className="text-xs text-slate-400">
+                All students in this view have completed their University Roll Number and Subject Counselling.
+              </p>
+            </div>
+          ) : (
+            departmentWiseDefaulters.map((deptGroup) => (
+              <div
+                key={deptGroup.department}
+                className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl"
+              >
+                <div className="bg-slate-950 px-5 py-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Building2 className="w-4 h-4 text-amber-400" />
+                    <h3 className="text-sm sm:text-base font-extrabold text-white font-serif">
+                      {deptGroup.department}
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-mono font-bold">
+                      {deptGroup.stream}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-mono font-bold">
+                      {deptGroup.items.length} Defaulters (out of {deptGroup.totalDeptStudents})
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs font-mono">
+                    <span className="text-amber-300">
+                      Univ Roll Pending: <strong>{deptGroup.missingUnivRollCount}</strong>
+                    </span>
+                    <span className="text-slate-600">|</span>
+                    <span className="text-rose-300">
+                      Subject Counselling Pending: <strong>{deptGroup.missingCounsellingCount}</strong>
+                    </span>
+                    <button
+                      onClick={() => {
+                        exportDefaulterListExcel(deptGroup.items, selectedSession, deptGroup.department);
+                        showToast(`Downloaded Defaulter List for ${deptGroup.department}!`);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/30 text-[11px] font-bold flex items-center transition"
+                    >
+                      <Download className="w-3.5 h-3.5 mr-1" />
+                      Dept Excel
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-200">
+                    <thead className="bg-slate-950/70 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                      <tr>
+                        <th className="py-3 px-3">Sl</th>
+                        <th className="py-3 px-3">Roll &amp; SAMS Barcode</th>
+                        <th className="py-3 px-3">Student Name</th>
+                        <th className="py-3 px-3">Batch / Stream</th>
+                        <th className="py-3 px-3">Department / Honours</th>
+                        <th className="py-3 px-3">University Roll No.</th>
+                        <th className="py-3 px-3">Subject Counselling Status</th>
+                        {canEdit && <th className="py-3 px-3 text-center">Action</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {deptGroup.items.map((entry, idx) => {
+                        const s = entry.student;
+                        const rec = entry.record;
+                        const uRoll = (s.universityRollNo || rec.universityRollNo || '').trim();
+                        return (
+                          <tr key={s.id} className="hover:bg-slate-800/40 transition">
+                            <td className="py-2.5 px-3 font-mono text-slate-400">{idx + 1}</td>
+                            <td className="py-2.5 px-3 font-mono">
+                              <div className="font-bold text-amber-300">{s.rollNo}</div>
+                              <div className="text-[10px] text-slate-400">{s.samsRegNo}</div>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="font-bold text-white">{s.name}</div>
+                              <div className="text-[10px] text-slate-400">Father: {s.parentName || 'N/A'}</div>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono">
+                              <div className="text-emerald-300 font-bold">{entry.batch}</div>
+                              <div className="text-[10px] text-purple-300">{s.stream}</div>
+                            </td>
+                            <td className="py-2.5 px-3 font-semibold text-slate-200">
+                              {s.department}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono">
+                              {entry.missingUnivRoll ? (
+                                <span className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold inline-flex items-center">
+                                  <AlertTriangle className="w-3 h-3 mr-1" /> Not Filled
+                                </span>
+                              ) : (
+                                <span className="text-cyan-300 font-bold">{uRoll}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              {entry.missingCounselling ? (
+                                <div className="space-y-1">
+                                  <span className="px-2.5 py-0.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold inline-flex items-center">
+                                    <AlertTriangle className="w-3 h-3 mr-1" /> Subject Counselling Not Filled
+                                  </span>
+                                  <div className="text-[10px] font-mono text-amber-300">
+                                    Pending: {entry.missingFields.join(', ')}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold inline-flex items-center">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" /> Filled / Allotted
+                                </span>
+                              )}
+                            </td>
+                            {canEdit && (
+                              <td className="py-2.5 px-3 text-center">
+                                <button
+                                  onClick={() => handleOpenEdit(s)}
+                                  className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold inline-flex items-center shadow transition"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5 mr-1" /> Fill Now
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       ) : (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
           <div className="overflow-x-auto">
@@ -1152,7 +1433,7 @@ export const CounsellingView: React.FC = () => {
       )}
 
       {/* Pagination Controls */}
-      {totalPages > 1 && (
+      {totalPages > 1 && viewMode !== 'defaulter_list' && (
         <div className="bg-slate-950 px-4 py-3 border-t border-slate-800 rounded-2xl flex items-center justify-between text-xs text-slate-300 shadow-xl">
           <div>
             Showing page <strong>{currentPage}</strong> of <strong>{totalPages}</strong> ({activeCountedStudents} total records)

@@ -4,7 +4,7 @@ export type CategoryType = 'GEN' | 'SC' | 'ST' | 'SEBC' | 'OBC';
 
 export type StudentStatus = 'Admitted' | 'Spot Applied' | 'Selected' | 'Verified' | 'Pending' | 'CLC Taken';
 
-export const ACADEMIC_YEARS = ['2025-26', '2024-25', '2023-24'] as const;
+export const ACADEMIC_YEARS = ['2026-27', '2025-26', '2024-25'] as const;
 export type AcademicYearType = typeof ACADEMIC_YEARS[number];
 
 export interface Student {
@@ -23,7 +23,8 @@ export interface Student {
   category: CategoryType; // Category
   mobileNumber?: string; // Mobile Number
   admissionDate?: string; // Admission Date
-  academicYear?: string; // Academic Year / Session e.g. '2025-26', '2024-25', '2023-24'
+  academicYear?: string; // Academic Year / Session e.g. '2026-27', '2025-26', '2024-25'
+  batchCorrected?: boolean; // Set true when Admin/HOD manually corrects batch assignment
   department: string; // Subject Name
   isAedp: boolean;
   maxMarks?: number;

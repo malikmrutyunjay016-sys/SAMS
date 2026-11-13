@@ -3,6 +3,8 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Student, FacultyMember } from '../types';
 import { compareRollNumbers } from '../lib/excelParser';
+import { inferSessionFromStudent } from '../lib/counsellingService';
+import { BatchCorrectionModal } from '../components/BatchCorrectionModal';
 import {
   Building2,
   Users,
@@ -44,8 +46,9 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
   const [searchFaculty, setSearchFaculty] = useState('');
   const [academicYearFilter, setAcademicYearFilter] = useState<string>('ALL');
 
-  // HOD Student Edit Modal state
+  // HOD Student Edit Modal & Batch Correction Modal state
   const [isHodStudentModalOpen, setIsHodStudentModalOpen] = useState(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [editingHodStudent, setEditingHodStudent] = useState<Student | null>(null);
   const [hodStudentForm, setHodStudentForm] = useState({
     name: '',
@@ -139,7 +142,7 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
 
       const matchesAcademicYear =
         academicYearFilter === 'ALL' ||
-        (s.academicYear || '2025-26') === academicYearFilter;
+        inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === academicYearFilter;
 
       return matchesSearch && matchesAcademicYear;
     })
@@ -232,7 +235,7 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
       gender: stu.gender || 'Male',
       address: stu.address || '',
       admissionDate: stu.admissionDate || '',
-      academicYear: stu.academicYear || '2025-26',
+      academicYear: inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo),
       category: stu.category,
       stream: stu.stream,
       department: stu.department,
@@ -611,7 +614,9 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
             All Years ({deptStudents.length})
           </button>
           {['2026-27', '2025-26', '2024-25'].map((ay) => {
-            const count = deptStudents.filter((s) => (s.academicYear || '2026-27') === ay).length;
+            const count = deptStudents.filter(
+              (s) => inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === ay
+            ).length;
             return (
               <button
                 key={ay}
@@ -632,6 +637,14 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={() => setIsBatchModalOpen(true)}
+            className="ml-auto px-3 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold flex items-center transition"
+          >
+            <Users className="w-3.5 h-3.5 mr-1.5" />
+            <span>View &amp; Correct Batch Count</span>
+          </button>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-800">
@@ -683,7 +696,7 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
                     <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.admissionDate || 'N/A'}</td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                        {stu.academicYear || '2025-26'}
+                        {inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo)}
                       </span>
                     </td>
                     <td className="py-2.5 px-3 font-bold text-slate-200 whitespace-nowrap">{stu.department}</td>
@@ -1090,6 +1103,17 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
         </div>
       )}
 
+      <BatchCorrectionModal
+        isOpen={isBatchModalOpen}
+        onClose={() => setIsBatchModalOpen(false)}
+        initialBatch={academicYearFilter}
+        canEdit={true}
+        scopedDeptName={hodDeptName}
+        onSaved={(_count, msg) => {
+          setToastMsg(msg);
+          setTimeout(() => setToastMsg(''), 4000);
+        }}
+      />
     </div>
   );
 };

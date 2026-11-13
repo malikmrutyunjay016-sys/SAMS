@@ -13,6 +13,8 @@ import {
   ParseResult
 } from '../lib/excelParser';
 import { Student, FacultyMember, Notice, FAQItem, SeatMatrixItem, HodAccount, StreamType, CategoryType, StudentStatus } from '../types';
+import { inferSessionFromStudent } from '../lib/counsellingService';
+import { BatchCorrectionModal } from '../components/BatchCorrectionModal';
 import * as XLSX from 'xlsx';
 import {
   ShieldCheck,
@@ -126,8 +128,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   const [academicYearFilter, setAcademicYearFilter] = useState('ALL');
   const [targetImportAcademicYear, setTargetImportAcademicYear] = useState('2026-27');
 
-  // Student Add / Edit Modal
+  // Student Add / Edit Modal & Batch Correction Modal
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+  const [isBatchCorrectionModalOpen, setIsBatchCorrectionModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [studentForm, setStudentForm] = useState({
     name: '',
@@ -457,7 +460,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
 
     const matchesAcademicYear =
       academicYearFilter === 'ALL' ||
-      (s.academicYear || '2025-26') === academicYearFilter;
+      inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === academicYearFilter;
 
     const matchesStatus =
       statusFilter === 'ALL' ||
@@ -627,7 +630,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       marksPercentage: s.marksPercentage,
       stream: s.stream,
       department: s.department,
-      academicYear: s.academicYear || '2025-26',
+      academicYear: inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo),
       phone: s.phone || '9437123456',
       gender: s.gender,
       bloodGroup: s.bloodGroup || 'O+',
@@ -1061,7 +1064,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
 
         const sessionStudentsForBreakdown = academicYearFilter === 'ALL'
           ? activeStudents
-          : activeStudents.filter((s) => (s.academicYear || '2026-27') === academicYearFilter);
+          : activeStudents.filter((s) => inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === academicYearFilter);
 
         const artsCount = sessionStudentsForBreakdown.filter((s) => getEffectiveStream(s) === 'Arts').length;
         const bioCount = sessionStudentsForBreakdown.filter((s) => getEffectiveStream(s) === 'Biological Science').length;
@@ -1145,7 +1148,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                   All Academic Years ({activeStudents.length})
                 </button>
                 {['2026-27', '2025-26', '2024-25'].map((ay) => {
-                  const count = activeStudents.filter((s) => (s.academicYear || '2026-27') === ay).length;
+                  const count = activeStudents.filter(
+                    (s) => inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === ay
+                  ).length;
                   return (
                     <button
                       key={ay}
@@ -1166,6 +1171,15 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     </button>
                   );
                 })}
+                <button
+                  type="button"
+                  onClick={() => setIsBatchCorrectionModalOpen(true)}
+                  className="ml-auto px-3 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold flex items-center transition"
+                  title="Inspect batch counts and correct student batch assignments"
+                >
+                  <Users className="w-3.5 h-3.5 mr-1.5" />
+                  <span>View &amp; Correct Batch Count</span>
+                </button>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -1405,7 +1419,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                           <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">{stu.admissionDate || 'N/A'}</td>
                           <td className="py-2.5 px-3 whitespace-nowrap">
                             <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                              {stu.academicYear || '2026-27'}
+                              {inferSessionFromStudent(stu.academicYear, stu, stu.rollNo, stu.samsRegNo)}
                             </span>
                           </td>
                           <td className="py-2.5 px-3 font-bold text-slate-200 whitespace-nowrap">{stu.department}</td>
@@ -1876,7 +1890,7 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       {/* ========================================================= */}
       {activeAdminTab === 'seats' && (() => {
         const sessionStudents = activeStudents.filter(
-          (s) => (s.academicYear || '2026-27') === adminSeatSession
+          (s) => inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === adminSeatSession
         );
         const sessionSeatItems = seatMatrix.filter(
           (item) => (item.academicYear || '2026-27') === adminSeatSession
@@ -3504,13 +3518,14 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 <div>
                   <label className="text-slate-300 block mb-1 font-semibold">Academic Year / Session *</label>
                   <select
-                    value={studentForm.academicYear || '2025-26'}
+                    value={studentForm.academicYear || '2026-27'}
                     onChange={(e) => setStudentForm({ ...studentForm, academicYear: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-300 font-bold focus:outline-none focus:border-amber-500"
                   >
-                    <option value="2025-26">2025-26 (Current)</option>
-                    <option value="2024-25">2024-25 (Last Year)</option>
-                    <option value="2023-24">2023-24 (2 Years Ago)</option>
+                    <option value="2026-27">2026-27 (1st Year / Current)</option>
+                    <option value="2025-26">2025-26 (2nd Year)</option>
+                    <option value="2024-25">2024-25 (3rd Year)</option>
+                    <option value="2023-24">2023-24 (Archive)</option>
                   </select>
                 </div>
 
@@ -4206,6 +4221,13 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
           </div>
         </div>
       )}
+      <BatchCorrectionModal
+        isOpen={isBatchCorrectionModalOpen}
+        onClose={() => setIsBatchCorrectionModalOpen(false)}
+        initialBatch={academicYearFilter}
+        canEdit={true}
+        onSaved={(_count, msg) => showToast('success', msg)}
+      />
     </div>
   );
 };

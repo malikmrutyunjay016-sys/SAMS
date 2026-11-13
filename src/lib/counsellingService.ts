@@ -224,6 +224,15 @@ export function normalizeSessionString(str?: string | null): string {
   return '';
 }
 
+export function inferRollBarcodeSession(rollNo?: string, barcode?: string): string {
+  const r = (rollNo || '').toUpperCase();
+  const b = (barcode || '').toUpperCase();
+  if (r.includes('24-') || b.startsWith('24D')) return '2024-25';
+  if (r.includes('25-') || b.startsWith('25D')) return '2025-26';
+  if (r.includes('26-') || b.startsWith('26D')) return '2026-27';
+  return '';
+}
+
 export function inferSessionFromStudent(
   rawSession?: string | null,
   matchedStudent?: Student,
@@ -232,6 +241,12 @@ export function inferSessionFromStudent(
   sheetName?: string,
   defaultSession: string = '2026-27'
 ): string {
+  // 0. Honor explicit admin/HOD manual batch correction first
+  if (matchedStudent?.batchCorrected && matchedStudent?.academicYear) {
+    const norm = normalizeSessionString(matchedStudent.academicYear);
+    if (norm) return norm;
+  }
+
   const r = (rollNo || matchedStudent?.rollNo || '').toUpperCase();
   const b = (barcode || matchedStudent?.samsRegNo || '').toUpperCase();
 
@@ -341,7 +356,7 @@ export function generateSuggestedCounselling(student: Student): StudentCounselli
   const isAedp = Boolean(student.isAedp || student.department?.toLowerCase().includes('aedp'));
   const dept = (student.department || 'General').trim();
   const stream = student.stream || 'Arts';
-  const cleanSession = (student.academicYear || '2026-27').trim();
+  const cleanSession = inferSessionFromStudent(student.academicYear, student, student.rollNo, student.samsRegNo);
 
   let regular: RegularHonoursCounselling | undefined = undefined;
   let aedp: AedpCounselling | undefined = undefined;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { inferSessionFromStudent } from '../lib/counsellingService';
 import {
   Award,
   Bell,
@@ -183,7 +184,10 @@ export const HomeView: React.FC<{
   });
 
   const activeSessionStudents = students.filter(
-    (s) => !s.isClcTaken && s.status !== 'CLC Taken' && (s.academicYear || '2026-27') === '2026-27'
+    (s) =>
+      !s.isClcTaken &&
+      s.status !== 'CLC Taken' &&
+      inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === '2026-27'
   );
   const activeSessionSeatMatrix = seatMatrix.filter((item) => (item.academicYear || '2026-27') === '2026-27');
   const effectiveSeatMatrix = activeSessionSeatMatrix.length > 0 ? activeSessionSeatMatrix : seatMatrix;

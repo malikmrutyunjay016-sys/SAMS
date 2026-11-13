@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { normalizeCategory } from '../lib/excelParser';
+import { inferSessionFromStudent } from '../lib/counsellingService';
 import { translateStream, translateDepartment } from '../lib/translations';
 import { StreamType } from '../types';
 import {
@@ -83,13 +84,21 @@ export const StatsView: React.FC = () => {
   const activeStudents = students.filter((s) => !s.isClcTaken && s.status !== 'CLC Taken');
 
   const availableSessions = Array.from(
-    new Set(['2026-27', '2025-26', '2024-25', ...activeStudents.map((s) => s.academicYear || '2026-27'), ...seatMatrix.map((m) => m.academicYear || '2026-27')])
+    new Set([
+      '2026-27',
+      '2025-26',
+      '2024-25',
+      ...activeStudents.map((s) => inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo)),
+      ...seatMatrix.map((m) => m.academicYear || '2026-27'),
+    ])
   ).sort().reverse();
   const [selectedSession, setSelectedSession] = useState<string>('2026-27');
 
   const filteredStudents = selectedSession === 'ALL'
     ? activeStudents
-    : activeStudents.filter((s) => (s.academicYear || '2026-27') === selectedSession);
+    : activeStudents.filter(
+        (s) => inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === selectedSession
+      );
 
   const matchedSeatMatrix = selectedSession === 'ALL'
     ? seatMatrix

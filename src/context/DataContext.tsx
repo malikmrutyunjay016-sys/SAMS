@@ -89,6 +89,15 @@ interface DataContextType {
   syncSamsGoogleSheet: (sheetUrl: string) => Promise<number>;
   correctStudentClassifications: () => number;
   deduplicateStudentsDatabase: () => number;
+  bulkUpdateStudentBatches: (
+    updates: Array<{
+      id: string;
+      academicYear?: string;
+      isClcTaken?: boolean;
+      status?: StudentStatus;
+      batchCorrected?: boolean;
+    }>
+  ) => number;
 
   // Faculty Actions
   addFaculty: (facultyMember: Omit<FacultyMember, 'id'>) => void;
@@ -223,7 +232,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const rawId = (s.id || '').trim();
       const rawSams = (s.samsRegNo || '').trim().toUpperCase();
       const rawRoll = (s.rollNo || '').trim().toUpperCase();
-      const rawSession = (s.academicYear || '2026-27').trim();
+      const rawSession = inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo);
 
       const isRealSams = rawSams && rawSams !== 'NA' && !rawSams.startsWith('24D15') && rawSams.length >= 5;
       const isRealRoll =
@@ -833,13 +842,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const rawDept = updated.department !== undefined ? updated.department : target.department;
     const rawStream = updated.stream !== undefined ? updated.stream : target.stream;
     const norm = normalizeDepartmentAndStream(rawDept, rawStream);
+    const hasBatchEdit =
+      updated.academicYear !== undefined && updated.academicYear !== target.academicYear;
 
-    const updatedStudent = {
+    const updatedStudent: Student = {
       ...target,
       ...updated,
       department: norm.department,
       stream: norm.stream,
       isAedp: norm.isAedp,
+      batchCorrected:
+        updated.batchCorrected !== undefined
+          ? updated.batchCorrected
+          : hasBatchEdit
+          ? true
+          : target.batchCorrected,
       updatedAt: new Date().toISOString(),
     };
     setStudents((prev) => prev.map((s) => (s.id === id ? updatedStudent : s)));
@@ -1267,6 +1284,99 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     addAuditLog('DEDUPLICATE_STUDENTS', `Cleaned and deduplicated student database. Total unique records: ${finalCount}`);
     return finalCount;
+  };
+
+  const bulkUpdateStudentBatches = (
+    updates: Array<{
+      id: string;
+      academicYear?: string;
+      isClcTaken?: boolean;
+      status?: StudentStatus;
+      batchCorrected?: boolean;
+    }>
+  ): number => {
+    if (!updates || updates.length === 0) return 0;
+    const nowIso = new Date().toISOString();
+    const updateMap = new Map(updates.map((u) => [u.id, u]));
+    const modifiedStudents: Student[] = [];
+
+    setStudents((prev) => {
+      const next = prev.map((s) => {
+        const upd = updateMap.get(s.id);
+        if (!upd) return s;
+
+        const nextAcademicYear = upd.academicYear !== undefined ? upd.academicYear : s.academicYear;
+        const nextIsClcTaken = upd.isClcTaken !== undefined ? upd.isClcTaken : s.isClcTaken;
+        const nextStatus: StudentStatus =
+          upd.status !== undefined
+            ? upd.status
+            : nextIsClcTaken
+            ? 'CLC Taken'
+            : s.status === 'CLC Taken'
+            ? 'Admitted'
+            : s.status || 'Admitted';
+        const nextBatchCorrected =
+          upd.batchCorrected !== undefined
+            ? upd.batchCorrected
+            : upd.academicYear !== undefined
+            ? true
+            : s.batchCorrected;
+
+        const hasDiff =
+          nextAcademicYear !== s.academicYear ||
+          Boolean(nextIsClcTaken) !== Boolean(s.isClcTaken) ||
+          nextStatus !== s.status ||
+          Boolean(nextBatchCorrected) !== Boolean(s.batchCorrected);
+
+        if (!hasDiff) return s;
+
+        const updatedStu: Student = {
+          ...s,
+          academicYear: nextAcademicYear,
+          isClcTaken: Boolean(nextIsClcTaken),
+          status: nextStatus,
+          batchCorrected: Boolean(nextBatchCorrected),
+          updatedAt: nowIso,
+        };
+        modifiedStudents.push(updatedStu);
+        return updatedStu;
+      });
+
+      if (modifiedStudents.length > 0) {
+        safeSaveLocalStorage(LS_PREFIX + 'students', JSON.stringify(next.slice(0, 10000)));
+      }
+      return modifiedStudents.length > 0 ? next : prev;
+    });
+
+    if (modifiedStudents.length > 0) {
+      // Persist student batch corrections to Firestore in background chunks
+      setTimeout(async () => {
+        if (isFirestoreQuotaExceeded()) return;
+        try {
+          const chunkSize = 350;
+          for (let i = 0; i < modifiedStudents.length; i += chunkSize) {
+            if (isFirestoreQuotaExceeded()) break;
+            const chunk = modifiedStudents.slice(i, i + chunkSize);
+            const batch = writeBatch(db);
+            chunk.forEach((stu) => {
+              batch.set(doc(db, 'students', stu.id), sanitizeCounsellingForFirestore(stu), {
+                merge: true,
+              });
+            });
+            await batch.commit();
+          }
+        } catch (err) {
+          console.warn('Background batch student correction sync caught:', err);
+        }
+      }, 20);
+
+      addAuditLog(
+        'BATCH_COUNT_CORRECTION',
+        `Updated admission batch / active status for ${modifiedStudents.length} student record(s).`
+      );
+    }
+
+    return modifiedStudents.length;
   };
 
   // ==========================================
@@ -1951,6 +2061,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (s.status && s.status !== 'Admitted' && s.status !== 'Verified') {
           return false;
         }
+        const stuBatch = inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo);
+        if ((item.academicYear || '2026-27') !== stuBatch) {
+          return false;
+        }
 
         const norm = normalizeDepartmentAndStream(s.department, s.stream);
         const sDept = (s.department || '').toLowerCase().trim();
@@ -2075,6 +2189,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         syncSamsGoogleSheet,
         correctStudentClassifications,
         deduplicateStudentsDatabase,
+        bulkUpdateStudentBatches,
         addFaculty,
         updateFaculty,
         deleteFaculty,

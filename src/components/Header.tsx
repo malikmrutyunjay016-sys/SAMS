@@ -129,7 +129,6 @@ export const Header: React.FC<{ onOpenAdminModal: () => void; onOpenHodModal: ()
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                     {role === 'SUPER_ADMIN' ? 'SUPER ADMIN ACCESS' : `HOD: ${hodDeptName}`}
                   </div>
-                  <div className="text-[10px] font-mono text-sky-200">SAMS Odisha Authenticated</div>
                 </div>
                 <button
                   onClick={logout}

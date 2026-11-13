@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { DEFAULT_SETTINGS } from '../lib/defaultData';
+import { DEFAULT_SETTINGS, DEPARTMENTS_LIST } from '../lib/defaultData';
 import { createDriveBackupSnapshot, parseSnapshotFile } from '../lib/driveService';
 import {
   parseExcelOrCsvFile,
@@ -14,7 +14,6 @@ import {
 } from '../lib/excelParser';
 import { Student, FacultyMember, Notice, FAQItem, SeatMatrixItem, HodAccount, StreamType, CategoryType, StudentStatus } from '../types';
 import { inferSessionFromStudent } from '../lib/counsellingService';
-import { BatchCorrectionModal } from '../components/BatchCorrectionModal';
 import * as XLSX from 'xlsx';
 import {
   ShieldCheck,
@@ -49,8 +48,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  UserCheck,
-  Award,
 } from 'lucide-react';
 
 export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ onOpenAdminModal }) => {
@@ -127,10 +124,11 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
   const [academicYearFilter, setAcademicYearFilter] = useState('ALL');
   const [targetImportAcademicYear, setTargetImportAcademicYear] = useState('2026-27');
+  const [targetImportSubject, setTargetImportSubject] = useState('AUTO');
+  const [facultyDeptFilter, setFacultyDeptFilter] = useState('ALL');
 
-  // Student Add / Edit Modal & Batch Correction Modal
+  // Student Add / Edit Modal
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
-  const [isBatchCorrectionModalOpen, setIsBatchCorrectionModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [studentForm, setStudentForm] = useState({
     name: '',
@@ -470,8 +468,21 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     return matchesSearch && matchesStream && matchesDept && matchesAcademicYear && matchesStatus;
   }).sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
 
+  // All available subjects from official department matrix + student DB
+  const allSubjectOptions = Array.from(
+    new Set([
+      ...DEPARTMENTS_LIST.map((d) => d.name),
+      ...activeStudents.map((s) => (s.department || '').trim()).filter(Boolean),
+    ])
+  ).sort((a, b) => a.localeCompare(b));
+
   // Filtered Faculty
   const filteredFaculty = faculty.filter((f) => {
+    const matchesSubject =
+      facultyDeptFilter === 'ALL' ||
+      (f.deptName || '').trim().toLowerCase() === facultyDeptFilter.trim().toLowerCase();
+    if (!matchesSubject) return false;
+
     const q = (facultySearch || '').trim().toLowerCase();
     return (
       !q ||
@@ -480,6 +491,18 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
       (f.designation || '').toLowerCase().includes(q)
     );
   });
+
+  // Helper to apply chosen subject override on parsed students if selected
+  const applySubjectSelectionToImportedStudents = (parsedStudents: Student[]): Student[] => {
+    if (!targetImportSubject || targetImportSubject === 'AUTO') return parsedStudents;
+    const norm = normalizeDepartmentAndStream(targetImportSubject);
+    return parsedStudents.map((stu) => ({
+      ...stu,
+      department: norm.department || targetImportSubject,
+      stream: norm.stream || stu.stream,
+      isAedp: norm.isAedp,
+    }));
+  };
 
   // ==========================================
   // EXCEL / CSV FILE IMPORT HANDLER
@@ -495,7 +518,9 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     try {
-      const res = await parseExcelOrCsvFile(file, targetImportAcademicYear);
+      const rawRes = await parseExcelOrCsvFile(file, targetImportAcademicYear);
+      const finalStudents = rawRes.success ? applySubjectSelectionToImportedStudents(rawRes.students) : [];
+      const res: ParseResult = { ...rawRes, students: finalStudents };
       setIsImporting(false);
       setImportResult(res);
 
@@ -534,10 +559,11 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
   const handleConfirmImport = () => {
     if (!importResult || !importResult.students.length) return;
 
-    bulkImportStudents(importResult.students, importReplaceMode);
+    const finalStudents = applySubjectSelectionToImportedStudents(importResult.students);
+    bulkImportStudents(finalStudents, importReplaceMode);
     showToast(
       'success',
-      `Successfully ${importReplaceMode ? 'replaced database with' : 'added'} ${importResult.students.length} student records into SAMS Database!`
+      `Successfully ${importReplaceMode ? 'replaced database with' : 'added'} ${finalStudents.length} student records into SAMS Database!`
     );
     setImportResult(null);
     setImportStatusMessage('');
@@ -1171,15 +1197,25 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                     </button>
                   );
                 })}
-                <button
-                  type="button"
-                  onClick={() => setIsBatchCorrectionModalOpen(true)}
-                  className="ml-auto px-3 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold flex items-center transition"
-                  title="Inspect batch counts and correct student batch assignments"
-                >
-                  <Users className="w-3.5 h-3.5 mr-1.5" />
-                  <span>View &amp; Correct Batch Count</span>
-                </button>
+
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-amber-400 font-mono text-[11px] font-bold">Subject:</span>
+                  <select
+                    value={departmentFilter}
+                    onChange={(e) => {
+                      setDepartmentFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-[11px] text-amber-300 font-bold focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="ALL">All Subjects / Honours ({streamStudents.length})</option>
+                    {allSubjectOptions.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept} ({deptCountsMap[dept] || 0})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -1562,6 +1598,23 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 <p className="text-[10px] text-slate-500">If the Excel sheet does not specify an Academic Year column, imported records will automatically be assigned to this selected session.</p>
               </div>
 
+              <div className="space-y-1.5 pt-1">
+                <label className="text-slate-300 font-semibold block">Target Subject / Honours for Import:</label>
+                <select
+                  value={targetImportSubject}
+                  onChange={(e) => setTargetImportSubject(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-emerald-300 font-bold focus:outline-none focus:border-amber-500"
+                >
+                  <option value="AUTO">Auto-Detect Subject from Excel Sheet (All Subjects)</option>
+                  {allSubjectOptions.map((subj) => (
+                    <option key={subj} value={subj}>
+                      {subj}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500">Choose a specific subject to assign all imported students to that honours/AEDP subject, or leave on Auto-Detect.</p>
+              </div>
+
               <label className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold shadow-lg flex items-center justify-center cursor-pointer transition">
                 <FileSpreadsheet className="w-5 h-5 mr-2" />
                 {isImporting ? 'Reading & Parsing Spreadsheet...' : 'Browse & Select Excel / CSV File'}
@@ -1799,15 +1852,30 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
             </div>
           </div>
 
-          <div className="relative w-full sm:w-72">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              placeholder="Search faculty name, department..."
-              value={facultySearch}
-              onChange={(e) => setFacultySearch(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-full sm:w-72">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Search faculty name, department..."
+                value={facultySearch}
+                onChange={(e) => setFacultySearch(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <select
+              value={facultyDeptFilter}
+              onChange={(e) => setFacultyDeptFilter(e.target.value)}
+              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-500"
+            >
+              <option value="ALL">All Subjects / Departments ({faculty.length})</option>
+              {allSubjectOptions.map((subj) => (
+                <option key={subj} value={subj}>
+                  {subj}
+                </option>
+              ))}
+            </select>
           </div>
 
           {faculty.length === 0 ? (
@@ -2922,297 +2990,6 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
               </div>
             </div>
 
-            {/* Section 4: UG Admission In-Charge Officers, DEO & Principal Administration */}
-            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-6">
-              <div className="border-b border-slate-800 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center">
-                  <UserCheck className="w-4 h-4 mr-2 text-amber-400" /> 4. Admission Committee: UG Admission In-Charge & DEO Helpdesk
-                </h3>
-                <span className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-mono">
-                  DISPLAYS IN HERO BANNER & CONTACT DIRECTORY
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Configure official details, phone numbers, emails, and photos for the Principal, the UG Admission In-Charge officers, and the SAMS Data Entry Operator (DEO). All fields are editable by the Admin.
-              </p>
-
-              {/* Subsection A: Principal-in-Charge */}
-              <div className="bg-slate-900/90 p-4 rounded-xl border border-slate-800/90 space-y-3">
-                <div className="flex items-center space-x-2 text-amber-300 font-bold text-xs">
-                  <Award className="w-4 h-4 text-amber-400" />
-                  <span>A. Principal-in-Charge</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Principal Name (English)</label>
-                    <input
-                      type="text"
-                      value={settingsForm.principalName}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, principalName: e.target.value })}
-                      placeholder="Prof. Amarendra Panda"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Principal Name (Odia / ଓଡ଼ିଆ)</label>
-                    <input
-                      type="text"
-                      value={settingsForm.principalNameOdia}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, principalNameOdia: e.target.value })}
-                      placeholder="ପ୍ରଫେସର ଅମରେନ୍ଦ୍ର ପଣ୍ଡା"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500 font-sans"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-slate-300 block mb-1 font-semibold">Official Academic Designation</label>
-                    <input
-                      type="text"
-                      value={settingsForm.principalDesignation}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, principalDesignation: e.target.value })}
-                      placeholder="Principal-in-Charge | Reader in Physics"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Principal Office Phone</label>
-                    <input
-                      type="text"
-                      value={settingsForm.principalPhone}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, principalPhone: e.target.value })}
-                      placeholder="06646-230234"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Principal Official Email</label>
-                    <input
-                      type="email"
-                      value={settingsForm.principalEmail}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, principalEmail: e.target.value })}
-                      placeholder="principal.baragada@gmail.com"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500 font-mono"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-slate-300 block mb-1 font-semibold">Principal Photo Image URL</label>
-                    <input
-                      type="url"
-                      value={settingsForm.principalPhotoUrl}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, principalPhotoUrl: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-amber-500 font-mono text-[11px]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Subsection B: UG Admission In-Charge */}
-              <div className="bg-slate-900/90 p-4 rounded-xl border border-blue-900/40 space-y-3">
-                <div className="flex items-center space-x-2 text-blue-300 font-bold text-xs">
-                  <UserCheck className="w-4 h-4 text-blue-400" />
-                  <span>B. UG Admission In-Charge</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Officer Name (English)</label>
-                    <input
-                      type="text"
-                      value={settingsForm.admissionIncharge1Name}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1Name: e.target.value })}
-                      placeholder="Dr. Manoranjan Dash"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Officer Name (Odia / ଓଡ଼ିଆ)</label>
-                    <input
-                      type="text"
-                      value={settingsForm.admissionIncharge1NameOdia}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1NameOdia: e.target.value })}
-                      placeholder="ଡଃ ମନୋରଞ୍ଜନ ଦାଶ"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 font-sans"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-slate-300 block mb-1 font-semibold">Designation & Department</label>
-                    <input
-                      type="text"
-                      value={settingsForm.admissionIncharge1Designation}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1Designation: e.target.value })}
-                      placeholder="UG Admission In-Charge | Sr. Lecturer in Economics"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Direct Mobile / Helpline</label>
-                    <input
-                      type="text"
-                      value={settingsForm.admissionIncharge1Phone}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1Phone: e.target.value })}
-                      placeholder="+91 94371 88201"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Official Email</label>
-                    <input
-                      type="email"
-                      value={settingsForm.admissionIncharge1Email}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1Email: e.target.value })}
-                      placeholder="admission.arts.pcb@gmail.com"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-slate-300 block mb-1 font-semibold">Photo Image URL</label>
-                    <input
-                      type="url"
-                      value={settingsForm.admissionIncharge1PhotoUrl}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge1PhotoUrl: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono text-[11px]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Subsection C: UG Admission In-Charge */}
-              <div className="bg-slate-900/90 p-4 rounded-xl border border-purple-900/40 space-y-3">
-                <div className="flex items-center space-x-2 text-purple-300 font-bold text-xs">
-                  <UserCheck className="w-4 h-4 text-purple-400" />
-                  <span>C. UG Admission In-Charge</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Officer Name (English)</label>
-                    <input
-                      type="text"
-                      value={settingsForm.admissionIncharge2Name}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2Name: e.target.value })}
-                      placeholder="Dr. Sasmita Panigrahi"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Officer Name (Odia / ଓଡ଼ିଆ)</label>
-                    <input
-                      type="text"
-                      value={settingsForm.admissionIncharge2NameOdia}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2NameOdia: e.target.value })}
-                      placeholder="ଡଃ ସସ୍ମିତା ପାଣିଗ୍ରାହୀ"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500 font-sans"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-slate-300 block mb-1 font-semibold">Designation & Department</label>
-                    <input
-                      type="text"
-                      value={settingsForm.admissionIncharge2Designation}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2Designation: e.target.value })}
-                      placeholder="UG Admission In-Charge | Sr. Lecturer in Chemistry"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Direct Mobile / Helpline</label>
-                    <input
-                      type="text"
-                      value={settingsForm.admissionIncharge2Phone}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2Phone: e.target.value })}
-                      placeholder="+91 94372 65430"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Official Email</label>
-                    <input
-                      type="email"
-                      value={settingsForm.admissionIncharge2Email}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2Email: e.target.value })}
-                      placeholder="admission.science.pcb@gmail.com"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500 font-mono"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-slate-300 block mb-1 font-semibold">Photo Image URL</label>
-                    <input
-                      type="url"
-                      value={settingsForm.admissionIncharge2PhotoUrl}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admissionIncharge2PhotoUrl: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500 font-mono text-[11px]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Subsection D: Data Entry Operator (DEO) */}
-              <div className="bg-slate-900/90 p-4 rounded-xl border border-emerald-900/40 space-y-3">
-                <div className="flex items-center space-x-2 text-emerald-300 font-bold text-xs">
-                  <UserCheck className="w-4 h-4 text-emerald-400" />
-                  <span>D. Data Entry Operator (DEO - SAMS Helpdesk & Verification)</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">DEO Name (English)</label>
-                    <input
-                      type="text"
-                      value={settingsForm.deoName}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, deoName: e.target.value })}
-                      placeholder="Sri Rajesh Kumar Meher"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">DEO Name (Odia / ଓଡ଼ିଆ)</label>
-                    <input
-                      type="text"
-                      value={settingsForm.deoNameOdia}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, deoNameOdia: e.target.value })}
-                      placeholder="ଶ୍ରୀ ରାଜେଶ କୁମାର ମେହେର"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500 font-sans"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-slate-300 block mb-1 font-semibold">Designation & Role Responsibilities</label>
-                    <input
-                      type="text"
-                      value={settingsForm.deoDesignation}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, deoDesignation: e.target.value })}
-                      placeholder="Data Entry Operator (DEO) | SAMS Helpdesk & Verification"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">Direct Contact / Mobile Number</label>
-                    <input
-                      type="text"
-                      value={settingsForm.deoPhone}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, deoPhone: e.target.value })}
-                      placeholder="+91 79780 45129"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 block mb-1 font-semibold">DEO Helpdesk Email</label>
-                    <input
-                      type="email"
-                      value={settingsForm.deoEmail}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, deoEmail: e.target.value })}
-                      placeholder="deo.sams.pcb@gmail.com"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-slate-300 block mb-1 font-semibold">Photo Image URL</label>
-                    <input
-                      type="url"
-                      value={settingsForm.deoPhotoUrl}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, deoPhotoUrl: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500 font-mono text-[11px]"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Section 5: Live Preview Box */}
             <div className="bg-slate-950 p-5 rounded-2xl border border-amber-500/30 space-y-3">
               <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-800 pb-2">
@@ -3530,14 +3307,27 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
                 </div>
 
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">Department / Honours *</label>
-                  <input
-                    type="text"
+                  <label className="text-slate-300 block mb-1 font-semibold">Subject / Honours *</label>
+                  <select
                     required
                     value={studentForm.department}
-                    onChange={(e) => setStudentForm({ ...studentForm, department: e.target.value })}
+                    onChange={(e) => {
+                      const chosen = e.target.value;
+                      const norm = normalizeDepartmentAndStream(chosen);
+                      setStudentForm({
+                        ...studentForm,
+                        department: chosen,
+                        stream: norm.stream || studentForm.stream,
+                      });
+                    }}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                  />
+                  >
+                    {allSubjectOptions.map((subj) => (
+                      <option key={subj} value={subj}>
+                        {subj}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -3669,15 +3459,19 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">Department *</label>
-                  <input
-                    type="text"
+                  <label className="text-slate-300 block mb-1 font-semibold">Subject / Department *</label>
+                  <select
                     required
                     value={facultyForm.deptName}
                     onChange={(e) => setFacultyForm({ ...facultyForm, deptName: e.target.value })}
-                    placeholder="e.g. Physics"
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                  />
+                  >
+                    {allSubjectOptions.map((subj) => (
+                      <option key={subj} value={subj}>
+                        {subj}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -4221,13 +4015,6 @@ export const AdminPortalView: React.FC<{ onOpenAdminModal: () => void }> = ({ on
           </div>
         </div>
       )}
-      <BatchCorrectionModal
-        isOpen={isBatchCorrectionModalOpen}
-        onClose={() => setIsBatchCorrectionModalOpen(false)}
-        initialBatch={academicYearFilter}
-        canEdit={true}
-        onSaved={(_count, msg) => showToast('success', msg)}
-      />
     </div>
   );
 };

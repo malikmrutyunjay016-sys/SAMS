@@ -3,14 +3,13 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Student, FacultyMember } from '../types';
 import { compareRollNumbers } from '../lib/excelParser';
-import { inferSessionFromStudent } from '../lib/counsellingService';
-import { BatchCorrectionModal } from '../components/BatchCorrectionModal';
+import { inferSessionFromStudent, isStudentInHodDept } from '../lib/counsellingService';
+import { DEPARTMENTS_LIST } from '../lib/defaultData';
 import {
   Building2,
   Users,
   CheckCircle2,
   LogOut,
-  Bell,
   Search,
   Edit2,
   X,
@@ -18,7 +17,6 @@ import {
   Plus,
   Trash2,
   UserCheck,
-  Award,
   Phone,
   Mail
 } from 'lucide-react';
@@ -27,10 +25,8 @@ import * as XLSX from 'xlsx';
 export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpenHodModal }) => {
   const {
     students,
-    seatMatrix,
     faculty,
     hodAccounts,
-    addNotice,
     updateStudent,
     addFaculty,
     updateFaculty,
@@ -38,17 +34,15 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
   } = useData();
   const { isHod, hodDeptId, hodDeptName, logout } = useAuth();
 
-  const [noticeTitle, setNoticeTitle] = useState('');
-  const [noticeCategory, setNoticeCategory] = useState<'General' | 'Admission' | 'Examination' | 'Departmental' | 'Spot Round'>('Departmental');
-  const [noticeContent, setNoticeContent] = useState('');
-  const [postedSuccess, setPostedSuccess] = useState(false);
   const [searchStudent, setSearchStudent] = useState('');
   const [searchFaculty, setSearchFaculty] = useState('');
+  const [selectedFacultySubject, setSelectedFacultySubject] = useState<string>('ALL');
+  const [selectedStudentSubject, setSelectedStudentSubject] = useState<string>('ALL');
   const [academicYearFilter, setAcademicYearFilter] = useState<string>('ALL');
+  const [courseTypeFilter, setCourseTypeFilter] = useState<'ALL' | 'REGULAR' | 'AEDP'>('ALL');
 
-  // HOD Student Edit Modal & Batch Correction Modal state
+  // HOD Student Edit Modal state
   const [isHodStudentModalOpen, setIsHodStudentModalOpen] = useState(false);
-  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [editingHodStudent, setEditingHodStudent] = useState<Student | null>(null);
   const [hodStudentForm, setHodStudentForm] = useState({
     name: '',
@@ -79,6 +73,7 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
   const [editingFaculty, setEditingFaculty] = useState<FacultyMember | null>(null);
   const [facultyForm, setFacultyForm] = useState({
     name: '',
+    deptName: '',
     designation: 'Assistant Professor',
     qualification: 'Ph.D., M.Sc.',
     email: '',
@@ -99,7 +94,7 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
           Departmental HOD Security Portal Access
         </h2>
         <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-          Please log in with your department-specific HOD credentials to access the departmental student roster, faculty directory, seat vacancy reports, and notice publishing desk.
+          Please log in with your department-specific HOD credentials to access the departmental student roster, faculty directory, and admission batch details.
         </p>
         <button
           onClick={onOpenHodModal}
@@ -113,13 +108,21 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
 
   const currentHodAccount = hodAccounts.find((h) => h.id === hodDeptId);
 
-  // Filter active students belonging to this department (exclude CLC Taken)
-  const deptStudents = students.filter(
-    (s) =>
-      !s.isClcTaken &&
-      s.status !== 'CLC Taken' &&
-      (s.department || '').toLowerCase().includes((hodDeptName || '').toLowerCase())
+  // All students belonging to this HOD department (including CLC Taken for batch analytics)
+  const allDeptStudents = students.filter((s) =>
+    hodDeptName?.toLowerCase() === 'faculty'
+      ? true
+      : isStudentInHodDept(s, hodDeptName)
   );
+
+  // Filter active students belonging to this department (exclude CLC Taken)
+  const deptStudents = allDeptStudents.filter(
+    (s) => !s.isClcTaken && s.status !== 'CLC Taken'
+  );
+
+  // Helper to check if a student is in an AEDP Specialization course
+  const isAedpStudent = (s: Student) =>
+    Boolean(s.isAedp || (s.department || '').toLowerCase().includes('aedp'));
 
   const filteredDeptStudents = deptStudents
     .filter((s) => {
@@ -144,20 +147,56 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
         academicYearFilter === 'ALL' ||
         inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === academicYearFilter;
 
-      return matchesSearch && matchesAcademicYear;
+      const matchesCourseType =
+        courseTypeFilter === 'ALL' ||
+        (courseTypeFilter === 'AEDP' && isAedpStudent(s)) ||
+        (courseTypeFilter === 'REGULAR' && !isAedpStudent(s));
+
+      const matchesSubject =
+        selectedStudentSubject === 'ALL' ||
+        (s.department || '').trim().toLowerCase() === selectedStudentSubject.trim().toLowerCase();
+
+      return matchesSearch && matchesAcademicYear && matchesCourseType && matchesSubject;
     })
     .sort((a, b) => compareRollNumbers(a.rollNo, b.rollNo));
 
+  // Subject options available for this HOD portal
+  const hodSubjectOptions = Array.from(
+    new Set([
+      ...(hodDeptName && hodDeptName.toLowerCase() !== 'faculty' ? [hodDeptName] : []),
+      ...DEPARTMENTS_LIST.filter((d) => {
+        if (!hodDeptName || hodDeptName.toLowerCase() === 'faculty') return true;
+        const h = hodDeptName.toLowerCase().trim();
+        const dn = d.name.toLowerCase();
+        return (
+          dn === h ||
+          (h.length >= 3 && dn.includes(h) && !(h === 'mathematics' && dn.includes('computer'))) ||
+          (h === 'commerce' && (dn.includes('commerce') || dn.includes('b.com')))
+        );
+      }).map((d) => d.name),
+      ...allDeptStudents.map((s) => (s.department || '').trim()).filter(Boolean),
+    ])
+  );
+
   // Filter faculty members belonging to this department
   const deptFaculty = faculty.filter((f) =>
-    (f.deptName || '').toLowerCase().includes((hodDeptName || '').toLowerCase())
+    hodDeptName?.toLowerCase() === 'faculty'
+      ? true
+      : (f.deptName || '').toLowerCase().includes((hodDeptName || '').toLowerCase()) ||
+        hodSubjectOptions.some((sub) => sub.toLowerCase() === (f.deptName || '').toLowerCase())
   );
 
   const filteredDeptFaculty = deptFaculty.filter((f) => {
+    const matchesSubject =
+      selectedFacultySubject === 'ALL' ||
+      (f.deptName || '').trim().toLowerCase() === selectedFacultySubject.trim().toLowerCase();
+    if (!matchesSubject) return false;
+
     const q = (searchFaculty || '').trim().toLowerCase();
     if (!q) return true;
     return (
       (f.name || '').toLowerCase().includes(q) ||
+      (f.deptName || '').toLowerCase().includes(q) ||
       (f.designation || '').toLowerCase().includes(q) ||
       (f.qualification || '').toLowerCase().includes(q) ||
       (f.email || '').toLowerCase().includes(q) ||
@@ -165,28 +204,74 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
     );
   });
 
-  const deptSeats = seatMatrix.filter((s) =>
-    s.deptName.toLowerCase().includes((hodDeptName || '').toLowerCase())
-  );
+  // Admission Batch Details across all HOD portals (with separate Regular Honours & AEDP Specialization boxes)
+  const admissionBatchCards = [
+    {
+      id: 'ALL',
+      label: 'All Batches',
+      yearTag: 'Total Dept Roster',
+      subtitle: `${hodDeptName} Combined`,
+    },
+    {
+      id: '2026-27',
+      label: '2026-27 Batch',
+      yearTag: '1st Year (Current)',
+      subtitle: 'UG Semester I & II',
+    },
+    {
+      id: '2025-26',
+      label: '2025-26 Batch',
+      yearTag: '2nd Year (1 Yr Ago)',
+      subtitle: 'UG Semester III & IV',
+    },
+    {
+      id: '2024-25',
+      label: '2024-25 Batch',
+      yearTag: '3rd Year (2 Yrs Ago)',
+      subtitle: 'UG Semester V & VI',
+    },
+  ].map((batch) => {
+    const batchAll =
+      batch.id === 'ALL'
+        ? allDeptStudents
+        : allDeptStudents.filter(
+            (s) => inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === batch.id
+          );
+    const activeList = batchAll.filter((s) => !s.isClcTaken && s.status !== 'CLC Taken');
+    const clcList = batchAll.filter((s) => Boolean(s.isClcTaken || s.status === 'CLC Taken'));
 
-  const handlePostNotice = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!noticeTitle || !noticeContent) return;
+    const regularActiveList = activeList.filter((s) => !isAedpStudent(s));
+    const aedpActiveList = activeList.filter((s) => isAedpStudent(s));
 
-    addNotice({
-      title: `[${hodDeptName}] ${noticeTitle}`,
-      category: noticeCategory,
-      deptId: hodDeptId,
-      date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-      isImportant: true,
-      content: noticeContent,
-    });
+    const regularClcCount = clcList.filter((s) => !isAedpStudent(s)).length;
+    const aedpClcCount = clcList.filter((s) => isAedpStudent(s)).length;
 
-    setNoticeTitle('');
-    setNoticeContent('');
-    setPostedSuccess(true);
-    setTimeout(() => setPostedSuccess(false), 3000);
-  };
+    const regularMale = regularActiveList.filter((s) => (s.gender || '').toLowerCase() === 'male').length;
+    const regularFemale = regularActiveList.filter((s) => (s.gender || '').toLowerCase() === 'female').length;
+
+    const aedpMale = aedpActiveList.filter((s) => (s.gender || '').toLowerCase() === 'male').length;
+    const aedpFemale = aedpActiveList.filter((s) => (s.gender || '').toLowerCase() === 'female').length;
+
+    const maleCount = activeList.filter((s) => (s.gender || '').toLowerCase() === 'male').length;
+    const femaleCount = activeList.filter((s) => (s.gender || '').toLowerCase() === 'female').length;
+
+    return {
+      ...batch,
+      totalRecords: batchAll.length,
+      activeCount: activeList.length,
+      clcCount: clcList.length,
+      regularCount: regularActiveList.length,
+      aedpCount: aedpActiveList.length,
+      regularClcCount,
+      aedpClcCount,
+      regularMale,
+      regularFemale,
+      aedpMale,
+      aedpFemale,
+      maleCount,
+      femaleCount,
+    };
+  });
 
   const handleExportHodStudentsExcel = () => {
     if (filteredDeptStudents.length === 0) {
@@ -271,11 +356,18 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
   // ==========================================
   const handleOpenAddFaculty = () => {
     setEditingFaculty(null);
+    const defaultSubject =
+      selectedFacultySubject !== 'ALL'
+        ? selectedFacultySubject
+        : hodDeptName && hodDeptName.toLowerCase() !== 'faculty'
+        ? hodDeptName
+        : hodSubjectOptions[0] || 'Physics';
     setFacultyForm({
       name: '',
+      deptName: defaultSubject,
       designation: 'Assistant Professor',
       qualification: 'Ph.D., M.Sc.',
-      email: `faculty.${(hodDeptName || 'dept').toLowerCase().replace(/\s+/g, '')}@baragada.edu.in`,
+      email: `faculty.${defaultSubject.toLowerCase().replace(/[^a-z0-9]/g, '')}@baragada.edu.in`,
       phone: '9437123456',
       photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
       isHod: false,
@@ -287,6 +379,7 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
     setEditingFaculty(f);
     setFacultyForm({
       name: f.name,
+      deptName: f.deptName || hodDeptName || 'Physics',
       designation: f.designation,
       qualification: f.qualification,
       email: f.email,
@@ -301,10 +394,11 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
     e.preventDefault();
     if (!facultyForm.name.trim()) return;
 
+    const chosenSubject = (facultyForm.deptName || hodDeptName || 'Department').trim();
     const payload = {
       name: facultyForm.name.trim(),
-      deptId: (hodDeptName || 'department').toLowerCase().replace(/[^a-z0-9]/g, '_'),
-      deptName: hodDeptName || 'Department',
+      deptId: chosenSubject.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      deptName: chosenSubject,
       designation: facultyForm.designation.trim(),
       qualification: facultyForm.qualification.trim(),
       email: facultyForm.email.trim() || `${facultyForm.name.toLowerCase().replace(/\s+/g, '.')}@baragada.edu.in`,
@@ -315,10 +409,10 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
 
     if (editingFaculty) {
       updateFaculty(editingFaculty.id, payload);
-      setToastMsg(`Successfully updated faculty details for ${facultyForm.name}`);
+      setToastMsg(`Successfully updated faculty details for ${facultyForm.name} (${chosenSubject})`);
     } else {
       addFaculty(payload);
-      setToastMsg(`Added new faculty member ${facultyForm.name} to Department of ${hodDeptName}`);
+      setToastMsg(`Added new faculty member ${facultyForm.name} to ${chosenSubject}`);
     }
 
     setIsFacultyModalOpen(false);
@@ -370,31 +464,113 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
         </button>
       </div>
 
-      {/* Seat Matrix & Vacancy Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {deptSeats.map((seat) => (
-          <div key={seat.id} className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-2">
-            <div className="flex justify-between text-xs text-slate-400 font-mono">
-              <span>{seat.isAedp ? 'AEDP Specialization' : 'Regular Honours'}</span>
-              <span className="text-amber-400 font-bold">{seat.specialization || 'Honours'}</span>
+      {/* Admission Batch Details (All HOD Portals) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {admissionBatchCards.map((batch) => {
+          const isSelected = academicYearFilter === batch.id;
+          return (
+            <div
+              key={batch.id}
+              onClick={() => {
+                setAcademicYearFilter(batch.id);
+                setCourseTypeFilter('ALL');
+              }}
+              className={`bg-slate-900 border p-5 rounded-2xl shadow-xl space-y-3 cursor-pointer transition ${
+                isSelected
+                  ? 'border-amber-500 ring-1 ring-amber-500/40'
+                  : 'border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex justify-between text-xs text-slate-400 font-mono">
+                <span>Admission Batch</span>
+                <span className="text-amber-400 font-bold">{batch.yearTag}</span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <div className="text-2xl font-extrabold text-white font-mono">{batch.label}</div>
+                <span className="text-[10px] font-mono text-slate-400 truncate">{batch.subtitle}</span>
+              </div>
+
+              {/* Separate Regular Honours & AEDP Specialization Boxes */}
+              <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAcademicYearFilter(batch.id);
+                    setCourseTypeFilter(
+                      isSelected && courseTypeFilter === 'REGULAR' ? 'ALL' : 'REGULAR'
+                    );
+                  }}
+                  className={`bg-slate-950 p-2.5 rounded-xl border transition space-y-1 ${
+                    isSelected && courseTypeFilter === 'REGULAR'
+                      ? 'border-emerald-500 ring-1 ring-emerald-500/40'
+                      : 'border-slate-800 hover:border-emerald-500/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] uppercase font-mono font-bold text-emerald-400">
+                      Regular Honours
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-500">Enrolled</span>
+                  </div>
+                  <div className="text-lg font-extrabold text-emerald-400 font-mono">
+                    {batch.regularCount}
+                  </div>
+                  <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 pt-0.5 border-t border-slate-800/80">
+                    <span>B/G: {batch.regularMale}/{batch.regularFemale}</span>
+                    <span>CLC: {batch.regularClcCount}</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAcademicYearFilter(batch.id);
+                    setCourseTypeFilter(
+                      isSelected && courseTypeFilter === 'AEDP' ? 'ALL' : 'AEDP'
+                    );
+                  }}
+                  className={`bg-slate-950 p-2.5 rounded-xl border transition space-y-1 ${
+                    isSelected && courseTypeFilter === 'AEDP'
+                      ? 'border-amber-500 ring-1 ring-amber-500/40'
+                      : 'border-slate-800 hover:border-amber-500/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] uppercase font-mono font-bold text-amber-400">
+                      AEDP Spec.
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-500">Enrolled</span>
+                  </div>
+                  <div className="text-lg font-extrabold text-amber-400 font-mono">
+                    {batch.aedpCount}
+                  </div>
+                  <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 pt-0.5 border-t border-slate-800/80">
+                    <span>B/G: {batch.aedpMale}/{batch.aedpFemale}</span>
+                    <span>CLC: {batch.aedpClcCount}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Combined Batch Footer Summary */}
+              <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
+                <div className="bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800">
+                  <span className="text-[9px] text-slate-500 block">Total Active</span>
+                  <span className="font-bold text-emerald-400 font-mono">{batch.activeCount}</span>
+                </div>
+                <div className="bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800">
+                  <span className="text-[9px] text-slate-500 block">Boys / Girls</span>
+                  <span className="font-bold text-slate-200 font-mono">
+                    {batch.maleCount} / {batch.femaleCount}
+                  </span>
+                </div>
+                <div className="bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800">
+                  <span className="text-[9px] text-slate-500 block">Total CLC</span>
+                  <span className="font-bold text-amber-400 font-mono">{batch.clcCount}</span>
+                </div>
+              </div>
             </div>
-            <div className="text-2xl font-extrabold text-white">{seat.deptName}</div>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs pt-2">
-              <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                <span className="text-[9px] text-slate-500 block">Sanctioned</span>
-                <span className="font-bold text-slate-200">{seat.sanctioned}</span>
-              </div>
-              <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                <span className="text-[9px] text-slate-500 block">Admitted</span>
-                <span className="font-bold text-emerald-400">{seat.admitted}</span>
-              </div>
-              <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                <span className="text-[9px] text-slate-500 block">Vacant</span>
-                <span className="font-bold text-amber-400">{seat.vacant}</span>
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Section 1: Departmental Faculty Directory Manager */}
@@ -411,6 +587,19 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={selectedFacultySubject}
+              onChange={(e) => setSelectedFacultySubject(e.target.value)}
+              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-semibold focus:outline-none focus:border-amber-500"
+            >
+              <option value="ALL">All Subjects ({deptFaculty.length})</option>
+              {hodSubjectOptions.map((subj) => (
+                <option key={subj} value={subj}>
+                  {subj}
+                </option>
+              ))}
+            </select>
+
             <div className="relative w-full sm:w-60">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
               <input
@@ -469,6 +658,9 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
                         )}
                       </div>
                       <p className="text-amber-400 font-semibold text-xs mt-0.5">{fac.designation}</p>
+                      <p className="text-emerald-400 text-[11px] font-mono mt-0.5 truncate">
+                        Subject: {fac.deptName}
+                      </p>
                       <p className="text-slate-400 text-[11px] font-mono mt-0.5 truncate">{fac.qualification}</p>
                     </div>
                   </div>
@@ -505,67 +697,7 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
         )}
       </div>
 
-      {/* Section 2: Post Departmental Notice */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-        <h2 className="text-sm font-bold text-white font-serif flex items-center">
-          <Bell className="w-4 h-4 mr-2 text-amber-400" /> Publish Departmental Notice
-        </h2>
-
-        {postedSuccess && (
-          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 p-3 rounded-xl text-xs font-semibold flex items-center">
-            <CheckCircle2 className="w-4 h-4 mr-2" /> Notice successfully published to college main notice board!
-          </div>
-        )}
-
-        <form onSubmit={handlePostNotice} className="space-y-3 text-xs">
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Notice Title</label>
-            <input
-              type="text"
-              required
-              value={noticeTitle}
-              onChange={(e) => setNoticeTitle(e.target.value)}
-              placeholder="e.g. Mid-Sem Internal Viva Voce Schedule for +3 1st Semester"
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Category</label>
-            <select
-              value={noticeCategory}
-              onChange={(e) => setNoticeCategory(e.target.value as any)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-            >
-              <option value="Departmental">Departmental</option>
-              <option value="Admission">Admission</option>
-              <option value="Examination">Examination</option>
-              <option value="General">General</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Notice Content / Instructions</label>
-            <textarea
-              rows={3}
-              required
-              value={noticeContent}
-              onChange={(e) => setNoticeContent(e.target.value)}
-              placeholder="Enter detailed notice content..."
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-            ></textarea>
-          </div>
-
-          <button
-            type="submit"
-            className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-lg"
-          >
-            Post Official Notice
-          </button>
-        </form>
-      </div>
-
-      {/* Section 3: Departmental Student Roster */}
+      {/* Section 2: Departmental Student Roster */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
           <div>
@@ -598,53 +730,126 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
           </div>
         </div>
 
-        {/* Academic Year / Session Filter Bar */}
-        <div className="flex flex-wrap items-center gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs">
-          <span className="text-amber-400 font-mono text-[11px] font-bold mr-1">
-            Academic Year / Session Filter:
-          </span>
-          <button
-            onClick={() => setAcademicYearFilter('ALL')}
-            className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition ${
-              academicYearFilter === 'ALL'
-                ? 'bg-amber-500 text-slate-950 border-amber-500 shadow'
-                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
-            }`}
-          >
-            All Years ({deptStudents.length})
-          </button>
-          {['2026-27', '2025-26', '2024-25'].map((ay) => {
-            const count = deptStudents.filter(
-              (s) => inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === ay
-            ).length;
-            return (
-              <button
-                key={ay}
-                onClick={() => setAcademicYearFilter(ay)}
-                className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition flex items-center ${
-                  academicYearFilter === ay
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow'
-                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
-                }`}
-              >
-                <span>{ay}</span>
-                <span className="ml-1 text-[9px] text-slate-400 font-normal">
-                  {ay === '2026-27' ? '(Current)' : ay === '2025-26' ? '(1 Yr Ago)' : '(2 Yrs Ago)'}
-                </span>
-                <span className="ml-1.5 px-1.5 py-0.2 bg-slate-950 rounded text-[10px] text-amber-400 font-mono">
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setIsBatchModalOpen(true)}
-            className="ml-auto px-3 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold flex items-center transition"
-          >
-            <Users className="w-3.5 h-3.5 mr-1.5" />
-            <span>View &amp; Correct Batch Count</span>
-          </button>
+        {/* Academic Year / Session & Course Type Filter Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-amber-400 font-mono text-[11px] font-bold mr-1">
+              Academic Year / Session Filter:
+            </span>
+            <button
+              onClick={() => setAcademicYearFilter('ALL')}
+              className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition ${
+                academicYearFilter === 'ALL'
+                  ? 'bg-amber-500 text-slate-950 border-amber-500 shadow'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+              }`}
+            >
+              All Years (
+              {
+                deptStudents.filter(
+                  (s) =>
+                    courseTypeFilter === 'ALL' ||
+                    (courseTypeFilter === 'AEDP' ? isAedpStudent(s) : !isAedpStudent(s))
+                ).length
+              }
+              )
+            </button>
+            {['2026-27', '2025-26', '2024-25'].map((ay) => {
+              const count = deptStudents.filter(
+                (s) =>
+                  inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === ay &&
+                  (courseTypeFilter === 'ALL' ||
+                    (courseTypeFilter === 'AEDP' ? isAedpStudent(s) : !isAedpStudent(s)))
+              ).length;
+              return (
+                <button
+                  key={ay}
+                  onClick={() => setAcademicYearFilter(ay)}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition flex items-center ${
+                    academicYearFilter === ay
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  <span>{ay}</span>
+                  <span className="ml-1 text-[9px] text-slate-400 font-normal">
+                    {ay === '2026-27' ? '(Current)' : ay === '2025-26' ? '(1 Yr Ago)' : '(2 Yrs Ago)'}
+                  </span>
+                  <span className="ml-1.5 px-1.5 py-0.2 bg-slate-950 rounded text-[10px] text-amber-400 font-mono">
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80 w-full sm:w-auto">
+            <span className="text-amber-400 font-mono text-[11px] font-bold mr-1">
+              Course Type:
+            </span>
+            {(() => {
+              const yearScopedStudents = deptStudents.filter(
+                (s) =>
+                  academicYearFilter === 'ALL' ||
+                  inferSessionFromStudent(s.academicYear, s, s.rollNo, s.samsRegNo) === academicYearFilter
+              );
+              const regCount = yearScopedStudents.filter((s) => !isAedpStudent(s)).length;
+              const aedpCount = yearScopedStudents.filter((s) => isAedpStudent(s)).length;
+
+              return (
+                <>
+                  <button
+                    onClick={() => setCourseTypeFilter('ALL')}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition ${
+                      courseTypeFilter === 'ALL'
+                        ? 'bg-amber-500 text-slate-950 border-amber-500 shadow'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    All ({yearScopedStudents.length})
+                  </button>
+                  <button
+                    onClick={() => setCourseTypeFilter('REGULAR')}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition flex items-center ${
+                      courseTypeFilter === 'REGULAR'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span>Regular (NEP)</span>
+                    <span className="ml-1.5 px-1.5 py-0.2 bg-slate-950 rounded text-[10px] text-emerald-400 font-mono">
+                      {regCount}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setCourseTypeFilter('AEDP')}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition flex items-center ${
+                      courseTypeFilter === 'AEDP'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span>AEDP</span>
+                    <span className="ml-1.5 px-1.5 py-0.2 bg-slate-950 rounded text-[10px] text-amber-400 font-mono">
+                      {aedpCount}
+                    </span>
+                  </button>
+                  <select
+                    value={selectedStudentSubject}
+                    onChange={(e) => setSelectedStudentSubject(e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] text-amber-300 font-bold focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="ALL">All Subjects ({yearScopedStudents.length})</option>
+                    {hodSubjectOptions.map((subj) => (
+                      <option key={subj} value={subj}>
+                        {subj}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              );
+            })()}
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-800">
@@ -919,12 +1124,22 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-300 block mb-1 font-semibold">Subject / Honours Name</label>
-                  <input
-                    type="text"
+                  <select
                     value={hodStudentForm.department}
                     onChange={(e) => setHodStudentForm({ ...hodStudentForm, department: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500"
-                  />
+                  >
+                    {Array.from(
+                      new Set([
+                        ...hodSubjectOptions,
+                        ...DEPARTMENTS_LIST.map((d) => d.name),
+                      ])
+                    ).map((subj) => (
+                      <option key={subj} value={subj}>
+                        {subj}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -999,13 +1214,24 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-300 block mb-1 font-semibold">Department</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={hodDeptName || 'Department'}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-amber-400 font-bold cursor-not-allowed"
-                  />
+                  <label className="text-slate-300 block mb-1 font-semibold">Subject / Department *</label>
+                  <select
+                    required
+                    value={facultyForm.deptName || hodDeptName || ''}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, deptName: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-400 font-bold focus:outline-none focus:border-amber-500"
+                  >
+                    {Array.from(
+                      new Set([
+                        ...hodSubjectOptions,
+                        ...DEPARTMENTS_LIST.map((d) => d.name),
+                      ])
+                    ).map((subj) => (
+                      <option key={subj} value={subj}>
+                        {subj}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -1102,18 +1328,6 @@ export const HodPortalView: React.FC<{ onOpenHodModal: () => void }> = ({ onOpen
           </div>
         </div>
       )}
-
-      <BatchCorrectionModal
-        isOpen={isBatchModalOpen}
-        onClose={() => setIsBatchModalOpen(false)}
-        initialBatch={academicYearFilter}
-        canEdit={true}
-        scopedDeptName={hodDeptName}
-        onSaved={(_count, msg) => {
-          setToastMsg(msg);
-          setTimeout(() => setToastMsg(''), 4000);
-        }}
-      />
     </div>
   );
 };

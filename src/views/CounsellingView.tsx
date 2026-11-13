@@ -502,7 +502,21 @@ export const CounsellingView: React.FC = () => {
 
   const isBlankSubject = (val?: string) => {
     const v = (val || '').trim();
-    return !v || v === '-' || v.toUpperCase() === 'N/A' || v.toUpperCase() === 'NA' || v.toUpperCase() === 'PENDING';
+    const u = v.toUpperCase();
+    return (
+      !v ||
+      v === '-' ||
+      v === '--' ||
+      v === '---' ||
+      u === 'N/A' ||
+      u === 'NA' ||
+      u === 'NIL' ||
+      u === 'NONE' ||
+      u === 'NULL' ||
+      u === 'UNDEFINED' ||
+      u === 'UNFILLED' ||
+      u === 'PENDING'
+    );
   };
 
   // Strict filtering specifically for Defaulter List so every filter in the toolbar applies strictly
@@ -555,15 +569,15 @@ export const CounsellingView: React.FC = () => {
       const hasRecUnivRoll = !isPlaceholderUnivRoll(rec.universityRollNo);
       const missingUnivRoll = !hasStudentUnivRoll && !hasRecUnivRoll;
 
-      // Build field checks scoped strictly to selectedSemester + selectedPaperCategory
+      // Build complete subject field checks across all NEP 2020 / AEDP subject fields
       type FieldCheck = { label: string; category: 'MAJOR' | 'MINOR' | 'MDC' | 'AEC' | 'VAC' | 'SEC'; sem: string; value?: string };
       const allChecks: FieldCheck[] = [];
 
       if (isAedp) {
         const a = rec.aedp;
         allChecks.push(
-          { label: 'Major 1', category: 'MAJOR', sem: 'ALL', value: a?.major1 },
-          { label: 'Major 2', category: 'MAJOR', sem: 'ALL', value: a?.major2 },
+          { label: 'Major 1', category: 'MAJOR', sem: 'ALL', value: a?.major1 || a?.sem1?.major1 },
+          { label: 'Major 2', category: 'MAJOR', sem: 'ALL', value: a?.major2 || a?.sem1?.major2 },
           { label: 'AEC 1', category: 'AEC', sem: 'Semester I', value: a?.aec1 || a?.sem1?.aec1 },
           { label: 'VAC 1', category: 'VAC', sem: 'Semester I', value: a?.vac1 || a?.sem1?.vac1 },
           { label: 'AEC 2', category: 'AEC', sem: 'Semester II', value: a?.aec2 || a?.sem2?.aec2 },
@@ -576,7 +590,7 @@ export const CounsellingView: React.FC = () => {
       } else {
         const r = rec.regular;
         allChecks.push(
-          { label: 'Major', category: 'MAJOR', sem: 'ALL', value: r?.major },
+          { label: 'Major', category: 'MAJOR', sem: 'ALL', value: r?.major || r?.sem1?.major },
           { label: 'Minor 1', category: 'MINOR', sem: 'Semester I', value: r?.minor1 || r?.sem1?.minor },
           { label: 'MDC 1', category: 'MDC', sem: 'Semester I', value: r?.mdc1 || r?.sem1?.mdc },
           { label: 'AEC 1', category: 'AEC', sem: 'Semester I', value: r?.aec1 || r?.sem1?.aec },
@@ -598,14 +612,9 @@ export const CounsellingView: React.FC = () => {
         );
       }
 
-      // Apply Semester & Paper Category filters strictly to subject checks
+      // Check all subject fields when selectedSemester === 'ALL', or scope to the chosen Semester & Paper Category
       const scopedChecks = allChecks.filter((chk) => {
-        const semOk =
-          selectedSemester === 'ALL'
-            ? isAedp
-              ? ['Major 2', 'MDC 1', 'AEC 1', 'SEC 1'].includes(chk.label)
-              : ['Minor 1', 'Minor 2', 'MDC 1', 'AEC 1', 'SEC 1'].includes(chk.label)
-            : chk.sem === 'ALL' || chk.sem === selectedSemester;
+        const semOk = selectedSemester === 'ALL' || chk.sem === 'ALL' || chk.sem === selectedSemester;
         const catOk = selectedPaperCategory === 'ALL' || chk.category === selectedPaperCategory;
         return semOk && catOk;
       });
@@ -626,7 +635,9 @@ export const CounsellingView: React.FC = () => {
         if (!hasSpecificPaper) return;
       }
 
-      const missingFields = scopedChecks.filter((chk) => isBlankSubject(chk.value)).map((chk) => chk.label);
+      const missingFields = Array.from(
+        new Set(scopedChecks.filter((chk) => isBlankSubject(chk.value)).map((chk) => chk.label))
+      );
 
       const missingCounselling =
         selectedPaperCategory === 'ALL' && selectedSemester === 'ALL'
@@ -1361,7 +1372,7 @@ export const CounsellingView: React.FC = () => {
                     </h3>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Admitted students in {selectedSession} whose NEP 2020 subject counselling (Minor / MDC / AEC / SEC) is incomplete or pending, grouped department-wise.
+                    Admitted students in {selectedSession} with any pending NEP 2020 subject counselling fields (Major / Minor 1 &amp; 2 / MDC 1–3 / AEC 1–2 / SEC 1–3 / VAC 1–4), grouped department-wise.
                   </p>
                 </div>
 
@@ -1381,7 +1392,7 @@ export const CounsellingView: React.FC = () => {
                 <div className="p-10 text-center space-y-2">
                   <CheckCircle2 className="w-9 h-9 text-emerald-400 mx-auto" />
                   <div className="text-sm font-bold text-white">All students have completed Subject Counselling!</div>
-                  <p className="text-xs text-slate-400">No students pending subject counselling for the selected filters.</p>
+                  <p className="text-xs text-slate-400">No students pending any subject counselling fields for the selected filters.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-800">
@@ -1442,9 +1453,19 @@ export const CounsellingView: React.FC = () => {
                                   </td>
                                   <td className="py-2.5 px-3 font-semibold text-slate-200">{s.department}</td>
                                   <td className="py-2.5 px-3">
-                                    <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold inline-flex items-center">
-                                      <AlertTriangle className="w-3 h-3 mr-1" /> Not Filled ({entry.missingFields.join(', ')})
-                                    </span>
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold inline-flex items-center">
+                                        <AlertTriangle className="w-3 h-3 mr-1" /> {entry.missingFields.length} Pending:
+                                      </span>
+                                      {entry.missingFields.map((field) => (
+                                        <span
+                                          key={field}
+                                          className="px-1.5 py-0.5 rounded bg-slate-950 text-amber-200 border border-amber-500/30 text-[10px] font-mono"
+                                        >
+                                          {field}
+                                        </span>
+                                      ))}
+                                    </div>
                                   </td>
                                   {canEdit && (
                                     <td className="py-2.5 px-3 text-center">

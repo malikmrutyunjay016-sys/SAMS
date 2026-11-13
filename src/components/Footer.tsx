@@ -87,14 +87,6 @@ export const Footer: React.FC = () => {
             <p className="text-[11px] text-slate-900 font-medium">
               {lang === 'or' ? 'ସାମ୍ସ କାଉଣ୍ଟର ସମୟ: ସୋମବାର - ଶନିବାର (୧୦:୦୦ AM - ୫:୦୦ PM)' : 'SAMS Counter Hours: Monday - Saturday (10:00 AM - 5:00 PM)'}
             </p>
-            <div className="p-2.5 rounded-lg bg-white/55 border border-[#56789c]/60 text-[10px] space-y-1 shadow-sm">
-              <div className="text-[#0f2238] font-bold flex items-center">
-                <Shield className="w-3 h-3 mr-1 text-[#1b314b]" /> {t.govtTransparency}
-              </div>
-              <p className="text-slate-800">
-                {t.transparencyDesc}
-              </p>
-            </div>
           </div>
 
         </div>

@@ -60,7 +60,6 @@ interface DataContextType {
   isInitialLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   lang: Language;
-  setLang: (lang: Language) => void;
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
   t: typeof TRANSLATIONS.en;
@@ -178,15 +177,9 @@ function safeGetLocalStorage(key: string): string | null {
 }
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [lang, setLang] = useState<Language>(() => {
-    const saved = safeGetLocalStorage(LS_PREFIX + 'lang') as Language;
-    return saved === 'or' || saved === 'en' ? saved : 'en';
-  });
+  const lang: Language = 'en';
 
-  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
-    const saved = safeGetLocalStorage(LS_PREFIX + 'themeMode') as ThemeMode;
-    return saved === 'maroon' || saved === 'navy' || saved === 'light' ? saved : 'light';
-  });
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('light');
 
   const [isQuotaExceeded, setIsQuotaExceeded] = useState<boolean>(() => isFirestoreQuotaExceeded());
 
@@ -206,6 +199,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    try {
+      localStorage.setItem(LS_PREFIX + 'themeMode', themeMode);
+    } catch {}
     document.documentElement.setAttribute('data-theme', themeMode);
     document.body.setAttribute('data-theme', themeMode);
   }, [themeMode]);
@@ -2196,7 +2192,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isInitialLoading,
         setIsLoading,
         lang,
-        setLang,
         themeMode,
         setThemeMode,
         t,

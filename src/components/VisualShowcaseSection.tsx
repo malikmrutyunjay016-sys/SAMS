@@ -87,7 +87,7 @@ export const VisualShowcaseSection: React.FC<{
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <button
                 onClick={onExploreClick}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs shadow-lg transition flex items-center"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition flex items-center"
               >
                 Explore Projects <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
               </button>
@@ -104,7 +104,7 @@ export const VisualShowcaseSection: React.FC<{
           <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
             
             {/* Pillar 1 */}
-            <div className="group relative h-80 rounded-2xl overflow-hidden border border-slate-700/80 shadow-xl flex flex-col justify-end p-5">
+            <div className="dark-photo-card group relative h-80 rounded-2xl overflow-hidden border border-slate-700/80 shadow-xl flex flex-col justify-end p-5">
               <img
                 src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80"
                 alt="Sustainable Land Use"
@@ -121,7 +121,7 @@ export const VisualShowcaseSection: React.FC<{
             </div>
 
             {/* Pillar 2 */}
-            <div className="group relative h-80 rounded-2xl overflow-hidden border border-slate-700/80 shadow-xl flex flex-col justify-end p-5">
+            <div className="dark-photo-card group relative h-80 rounded-2xl overflow-hidden border border-slate-700/80 shadow-xl flex flex-col justify-end p-5">
               <img
                 src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=600&q=80"
                 alt="Climate Action"
@@ -138,7 +138,7 @@ export const VisualShowcaseSection: React.FC<{
             </div>
 
             {/* Pillar 3 */}
-            <div className="group relative h-80 rounded-2xl overflow-hidden border border-slate-700/80 shadow-xl flex flex-col justify-end p-5">
+            <div className="dark-photo-card group relative h-80 rounded-2xl overflow-hidden border border-slate-700/80 shadow-xl flex flex-col justify-end p-5">
               <img
                 src="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=600&q=80"
                 alt="Community Empowerment"
@@ -188,7 +188,7 @@ export const VisualShowcaseSection: React.FC<{
                   alt="Ocean Cleanup"
                   className="w-full h-full object-cover"
                 />
-                <span className="absolute bottom-2 left-2 bg-slate-950/80 backdrop-blur-sm text-slate-200 text-[9px] font-bold px-2 py-0.5 rounded">
+                <span className="dark-photo-tag absolute bottom-2 left-2 bg-slate-950/85 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded">
                   Ocean Cleanup
                 </span>
               </div>
@@ -209,7 +209,7 @@ export const VisualShowcaseSection: React.FC<{
                   alt="Reforestation"
                   className="w-full h-full object-cover"
                 />
-                <span className="absolute bottom-2 left-2 bg-slate-950/80 backdrop-blur-sm text-slate-200 text-[9px] font-bold px-2 py-0.5 rounded">
+                <span className="dark-photo-tag absolute bottom-2 left-2 bg-slate-950/85 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded">
                   Reforestation
                 </span>
               </div>
@@ -230,7 +230,7 @@ export const VisualShowcaseSection: React.FC<{
                   alt="Community"
                   className="w-full h-full object-cover"
                 />
-                <span className="absolute bottom-2 left-2 bg-slate-950/80 backdrop-blur-sm text-slate-200 text-[9px] font-bold px-2 py-0.5 rounded">
+                <span className="dark-photo-tag absolute bottom-2 left-2 bg-slate-950/85 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded">
                   Community
                 </span>
               </div>
@@ -289,7 +289,7 @@ export const VisualShowcaseSection: React.FC<{
                   />
                   <button
                     type="submit"
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#1b314b] hover:bg-[#132438] text-white font-bold text-xs flex items-center justify-center shrink-0 shadow"
                   >
                     Subscribe <ArrowRight className="w-3.5 h-3.5 ml-1" />
                   </button>

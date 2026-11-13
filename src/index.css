@@ -177,139 +177,451 @@ body[data-theme="navy"] {
 }
 
 /* ========================================================
-/* ========================================================
-   3. THEME: LIGHT / ECO-GREEN & CHARTREUSE (Aeline Style)
-   Derived from Image: Organic Forest Green, Chartreuse/Lime, Crisp White Cards
+   3. THEME: DYNAMIC WHITE & GREY BODY + VIOLET CHROME
    ======================================================== */
+@keyframes dynamicWhiteGreyShift {
+  0% {
+    background-position: 0% 25%;
+  }
+  50% {
+    background-position: 100% 75%;
+  }
+  100% {
+    background-position: 0% 25%;
+  }
+}
+
 .theme-light,
 [data-theme="light"],
-body[data-theme="light"] {
-  background-color: #f4f6f1 !important;
-  color: #131f15 !important;
+body[data-theme="light"],
+.dynamic-white-grey-bg {
+  background-color: #f1f3f6 !important;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0) 48%),
+    radial-gradient(circle at 86% 24%, rgba(203, 213, 225, 0.65) 0%, rgba(203, 213, 225, 0) 46%),
+    radial-gradient(circle at 48% 82%, rgba(226, 232, 240, 0.85) 0%, rgba(226, 232, 240, 0) 55%),
+    linear-gradient(135deg, #ffffff 0%, #f1f5f9 32%, #e2e8f0 68%, #f8fafc 100%) !important;
+  background-size: 160% 160% !important;
+  animation: dynamicWhiteGreyShift 18s ease-in-out infinite;
+  color: #0f172a !important;
 }
 
-/* Background layers */
-.theme-light .bg-slate-950,
-.theme-light .bg-slate-950\/90,
-.theme-light .bg-slate-950\/80,
-.theme-light .bg-slate-950\/70 {
-  background-color: #e8efe6 !important;
-  color: #131f15 !important;
+/* Background layers (scoped to main and root-level modals, preserving hero-banner & dark photo overlays) */
+.theme-light main .bg-slate-950:not(.hero-banner *):not(.dark-photo-card *):not(.dark-photo-tag):not(.fixed.inset-0),
+.theme-light main .bg-slate-950\/90:not(.hero-banner *):not(.dark-photo-card *):not(.dark-photo-tag):not(.fixed.inset-0),
+.theme-light main .bg-slate-950\/85:not(.hero-banner *):not(.dark-photo-card *):not(.dark-photo-tag):not(.fixed.inset-0),
+.theme-light main .bg-slate-950\/80:not(.hero-banner *):not(.dark-photo-card *):not(.dark-photo-tag):not(.fixed.inset-0),
+.theme-light main .bg-slate-950\/70:not(.hero-banner *):not(.dark-photo-card *):not(.dark-photo-tag):not(.fixed.inset-0),
+.theme-light main .bg-slate-950\/60:not(.hero-banner *):not(.dark-photo-card *):not(.dark-photo-tag):not(.fixed.inset-0),
+.theme-light main .bg-slate-950\/40:not(.hero-banner *):not(.dark-photo-card *):not(.dark-photo-tag):not(.fixed.inset-0),
+.theme-light > .fixed .bg-slate-950,
+.theme-light > .fixed .bg-slate-950\/90,
+.theme-light > .fixed .bg-slate-950\/85,
+.theme-light > .fixed .bg-slate-950\/80,
+.theme-light > .fixed .bg-slate-950\/70,
+.theme-light > .fixed .bg-slate-950\/60,
+.theme-light > .fixed .bg-slate-950\/40 {
+  background-color: #eef2f6 !important;
+  color: #0f172a !important;
 }
 
-.theme-light .bg-slate-900,
-.theme-light .bg-slate-900\/90,
-.theme-light .bg-slate-900\/80,
-.theme-light .bg-slate-900\/70,
-.theme-light .bg-slate-900\/50,
-.theme-light .bg-slate-900\/40 {
-  background-color: #ffffff !important;
-  color: #131f15 !important;
-  box-shadow: 0 4px 20px -4px rgba(27, 43, 29, 0.05), 0 0 0 1px #e1e7de !important;
+.theme-light main .bg-slate-900:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-900\/90:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-900\/80:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-900\/70:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-900\/60:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-900\/50:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-900\/40:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light > .fixed .bg-slate-900,
+.theme-light > .fixed .bg-slate-900\/90,
+.theme-light > .fixed .bg-slate-900\/80,
+.theme-light > .fixed .bg-slate-900\/70,
+.theme-light > .fixed .bg-slate-900\/60 {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  color: #0f172a !important;
+  box-shadow: 0 6px 24px -6px rgba(15, 23, 42, 0.08), 0 0 0 1px #dce2ea !important;
 }
 
-.theme-light .bg-slate-800,
-.theme-light .bg-slate-800\/90,
-.theme-light .bg-slate-800\/80,
-.theme-light .bg-slate-800\/60,
-.theme-light .bg-slate-800\/50 {
-  background-color: #f0f4ed !important;
-  color: #131f15 !important;
+.theme-light main .bg-slate-800:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-800\/90:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-800\/80:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-800\/60:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-800\/50:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-800\/40:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .bg-slate-800\/30:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light > .fixed .bg-slate-800,
+.theme-light > .fixed .bg-slate-800\/90,
+.theme-light > .fixed .bg-slate-800\/80,
+.theme-light > .fixed .bg-slate-800\/60,
+.theme-light > .fixed .bg-slate-800\/40 {
+  background-color: #f1f4f8 !important;
+  color: #0f172a !important;
 }
 
-.theme-light .hover\:bg-slate-800:hover,
-.theme-light .hover\:bg-slate-800\/70:hover {
-  background-color: #e2ebe0 !important;
+/* Dark slate gradient showcase banners -> crisp light white cards with dark typography */
+.theme-light main .bg-gradient-to-r.from-slate-900:not(.hero-banner),
+.theme-light main .bg-gradient-to-r.from-slate-950:not(.hero-banner),
+.theme-light main .bg-gradient-to-br.from-slate-900:not(.hero-banner),
+.theme-light main .bg-gradient-to-br.from-slate-950:not(.hero-banner) {
+  background-image: none !important;
+  background-color: rgba(255, 255, 255, 0.97) !important;
+  color: #0f172a !important;
+  box-shadow: 0 6px 24px -6px rgba(15, 23, 42, 0.08), 0 0 0 1px #dce2ea !important;
 }
 
-.theme-light .hover\:bg-slate-900:hover {
-  background-color: #f8faf6 !important;
+.theme-light main .bg-gradient-to-r.from-emerald-950\/90:not(.hero-banner) {
+  background-image: none !important;
+  background-color: #ecfdf5 !important;
+  border-color: #6ee7b7 !important;
+  color: #064e3b !important;
+}
+
+/* Colored dark *-950 surface alerts & cards -> soft tinted light cards with dark text */
+.theme-light main .bg-rose-950:not(.hero-banner *),
+.theme-light main .bg-rose-950\/90:not(.hero-banner *),
+.theme-light main .bg-rose-950\/80:not(.hero-banner *),
+.theme-light main .bg-rose-950\/70:not(.hero-banner *),
+.theme-light main .bg-red-950:not(.hero-banner *),
+.theme-light main .bg-red-950\/40:not(.hero-banner *),
+.theme-light > .fixed .bg-rose-950,
+.theme-light > .fixed .bg-red-950 {
+  background-color: #fff1f2 !important;
+  border-color: #fda4af !important;
+  color: #881337 !important;
+}
+
+.theme-light main .bg-blue-950:not(.hero-banner *),
+.theme-light main .bg-blue-950\/90:not(.hero-banner *),
+.theme-light > .fixed .bg-blue-950 {
+  background-color: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1e3a8a !important;
+}
+
+.theme-light main .bg-emerald-950:not(.hero-banner *),
+.theme-light main .bg-emerald-950\/90:not(.hero-banner *),
+.theme-light main .bg-emerald-950\/20:not(.hero-banner *),
+.theme-light > .fixed .bg-emerald-950 {
+  background-color: #ecfdf5 !important;
+  border-color: #6ee7b7 !important;
+  color: #065f46 !important;
+}
+
+.theme-light main .bg-purple-950\/40:not(.hero-banner *),
+.theme-light main .bg-violet-950:not(.hero-banner *),
+.theme-light main .bg-violet-950\/90:not(.hero-banner *),
+.theme-light > .fixed .bg-purple-950\/40,
+.theme-light > .fixed .bg-violet-950 {
+  background-color: #f5f3ff !important;
+  border-color: #c4b5fd !important;
+  color: #4c1d95 !important;
+}
+
+/* Hover backgrounds & hover text on light surfaces */
+.theme-light main .hover\:bg-slate-800:not(.hero-banner *):hover,
+.theme-light main .hover\:bg-slate-800\/70:not(.hero-banner *):hover,
+.theme-light main .hover\:bg-slate-800\/60:not(.hero-banner *):hover,
+.theme-light main .hover\:bg-slate-800\/40:not(.hero-banner *):hover,
+.theme-light main .hover\:bg-slate-800\/30:not(.hero-banner *):hover,
+.theme-light main .hover\:bg-slate-700:not(.hero-banner *):hover,
+.theme-light > .fixed .hover\:bg-slate-800:hover,
+.theme-light > .fixed .hover\:bg-slate-800\/40:hover,
+.theme-light > .fixed .hover\:bg-slate-700:hover {
+  background-color: #e2e8f0 !important;
+}
+
+.theme-light main .hover\:bg-slate-900:not(.hero-banner *):hover,
+.theme-light main .hover\:bg-slate-900\/60:not(.hero-banner *):hover,
+.theme-light > .fixed .hover\:bg-slate-900:hover {
+  background-color: #f8fafc !important;
+}
+
+.theme-light main .hover\:bg-red-950:not(.hero-banner *):hover,
+.theme-light main .hover\:bg-red-950\/40:not(.hero-banner *):hover {
+  background-color: #fee2e2 !important;
+  color: #b91c1c !important;
+}
+
+.theme-light main .hover\:text-white:where(:not(.hero-banner *, .dark-photo-card *, .bg-red-500, .bg-red-600, .bg-red-700, .bg-rose-500, .bg-rose-600, .bg-emerald-600, .bg-emerald-700, .bg-purple-600, .bg-purple-700, .bg-violet-600, .bg-violet-800, .bg-violet-900, .bg-\[\#1b314b\])):hover,
+.theme-light main .hover\:text-slate-200:where(:not(.hero-banner *, .dark-photo-card *)):hover,
+.theme-light > .fixed .hover\:text-white:where(:not(.bg-red-600, .bg-rose-600, .bg-emerald-600)):hover,
+.theme-light > .fixed .hover\:text-slate-200:hover {
+  color: #0f172a !important;
+}
+
+.theme-light main .hover\:text-amber-100:where(:not(.hero-banner *)):hover,
+.theme-light main .hover\:text-amber-200:where(:not(.hero-banner *)):hover,
+.theme-light main .hover\:text-amber-300:where(:not(.hero-banner *)):hover,
+.theme-light main .hover\:text-amber-400:where(:not(.hero-banner *)):hover,
+.theme-light > .fixed .hover\:text-amber-300:hover,
+.theme-light > .fixed .hover\:text-amber-400:hover {
+  color: #4c1d95 !important;
+}
+
+.theme-light main .hover\:text-emerald-400:where(:not(.hero-banner *)):hover {
+  color: #047857 !important;
+}
+
+.theme-light main .hover\:text-red-200:where(:not(.hero-banner *)):hover {
+  color: #991b1b !important;
 }
 
 /* Borders */
-.theme-light .border-slate-800,
-.theme-light .border-slate-800\/80,
-.theme-light .border-slate-800\/60,
-.theme-light .border-slate-700,
-.theme-light .border-slate-700\/80,
-.theme-light .border-slate-600 {
-  border-color: #e1e7de !important;
+.theme-light main .border-slate-800:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .border-slate-800\/90:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .border-slate-800\/80:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .border-slate-800\/60:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .border-slate-700:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .border-slate-700\/80:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .border-slate-700\/50:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light main .border-slate-600:not(.hero-banner *):not(.dark-photo-card *),
+.theme-light > .fixed .border-slate-800,
+.theme-light > .fixed .border-slate-700,
+.theme-light > .fixed .border-slate-700\/50,
+.theme-light > .fixed .border-slate-600 {
+  border-color: #d5dce6 !important;
 }
 
-.theme-light .border-amber-500\/40,
-.theme-light .border-amber-500\/30 {
-  border-color: #a8cd89 !important;
+.theme-light main .border-amber-500\/50:not(.hero-banner *),
+.theme-light main .border-amber-500\/40:not(.hero-banner *),
+.theme-light main .border-amber-500\/30:not(.hero-banner *),
+.theme-light main .border-amber-500\/20:not(.hero-banner *),
+.theme-light > .fixed .border-amber-500\/50,
+.theme-light > .fixed .border-amber-500\/40,
+.theme-light > .fixed .border-amber-500\/30,
+.theme-light > .fixed .border-amber-500\/20 {
+  border-color: #c4b5fd !important;
 }
 
-/* Typography overrides for Light mode */
-.theme-light .text-white:not(.hero-banner *):not(.hero-welcome-title):not(.text-white-always),
-.theme-light .text-slate-100:not(.hero-banner *):not(.text-white-always) {
-  color: #131f15 !important;
+/* Typography overrides for dynamic white/grey main content & modals (preserve hero-banner, photo overlays & dark buttons) */
+.theme-light main .text-white:where(:not(.hero-banner *, .hero-welcome-title, .dark-photo-card *, .dark-photo-tag, .text-white-always, .bg-red-500, .bg-red-600, .bg-red-700, .bg-rose-500, .bg-rose-600, .bg-emerald-600, .bg-emerald-700, .bg-purple-600, .bg-purple-700, .bg-violet-600, .bg-violet-800, .bg-violet-900, .bg-\[\#1b314b\])),
+.theme-light main .text-slate-100:where(:not(.hero-banner *, .dark-photo-card *, .text-white-always)),
+.theme-light > .fixed .text-white:where(:not(.text-white-always, .bg-red-600, .bg-rose-600, .bg-emerald-600, .bg-emerald-700)),
+.theme-light > .fixed .text-slate-100:where(:not(.text-white-always)) {
+  color: #0f172a !important;
 }
 
-.theme-light .text-slate-200:not(.hero-banner *) {
-  color: #213324 !important;
+.theme-light main .text-slate-200:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light > .fixed .text-slate-200 {
+  color: #1e293b !important;
 }
 
-.theme-light .text-slate-300:not(.hero-banner *) {
-  color: #354738 !important;
+.theme-light main .text-slate-300:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light > .fixed .text-slate-300 {
+  color: #334155 !important;
 }
 
-.theme-light .text-slate-400:not(.hero-banner *) {
-  color: #556358 !important;
+.theme-light main .text-slate-400:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-slate-500:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light > .fixed .text-slate-400,
+.theme-light > .fixed .text-slate-500 {
+  color: #475569 !important;
 }
 
-.theme-light .text-slate-500:not(.hero-banner *) {
-  color: #556358 !important;
+.theme-light main .text-amber-500:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-amber-400:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-amber-300:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-amber-300\/80:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-amber-200:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-amber-200\/90:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-amber-100:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light > .fixed .text-amber-500,
+.theme-light > .fixed .text-amber-400,
+.theme-light > .fixed .text-amber-300,
+.theme-light > .fixed .text-amber-200,
+.theme-light > .fixed .text-amber-100 {
+  color: #5b21b6 !important;
 }
 
-.theme-light .text-amber-400,
-.theme-light .text-amber-500,
-.theme-light .text-amber-300 {
-  color: #2b4c30 !important;
+.theme-light main .text-violet-100:where(:not(.hero-banner *)),
+.theme-light main .text-violet-200:where(:not(.hero-banner *)),
+.theme-light main .text-purple-200:where(:not(.hero-banner *)),
+.theme-light main .text-purple-300:where(:not(.hero-banner *)),
+.theme-light main .text-purple-400:where(:not(.hero-banner *)),
+.theme-light > .fixed .text-purple-200,
+.theme-light > .fixed .text-purple-300,
+.theme-light > .fixed .text-purple-400 {
+  color: #6d28d9 !important;
 }
 
-/* Buttons and primary CTA styling */
-.theme-light button.bg-amber-500,
-.theme-light button.bg-amber-600,
-.theme-light .bg-amber-500,
-.theme-light .bg-amber-400 {
-  background-color: #2d4f32 !important;
+.theme-light main .text-blue-200:where(:not(.hero-banner *)),
+.theme-light main .text-blue-300:where(:not(.hero-banner *)),
+.theme-light main .text-blue-400:where(:not(.hero-banner *)),
+.theme-light > .fixed .text-blue-200,
+.theme-light > .fixed .text-blue-300,
+.theme-light > .fixed .text-blue-400 {
+  color: #1d4ed8 !important;
+}
+
+.theme-light main .text-sky-200:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-sky-200\/80:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-sky-300:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-sky-400:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-cyan-300:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-cyan-400:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light > .fixed .text-sky-200,
+.theme-light > .fixed .text-sky-300,
+.theme-light > .fixed .text-sky-400,
+.theme-light > .fixed .text-cyan-300,
+.theme-light > .fixed .text-cyan-400 {
+  color: #0369a1 !important;
+}
+
+.theme-light main .text-emerald-200:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-emerald-300:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light main .text-emerald-400:where(:not(.hero-banner *, .dark-photo-card *)),
+.theme-light > .fixed .text-emerald-200,
+.theme-light > .fixed .text-emerald-300,
+.theme-light > .fixed .text-emerald-400 {
+  color: #047857 !important;
+}
+
+.theme-light main .text-teal-300:where(:not(.hero-banner *)),
+.theme-light > .fixed .text-teal-300 {
+  color: #0f766e !important;
+}
+
+.theme-light main .text-red-200:where(:not(.hero-banner *)),
+.theme-light main .text-red-300:where(:not(.hero-banner *)),
+.theme-light main .text-red-400:where(:not(.hero-banner *)),
+.theme-light main .text-red-500:where(:not(.hero-banner *)),
+.theme-light > .fixed .text-red-200,
+.theme-light > .fixed .text-red-300,
+.theme-light > .fixed .text-red-400 {
+  color: #b91c1c !important;
+}
+
+.theme-light main .text-rose-200:where(:not(.hero-banner *)),
+.theme-light main .text-rose-200\/90:where(:not(.hero-banner *)),
+.theme-light main .text-rose-300:where(:not(.hero-banner *)),
+.theme-light main .text-rose-400:where(:not(.hero-banner *)),
+.theme-light > .fixed .text-rose-200,
+.theme-light > .fixed .text-rose-300,
+.theme-light > .fixed .text-rose-400 {
+  color: #be123c !important;
+}
+
+.theme-light main .text-pink-400:where(:not(.hero-banner *)) {
+  color: #be185d !important;
+}
+
+/* Soft violet badges & accent pills on white/grey cards */
+.theme-light main .bg-amber-500\/5:where(:not(.hero-banner *)),
+.theme-light main .bg-amber-500\/10:where(:not(.hero-banner *)),
+.theme-light main .bg-amber-500\/15:where(:not(.hero-banner *)),
+.theme-light main .bg-amber-500\/20:where(:not(.hero-banner *)),
+.theme-light main .bg-amber-400\/10:where(:not(.hero-banner *)),
+.theme-light main .bg-amber-400\/15:where(:not(.hero-banner *)),
+.theme-light main .bg-amber-400\/20:where(:not(.hero-banner *)),
+.theme-light > .fixed .bg-amber-500\/10,
+.theme-light > .fixed .bg-amber-500\/20 {
+  background-color: #ede9fe !important;
+  color: #4c1d95 !important;
+  border-color: #c4b5fd !important;
+}
+
+/* ALWAYS keep crisp light/white text on dark/saturated buttons, badges, toasts & dark navy controls */
+.theme-light main button.bg-amber-500:where(:not(.hero-banner *)),
+.theme-light main button.bg-amber-600:where(:not(.hero-banner *)),
+.theme-light main button.bg-amber-400:where(:not(.hero-banner *)),
+.theme-light main .bg-amber-500:where(:not(.hero-banner *, .h-full)),
+.theme-light main .bg-amber-400:where(:not(.hero-banner *)),
+.theme-light > .fixed button.bg-amber-500,
+.theme-light > .fixed button.bg-amber-600,
+.theme-light > .fixed .bg-amber-500,
+.theme-light > .fixed .bg-amber-400 {
+  background-color: #6d28d9 !important;
   color: #ffffff !important;
-  border-color: #244128 !important;
+  border-color: #5b21b6 !important;
 }
 
-.theme-light button.bg-amber-500:hover,
-.theme-light button.bg-amber-600:hover {
-  background-color: #213c25 !important;
-}
-
-.theme-light .bg-gradient-to-r.from-amber-500.to-amber-600,
-.theme-light .bg-gradient-to-r.from-amber-400.to-amber-600 {
-  background: linear-gradient(135deg, #2d4f32 0%, #1f3823 100%) !important;
+.theme-light main button.bg-amber-500:where(:not(.hero-banner *)) *,
+.theme-light main button.bg-amber-600:where(:not(.hero-banner *)) *,
+.theme-light main .bg-amber-500:where(:not(.hero-banner *)) *,
+.theme-light main .bg-amber-400:where(:not(.hero-banner *)) *,
+.theme-light > .fixed button.bg-amber-500 *,
+.theme-light > .fixed .bg-amber-500 * {
   color: #ffffff !important;
 }
 
-/* Chartreuse / Lime Badges & Accent Pills */
-.theme-light .bg-amber-500\/10,
-.theme-light .bg-amber-500\/20,
-.theme-light .bg-amber-400\/10 {
-  background-color: #d2eb4b !important;
-  color: #182b1c !important;
-  border-color: #bad338 !important;
+.theme-light main .bg-amber-500:where(:not(.hero-banner *)) .bg-slate-950\/20 {
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
 }
 
-/* Hero Banner in Eco Light Mode */
+.theme-light main button.bg-amber-500:where(:not(.hero-banner *)):hover,
+.theme-light main button.bg-amber-600:where(:not(.hero-banner *)):hover,
+.theme-light > .fixed button.bg-amber-500:hover,
+.theme-light > .fixed button.bg-amber-600:hover {
+  background-color: #5b21b6 !important;
+}
+
+.theme-light main .bg-gradient-to-r.from-amber-500.to-amber-600:where(:not(.hero-banner *)),
+.theme-light main .bg-gradient-to-r.from-amber-400.to-amber-600:where(:not(.hero-banner *)),
+.theme-light main .bg-gradient-to-tr.from-amber-500.to-amber-600:where(:not(.hero-banner *)),
+.theme-light > .fixed .bg-gradient-to-r.from-amber-500.to-amber-600 {
+  background: linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%) !important;
+  color: #ffffff !important;
+}
+
+.theme-light main .bg-gradient-to-r.from-amber-500.to-amber-600:where(:not(.hero-banner *)) *,
+.theme-light main .bg-gradient-to-tr.from-amber-500.to-amber-600:where(:not(.hero-banner *)) *,
+.theme-light > .fixed .bg-gradient-to-r.from-amber-500.to-amber-600 * {
+  color: #ffffff !important;
+}
+
+.theme-light main :is(.bg-red-500, .bg-red-600, .bg-red-700, .bg-rose-500, .bg-rose-600, .bg-emerald-600, .bg-emerald-700, .bg-purple-600, .bg-purple-700, .bg-violet-600, .bg-violet-800, .bg-violet-900, .bg-\[\#1b314b\], .bg-gradient-to-r.from-emerald-600):where(:not(.hero-banner *)),
+.theme-light > .fixed :is(.bg-red-600, .bg-rose-600, .bg-emerald-600, .bg-emerald-700, .bg-gradient-to-r.from-emerald-600) {
+  color: #ffffff !important;
+}
+
+.theme-light main :is(.bg-red-500, .bg-red-600, .bg-red-700, .bg-rose-500, .bg-rose-600, .bg-emerald-600, .bg-emerald-700, .bg-purple-600, .bg-purple-700, .bg-violet-600, .bg-violet-800, .bg-violet-900, .bg-\[\#1b314b\], .bg-gradient-to-r.from-emerald-600):where(:not(.hero-banner *)) *,
+.theme-light > .fixed :is(.bg-red-600, .bg-rose-600, .bg-emerald-600, .bg-emerald-700, .bg-gradient-to-r.from-emerald-600) * {
+  color: #ffffff !important;
+}
+
+.theme-light main :is(.bg-rose-500, .bg-red-600, .bg-emerald-600, .bg-purple-700, .bg-\[\#1b314b\]):where(:not(.hero-banner *)):hover {
+  color: #ffffff !important;
+}
+
+/* Photo overlay cards stay dark-scrim with light text */
+.theme-light .dark-photo-card .text-white,
+.theme-light .dark-photo-tag {
+  color: #ffffff !important;
+}
+
+.theme-light .dark-photo-card .text-slate-300 {
+  color: #e2e8f0 !important;
+}
+
+.theme-light .dark-photo-card .text-emerald-400 {
+  color: #34d399 !important;
+}
+
+.theme-light .dark-photo-card .text-sky-400 {
+  color: #38bdf8 !important;
+}
+
+.theme-light .dark-photo-card .text-amber-400 {
+  color: #fbbf24 !important;
+}
+
+.theme-light .dark-photo-card .bg-slate-950\/80,
+.theme-light .dark-photo-tag.bg-slate-950\/85 {
+  background-color: rgba(2, 6, 23, 0.85) !important;
+}
+
+/* Hero Banner (deep violet-slate card with bright crisp contrast) */
 .hero-banner,
 .theme-light .hero-banner,
 [data-theme="light"] .hero-banner {
-  background: linear-gradient(135deg, #1d3621 0%, #132416 45%, #0d1a0f 100%) !important;
-  border-color: #cbeb47 !important;
-  box-shadow: 0 20px 40px -15px rgba(21, 35, 23, 0.35), 0 0 0 1px rgba(203, 235, 71, 0.3) !important;
+  background: linear-gradient(135deg, #2b0f54 0%, #1c0a3b 48%, #111827 100%) !important;
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 20px 40px -15px rgba(46, 16, 101, 0.35), 0 0 0 1px rgba(139, 92, 246, 0.35) !important;
 }
 
 .theme-light .hero-banner .hero-welcome-sub {
-  color: #d1ded3 !important;
+  color: #e2e8f0 !important;
 }
 
 .theme-light .hero-banner .text-slate-100,
@@ -318,70 +630,83 @@ body[data-theme="light"] {
 }
 
 .theme-light .hero-banner .text-slate-300 {
-  color: #e0eae2 !important;
+  color: #e2e8f0 !important;
 }
 
 .theme-light .hero-banner .text-slate-400 {
-  color: #a8baa9 !important;
+  color: #cbd5e1 !important;
 }
 
 .theme-light .hero-banner .bg-slate-950,
 .theme-light .hero-banner .bg-slate-950\/90 {
-  background-color: rgba(14, 26, 16, 0.95) !important;
+  background-color: rgba(18, 9, 38, 0.94) !important;
   color: #ffffff !important;
 }
 
 .theme-light .hero-banner .bg-slate-900 {
-  background-color: #182c1b !important;
+  background-color: #1b0d38 !important;
   color: #ffffff !important;
 }
 
 .theme-light .hero-banner .hover\:bg-slate-800:hover {
-  background-color: #243e27 !important;
+  background-color: #2e1860 !important;
 }
 
 .theme-light .hero-banner .border-slate-800 {
-  border-color: rgba(60, 92, 64, 0.8) !important;
+  border-color: rgba(139, 92, 246, 0.35) !important;
 }
 
-/* Form Inputs in Light Mode */
-.theme-light input,
-.theme-light select,
-.theme-light textarea {
+/* Form Inputs in Light Mode (outside violet header/nav) */
+.theme-light main input,
+.theme-light main select,
+.theme-light main textarea,
+.theme-light > .fixed input,
+.theme-light > .fixed select,
+.theme-light > .fixed textarea {
   background-color: #ffffff !important;
-  color: #131f15 !important;
-  border-color: #cfd8cc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
 }
 
-.theme-light input::placeholder,
-.theme-light textarea::placeholder {
-  color: #7b8a7d !important;
+.theme-light main input::placeholder,
+.theme-light main textarea::placeholder,
+.theme-light > .fixed input::placeholder,
+.theme-light > .fixed textarea::placeholder {
+  color: #64748b !important;
 }
 
-.theme-light input:focus,
-.theme-light select:focus,
-.theme-light textarea:focus {
-  border-color: #2d4f32 !important;
-  box-shadow: 0 0 0 2px rgba(45, 79, 50, 0.2) !important;
+.theme-light main input:focus,
+.theme-light main select:focus,
+.theme-light main textarea:focus,
+.theme-light > .fixed input:focus,
+.theme-light > .fixed select:focus,
+.theme-light > .fixed textarea:focus {
+  border-color: #6d28d9 !important;
+  box-shadow: 0 0 0 2px rgba(109, 40, 217, 0.2) !important;
 }
 
 /* Light theme Table Headers & Rows */
-.theme-light thead th {
-  background-color: #eef3eb !important;
-  color: #131f15 !important;
-  border-color: #e1e7de !important;
+.theme-light main thead th,
+.theme-light > .fixed thead th {
+  background-color: #eef1f6 !important;
+  color: #0f172a !important;
+  border-color: #d5dce6 !important;
 }
 
-.theme-light tbody tr {
-  border-color: #edf2ea !important;
+.theme-light main tbody tr,
+.theme-light > .fixed tbody tr {
+  border-color: #e2e8f0 !important;
 }
 
-.theme-light tbody tr:hover {
-  background-color: #f4f8f2 !important;
+.theme-light main tbody tr:hover,
+.theme-light > .fixed tbody tr:hover {
+  background-color: #f8fafc !important;
 }
 
-/* Light theme Modals */
+/* Light theme Modals Backdrop */
+.theme-light .fixed.inset-0.bg-slate-950\/85,
 .theme-light .fixed.inset-0.bg-slate-950\/80,
+.theme-light .fixed.inset-0.bg-slate-950\/70,
 .theme-light .fixed.inset-0.bg-black\/80 {
-  background-color: rgba(19, 31, 21, 0.65) !important;
+  background-color: rgba(15, 23, 42, 0.65) !important;
 }

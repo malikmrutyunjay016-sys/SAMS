@@ -814,7 +814,7 @@ export const BatchCorrectionModal: React.FC<BatchCorrectionModalProps> = ({
                 type="button"
                 onClick={handleSaveChanges}
                 disabled={pendingEditCount === 0}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-slate-950 font-extrabold flex items-center shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-extrabold flex items-center shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                 <Save className="w-4 h-4 mr-1.5" />
                 <span>

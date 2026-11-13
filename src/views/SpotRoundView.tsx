@@ -22,7 +22,7 @@ export const SpotRoundView: React.FC = () => {
             href="https://ug-admission-pcb.vercel.app/"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-xs flex items-center shadow-lg transition transform hover:-translate-y-0.5 shrink-0"
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-black text-xs flex items-center shadow-lg transition transform hover:-translate-y-0.5 shrink-0"
           >
             <span>{lang === 'or' ? 'ଅଫିସିଆଲ୍ ନାମଲେଖା ପୋର୍ଟାଲ୍ ଯାଆନ୍ତୁ' : 'Go to Live Admission Portal'}</span>
             <ExternalLink className="w-4 h-4 ml-2" />

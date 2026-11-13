@@ -760,42 +760,25 @@ export const CounsellingView: React.FC = () => {
   const handleDirectCounsellingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (role !== 'SUPER_ADMIN' && (role !== 'HOD' || !hodDeptName)) {
-      showToast('Access Denied: Only Super Admin or an authorized Department HOD can upload counselling Excel.');
+    if (role !== 'SUPER_ADMIN') {
+      showToast('Access Denied: Only Super Admin can upload counselling Excel.');
       e.target.value = '';
       return;
     }
     setIsUploadingCounsellingExcel(true);
     try {
       const targetSess = selectedSession === 'ALL' ? '2026-27' : selectedSession;
-      const scopedStudents = role === 'HOD' ? allDisplayStudents : students;
-      const res = await parseCounsellingExcelFile(file, scopedStudents, counsellingMap, targetSess);
+      const res = await parseCounsellingExcelFile(file, students, counsellingMap, targetSess);
       setIsUploadingCounsellingExcel(false);
-      const allowedRecords =
-        role === 'HOD' && hodDeptName
-          ? res.records.filter((r) => {
-              const matchedStu = scopedStudents.find((s) => s.id === r.studentId || s.id === r.id);
-              return Boolean(matchedStu && isStudentInHodDept(matchedStu, hodDeptName, r));
-            })
-          : res.records;
-
-      if (res.success && allowedRecords.length > 0) {
-        const detectedBatch = allowedRecords[0]?.academicYear || targetSess;
-        bulkSaveCounsellingRecords(allowedRecords, 'merge', detectedBatch);
+      if (res.success && res.records.length > 0) {
+        const detectedBatch = res.records[0]?.academicYear || targetSess;
+        bulkSaveCounsellingRecords(res.records, 'merge', detectedBatch);
         if (selectedSession !== 'ALL' && detectedBatch && detectedBatch !== selectedSession) {
           setSelectedSession(detectedBatch);
         }
-        showToast(
-          role === 'HOD'
-            ? `Updated subject counselling for ${allowedRecords.length} student(s) in Department of ${hodDeptName} (batch ${detectedBatch})!`
-            : `Updated & fixed subject counselling for ${allowedRecords.length} matched students in batch ${detectedBatch}!`
-        );
+        showToast(`Updated & fixed subject counselling for ${res.records.length} matched students in batch ${detectedBatch}!`);
       } else {
-        showToast(
-          role === 'HOD'
-            ? `No matching students found in Department of ${hodDeptName}. HOD can only update subject counselling for their own department.`
-            : res.errors?.[0] || 'No matching student records found in the uploaded Excel file.'
-        );
+        showToast(res.errors?.[0] || 'No matching student records found in the uploaded Excel file.');
       }
     } catch (err: any) {
       setIsUploadingCounsellingExcel(false);
@@ -861,7 +844,7 @@ export const CounsellingView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <div className="flex flex-col items-start md:items-end gap-2.5 shrink-0">
           <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex flex-wrap items-center gap-1">
             <button
               onClick={() => setViewMode('table')}
@@ -892,26 +875,28 @@ export const CounsellingView: React.FC = () => {
             </button>
           </div>
 
-          {canEdit && (
-            <label className="px-3.5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center shadow-lg transition cursor-pointer">
-              <Upload className="w-4 h-4 mr-1.5" />
-              <span>{isUploadingCounsellingExcel ? 'Updating...' : 'Upload Counselling Excel'}</span>
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleDirectCounsellingUpload}
-                className="hidden"
-              />
-            </label>
-          )}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {role === 'SUPER_ADMIN' && (
+              <label className="px-3.5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center shadow-lg transition cursor-pointer">
+                <Upload className="w-4 h-4 mr-1.5" />
+                <span>{isUploadingCounsellingExcel ? 'Updating...' : 'Upload Counselling Excel'}</span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleDirectCounsellingUpload}
+                  className="hidden"
+                />
+              </label>
+            )}
 
-          <button
-            onClick={handleExportAll}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs flex items-center shadow-lg transition"
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            {lang === 'or' ? 'କାଉନସେଲିଂ ରିପୋର୍ଟ ଡାଉନଲୋଡ୍ (Excel)' : 'Export Counselling Excel'}
-          </button>
+            <button
+              onClick={handleExportAll}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs flex items-center shadow-lg transition"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              {lang === 'or' ? 'କାଉନସେଲିଂ ରିପୋର୍ଟ ଡାଉନଲୋଡ୍ (Excel)' : 'Export Counselling Excel'}
+            </button>
+          </div>
         </div>
       </div>
 

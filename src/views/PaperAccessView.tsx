@@ -1045,7 +1045,7 @@ export const PaperAccessView: React.FC = () => {
                 onClick={() => setActiveSubTab('markfoil')}
                 className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 transition ${
                   activeSubTab === 'markfoil'
-                    ? 'bg-purple-500 text-slate-950 shadow-md font-extrabold'
+                    ? 'bg-purple-700 text-white shadow-md font-extrabold'
                     : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`}
               >
@@ -1318,7 +1318,7 @@ export const PaperAccessView: React.FC = () => {
                   </button>
                   <button
                     onClick={handlePrintMarkFoil}
-                    className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-slate-950 font-extrabold text-xs shadow-lg flex items-center space-x-1.5 transition active:scale-95"
+                    className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white font-extrabold text-xs shadow-lg flex items-center space-x-1.5 transition active:scale-95"
                   >
                     <Printer className="w-4 h-4" />
                     <span>Print Official Mark Foil (PDF)</span>

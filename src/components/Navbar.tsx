@@ -29,7 +29,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
-  const { systemSettings, t, lang, themeMode } = useData();
+  const { systemSettings, t, lang } = useData();
   const { isHod, isAdmin, hodDeptId, hodDeptName } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuContainerRef = useRef<HTMLDivElement>(null);
@@ -57,11 +57,11 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
       label: t.spotRound,
       icon: UserCheck,
       badge: systemSettings.spotRoundEnabled ? (
-        <span className="bg-emerald-500 text-slate-950 font-extrabold text-[9px] px-1.5 py-0.2 rounded-full animate-pulse ml-1.5 flex items-center">
+        <span className="bg-emerald-400 text-slate-950 font-extrabold text-[9px] px-1.5 py-0.2 rounded-full animate-pulse ml-1.5 flex items-center">
           <Radio className="w-2.5 h-2.5 mr-0.5" /> {t.liveBadge}
         </span>
       ) : (
-        <span className="bg-slate-700 text-slate-300 font-bold text-[9px] px-1.5 py-0.2 rounded ml-1.5">
+        <span className="bg-violet-950/90 text-violet-200 border border-violet-400/30 font-bold text-[9px] px-1.5 py-0.2 rounded ml-1.5">
           {t.offBadge}
         </span>
       ),
@@ -115,40 +115,11 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
       ? t.adminPortal
       : activeNavItem?.label || t.home;
 
-  const navBgClass =
-    themeMode === 'maroon'
-      ? 'bg-[#18050e] border-b border-red-950/80 text-pink-100 shadow-xl'
-      : themeMode === 'navy'
-      ? 'bg-[#061226] border-b border-blue-950/80 text-cyan-100 shadow-xl'
-      : 'bg-[#25442b] border-b border-[#1a311f] text-slate-100 shadow-lg';
-
-  const dropdownPanelClass =
-    themeMode === 'maroon'
-      ? 'bg-[#18050e] border border-amber-500/35 text-pink-100'
-      : themeMode === 'navy'
-      ? 'bg-[#061226] border border-cyan-500/35 text-cyan-100'
-      : 'bg-[#1c3521] border border-emerald-400/30 text-slate-100';
-
-  const activePillClass =
-    themeMode === 'navy'
-      ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-[0_0_12px_rgba(56,189,248,0.4)] font-bold'
-      : themeMode === 'maroon'
-      ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.4)] font-bold'
-      : 'bg-[#d2eb4b] text-[#16291a] shadow-md font-extrabold';
-
-  const inactiveItemClass =
-    themeMode === 'maroon'
-      ? 'hover:bg-red-950/70 text-pink-100/90 hover:text-white'
-      : themeMode === 'navy'
-      ? 'hover:bg-blue-950/70 text-blue-100/90 hover:text-white'
-      : 'hover:bg-[#274a2d] text-emerald-50/90 hover:text-white';
-
-  const iconColorClass =
-    themeMode === 'navy'
-      ? 'text-cyan-400'
-      : themeMode === 'maroon'
-      ? 'text-amber-400'
-      : 'text-[#d2eb4b]';
+  const navBgClass = 'bg-[#233b56] border-b border-[#18293d] text-white shadow-lg';
+  const dropdownPanelClass = 'bg-[#1b314b] border border-[#56789c] text-white';
+  const activePillClass = 'bg-white text-[#1b314b] shadow-md font-extrabold';
+  const inactiveItemClass = 'hover:bg-[#315073] text-slate-100 hover:text-white';
+  const iconColorClass = 'text-sky-300';
 
   return (
     <nav className={`${navBgClass} sticky top-0 z-20 transition-colors duration-300`}>
@@ -165,13 +136,13 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                 activeTab === 'home' ? activePillClass : `${inactiveItemClass} font-semibold`
               }`}
             >
-              <Home className={`w-3.5 h-3.5 mr-1.5 ${activeTab === 'home' ? 'text-[#16291a]' : iconColorClass}`} />
+              <Home className={`w-3.5 h-3.5 mr-1.5 ${activeTab === 'home' ? 'text-[#1b314b]' : iconColorClass}`} />
               {t.home}
             </button>
 
             {activeTab !== 'home' && (
               <div className="flex items-center space-x-1.5 text-xs truncate">
-                <span className="opacity-50">/</span>
+                <span className="text-sky-300">/</span>
                 <span className="font-bold truncate max-w-[180px] sm:max-w-xs text-white">
                   {currentTitle}
                 </span>
@@ -189,8 +160,8 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                 }}
                 className={`hidden sm:flex px-3 py-1.5 rounded-full text-xs font-bold items-center transition ${
                   activeTab === 'hod'
-                    ? 'bg-amber-500 text-slate-950 shadow'
-                    : 'bg-slate-900/70 text-amber-300 border border-amber-500/40 hover:bg-slate-800'
+                    ? 'bg-amber-400 text-slate-950 shadow'
+                    : 'bg-[#16273a] text-amber-300 border border-amber-400/50 hover:bg-[#2c4a6e]'
                 }`}
               >
                 <Building2 className="w-3.5 h-3.5 mr-1" /> {t.hodDesk}
@@ -205,11 +176,11 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                 }}
                 className={`hidden sm:flex px-3 py-1.5 rounded-full text-xs font-bold items-center transition ${
                   activeTab === 'admin'
-                    ? 'bg-amber-500 text-slate-950 shadow'
-                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:bg-amber-500/30'
+                    ? 'bg-amber-400 text-slate-950 shadow'
+                    : 'bg-amber-400/20 text-amber-200 border border-amber-400/50 hover:bg-amber-400/30'
                 }`}
               >
-                <ShieldCheck className="w-3.5 h-3.5 mr-1 text-amber-400" /> {t.adminPortal}
+                <ShieldCheck className="w-3.5 h-3.5 mr-1 text-amber-300" /> {t.adminPortal}
               </button>
             )}
 
@@ -221,17 +192,17 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
                 className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  menuOpen ? activePillClass : `${inactiveItemClass} border border-white/20`
+                  menuOpen ? activePillClass : `${inactiveItemClass} border border-white/25 bg-white/10`
                 }`}
               >
                 {menuOpen ? (
-                  <X className={`w-3.5 h-3.5 ${menuOpen ? 'text-[#16291a]' : iconColorClass}`} />
+                  <X className="w-3.5 h-3.5 text-[#1b314b]" />
                 ) : (
                   <Menu className={`w-3.5 h-3.5 ${iconColorClass}`} />
                 )}
                 <span>{lang === 'or' ? 'ମେନୁ (Menu)' : 'Menu'}</span>
                 <ChevronDown
-                  className={`w-3.5 h-3.5 transition-transform duration-200 ${menuOpen ? 'rotate-180 text-[#16291a]' : ''}`}
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${menuOpen ? 'rotate-180 text-[#1b314b]' : 'text-sky-200'}`}
                 />
               </button>
 
@@ -240,7 +211,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                   role="menu"
                   className={`absolute right-0 mt-2 w-72 sm:w-80 rounded-2xl shadow-2xl p-2 z-50 space-y-1 max-h-[80vh] overflow-y-auto ${dropdownPanelClass}`}
                 >
-                  <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider opacity-60 border-b border-white/10 mb-1">
+                  <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-sky-200/80 border-b border-white/15 mb-1">
                     {lang === 'or' ? 'ପୋର୍ଟାଲ୍ ନେଭିଗେସନ୍' : 'Portal Navigation'}
                   </div>
 
@@ -262,7 +233,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                         <span className="flex items-center min-w-0">
                           <Icon
                             className={`w-4 h-4 mr-2.5 shrink-0 ${
-                              isActive ? 'text-[#16291a]' : iconColorClass
+                              isActive ? 'text-[#1b314b]' : iconColorClass
                             }`}
                           />
                           <span className="truncate">{item.label}</span>
@@ -273,7 +244,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                   })}
 
                   {(isHod || isAdmin) && (
-                    <div className="pt-1.5 mt-1.5 border-t border-white/10 space-y-1">
+                    <div className="pt-1.5 mt-1.5 border-t border-white/15 space-y-1">
                       {isHod && (
                         <button
                           role="menuitem"
@@ -283,8 +254,8 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                           }}
                           className={`w-full px-3 py-2.5 rounded-xl text-xs font-bold flex items-center transition ${
                             activeTab === 'hod'
-                              ? 'bg-amber-500 text-slate-950 shadow'
-                              : 'bg-slate-900/60 text-amber-300 border border-amber-500/30 hover:bg-slate-800'
+                              ? 'bg-amber-400 text-slate-950 shadow'
+                              : 'bg-[#16273a] text-amber-200 border border-amber-400/35 hover:bg-[#2c4a6e]'
                           }`}
                         >
                           <Building2 className="w-4 h-4 mr-2.5 shrink-0" />
@@ -301,11 +272,11 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                           }}
                           className={`w-full px-3 py-2.5 rounded-xl text-xs font-bold flex items-center transition ${
                             activeTab === 'admin'
-                              ? 'bg-amber-500 text-slate-950 shadow'
-                              : 'bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:bg-amber-500/25'
+                              ? 'bg-amber-400 text-slate-950 shadow'
+                              : 'bg-amber-400/15 text-amber-200 border border-amber-400/40 hover:bg-amber-400/25'
                           }`}
                         >
-                          <ShieldCheck className="w-4 h-4 mr-2.5 shrink-0 text-amber-400" />
+                          <ShieldCheck className="w-4 h-4 mr-2.5 shrink-0 text-amber-300" />
                           <span>{t.adminPortal}</span>
                         </button>
                       )}

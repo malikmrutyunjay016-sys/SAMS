@@ -30,18 +30,13 @@ function AppContent() {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showHodModal, setShowHodModal] = useState(false);
 
-  // Dynamic Theme Classes
-  const themeContainerClass =
-    themeMode === 'maroon'
-      ? 'theme-maroon bg-[#0c0307] text-[#fce7f3]'
-      : themeMode === 'navy'
-      ? 'theme-navy bg-[#030712] text-[#f0f9ff]'
-      : 'theme-light bg-[#f4f6f1] text-[#131f15]';
+  // Dynamic White & Grey Default Theme Container
+  const themeContainerClass = 'theme-light dynamic-white-grey-bg text-slate-900';
 
   return (
     <div
       data-theme={themeMode}
-      className={`min-h-screen ${themeContainerClass} flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-300`}
+      className={`min-h-screen ${themeContainerClass} flex flex-col font-sans selection:bg-violet-600 selection:text-white transition-colors duration-300`}
     >
       {/* Centered Loading Overlay Box */}
       <LoadingOverlay />
@@ -53,7 +48,7 @@ function AppContent() {
       />
 
       {isQuotaExceeded && (
-        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-300 flex flex-wrap items-center justify-between gap-2">
+        <div className="bg-amber-50 border-b border-amber-300 px-4 py-2 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-2">
             <span className="font-bold uppercase tracking-wider bg-amber-500/20 px-2 py-0.5 rounded text-[10px]">
               Local Cache Mode
@@ -66,7 +61,7 @@ function AppContent() {
             href="https://console.firebase.google.com/project/gen-lang-client-0743522657/firestore/databases/ai-studio-d7d173c0-b7d1-4d2c-8274-6f17561cf0cf/data?openUpgradeDialog=true"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline hover:text-amber-100 font-semibold shrink-0"
+            className="underline hover:text-amber-700 font-semibold shrink-0"
           >
             Upgrade Plan / Firebase Console &rarr;
           </a>

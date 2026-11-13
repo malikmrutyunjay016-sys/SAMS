@@ -626,17 +626,6 @@ export const CounsellingView: React.FC = () => {
             >
               Excel Matrix View
             </button>
-            <button
-              onClick={() => setViewMode('defaulter_list')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center ${
-                viewMode === 'defaulter_list'
-                  ? 'bg-rose-500 text-white shadow'
-                  : 'text-rose-300 hover:text-white bg-rose-500/10 border border-rose-500/30'
-              }`}
-            >
-              <AlertTriangle className="w-3.5 h-3.5 mr-1.5" />
-              Defaulter List ({allDefaulterCandidates.length})
-            </button>
           </div>
 
           {canEdit && (

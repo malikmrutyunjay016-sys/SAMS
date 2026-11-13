@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { translateStream, translateDepartment } from '../lib/translations';
+import { normalizeDepartmentAndStream } from '../lib/excelParser';
 import { BookOpen, CheckCircle, Sparkles, AlertCircle, Filter, ArrowRight } from 'lucide-react';
 
 export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNavigateSpot }) => {
@@ -8,7 +9,9 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
   const [selectedStream, setSelectedStream] = useState<string>('ALL');
   const [selectedType, setSelectedType] = useState<string>('ALL');
 
-  const activeStudents = students.filter((s) => !s.isClcTaken && s.status !== 'CLC Taken');
+  const activeStudents = students.filter(
+    (s) => !s.isClcTaken && s.status !== 'CLC Taken' && (!s.status || s.status === 'Admitted' || s.status === 'Verified')
+  );
 
   const availableSessions = Array.from(
     new Set(['2026-27', '2025-26', '2024-25', ...activeStudents.map((s) => s.academicYear || '2026-27'), ...seatMatrix.map((m) => m.academicYear || '2026-27')])
@@ -33,8 +36,10 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
   const regularCounts = new Map<string, number>();
   const aedpCounts = new Map<string, number>();
   sessionStudents.forEach((s) => {
-    const d = (s.department || '').toLowerCase().trim();
-    if (s.isAedp) {
+    const norm = normalizeDepartmentAndStream(s.department, s.stream);
+    const d = (norm.department || s.department || '').toLowerCase().trim();
+    const isAedpStudent = Boolean(s.isAedp || norm.isAedp);
+    if (isAedpStudent) {
       aedpCounts.set(d, (aedpCounts.get(d) || 0) + 1);
     } else {
       regularCounts.set(d, (regularCounts.get(d) || 0) + 1);
@@ -79,6 +84,7 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
   const totalSanctioned = filteredMatrix.reduce((a, b) => a + b.sanctioned, 0);
   const totalAdmitted = filteredMatrix.reduce((a, b) => a + b.admitted, 0);
   const totalVacant = filteredMatrix.reduce((a, b) => a + b.vacant, 0);
+  const overallPercentFilled = totalSanctioned > 0 ? Math.min(100, Math.round((totalAdmitted / totalSanctioned) * 100)) : 0;
 
   return (
     <div className="space-y-8 pb-12">
@@ -284,15 +290,21 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
 
         <div className="md:col-span-4 grid grid-cols-3 gap-3 text-center">
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 uppercase font-mono block">{t.sanctioned}</span>
+            <span className="text-[10px] text-slate-400 uppercase font-mono block">
+              {lang === 'or' ? `ମୋଟ ${t.sanctioned}` : `Total ${t.sanctioned}`}
+            </span>
             <span className="text-lg font-bold text-white">{totalSanctioned}</span>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 uppercase font-mono block">{t.admitted}</span>
+            <span className="text-[10px] text-slate-400 uppercase font-mono block">
+              {lang === 'or' ? `ମୋଟ ${t.admitted}` : `Total ${t.admitted}`}
+            </span>
             <span className="text-lg font-bold text-emerald-400">{totalAdmitted}</span>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 uppercase font-mono block">{t.vacant}</span>
+            <span className="text-[10px] text-slate-400 uppercase font-mono block">
+              {lang === 'or' ? `ମୋଟ ${t.vacant}` : `Total ${t.vacant}`}
+            </span>
             <span className="text-lg font-bold text-amber-400">{totalVacant}</span>
           </div>
         </div>
@@ -360,6 +372,42 @@ export const SeatMatrixView: React.FC<{ onNavigateSpot: () => void }> = ({ onNav
                 );
               })}
             </tbody>
+            <tfoot className="bg-slate-950 border-t-2 border-amber-500/40 font-mono text-xs">
+              <tr>
+                <td colSpan={3} className="py-4 px-4 font-extrabold text-amber-300 uppercase tracking-wide">
+                  {lang === 'or'
+                    ? `ମୋଟ ହିସାବ (${filteredMatrix.length} ବିଭାଗ / ପାଠ୍ୟକ୍ରମ)`
+                    : `Total Calculation (${filteredMatrix.length} Courses)`}
+                </td>
+                <td className="py-4 px-4 text-center font-extrabold text-white text-sm">
+                  {totalSanctioned}
+                </td>
+                <td className="py-4 px-4 text-center font-extrabold text-emerald-400 text-sm">
+                  {totalAdmitted}
+                </td>
+                <td className="py-4 px-4 text-center">
+                  <span className="px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-extrabold text-sm">
+                    {totalVacant}
+                  </span>
+                </td>
+                <td className="py-4 px-4 min-w-[140px]">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-mono text-slate-300 font-bold">
+                      <span>{overallPercentFilled}% {t.seatsFilled}</span>
+                      <span>{totalAdmitted}/{totalSanctioned}</span>
+                    </div>
+                    <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-700">
+                      <div
+                        className={`h-full rounded-full ${
+                          overallPercentFilled >= 90 ? 'bg-emerald-500' : overallPercentFilled >= 70 ? 'bg-amber-500' : 'bg-blue-500'
+                        }`}
+                        style={{ width: `${overallPercentFilled}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>

@@ -1,19 +1,12 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { DEFAULT_FAQS } from '../lib/defaultData';
-import { FAQItem } from '../types';
 import {
   HelpCircle,
   Plus,
-  Trash2,
-  Edit2,
   ChevronDown,
   Search,
   CheckCircle2,
-  RotateCcw,
-  SlidersHorizontal,
-  AlertTriangle,
   X
 } from 'lucide-react';
 
@@ -59,26 +52,18 @@ function translateFaqCategory(category: string, lang: string): string {
 }
 
 export const FaqView: React.FC = () => {
-  const { faqs, addFAQ, updateFAQ, deleteFAQ, t, lang } = useData();
+  const { faqs, addFAQ, t, lang } = useData();
   const { isAdmin } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [expandedId, setExpandedId] = useState<string | null>('faq_1');
 
-  // Manage / Edit Mode Toggle (defaults to true for easy access)
-  const [isManageMode, setIsManageMode] = useState(true);
-
-  // Modal / Form state for Add/Edit FAQ
+  // Modal / Form state for Add FAQ
   const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [questionInput, setQuestionInput] = useState('');
   const [answerInput, setAnswerInput] = useState('');
   const [categoryInput, setCategoryInput] = useState('Admission');
-
-  // In-app Delete Confirmation Modal State
-  const [faqToDelete, setFaqToDelete] = useState<FAQItem | null>(null);
-  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
 
   // Success Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -105,82 +90,23 @@ export const FaqView: React.FC = () => {
   });
 
   const handleOpenAddModal = () => {
-    setEditingId(null);
+    if (!isAdmin) return;
     setQuestionInput('');
     setAnswerInput('');
     setCategoryInput(selectedCategory !== 'ALL' ? selectedCategory : 'Admission');
     setShowModal(true);
   };
 
-  const handleOpenEditModal = (faq: FAQItem) => {
-    setEditingId(faq.id);
-    setQuestionInput(faq.question);
-    setAnswerInput(faq.answer);
-    setCategoryInput(faq.category);
-    setShowModal(true);
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!questionInput.trim() || !answerInput.trim()) return;
+    if (!isAdmin || !questionInput.trim() || !answerInput.trim()) return;
 
-    if (editingId) {
-      updateFAQ(editingId, questionInput.trim(), answerInput.trim(), categoryInput);
-      showToast(lang === 'or' ? 'FAQ ସଫଳତାର ସହ ସମ୍ପାଦିତ ହେଲା।' : 'FAQ updated successfully.');
-    } else {
-      addFAQ(questionInput.trim(), answerInput.trim(), categoryInput);
-      showToast(lang === 'or' ? 'ନୂତନ FAQ ସଫଳତାର ସହ ଯୋଡ଼ାଗଲା।' : 'New FAQ added successfully.');
-    }
+    addFAQ(questionInput.trim(), answerInput.trim(), categoryInput);
+    showToast(lang === 'or' ? 'ନୂତନ FAQ ସଫଳତାର ସହ ଯୋଡ଼ାଗଲା।' : 'New FAQ added successfully.');
 
     setShowModal(false);
-    setEditingId(null);
     setQuestionInput('');
     setAnswerInput('');
-  };
-
-  // Immediate reliable delete function for FAQ item
-  const confirmDeleteFaq = () => {
-    if (!faqToDelete) return;
-    const targetId = faqToDelete.id;
-    const targetQuestion = faqToDelete.question;
-    deleteFAQ(targetId);
-    showToast(
-      lang === 'or'
-        ? `FAQ ଡିଲିଟ୍ ହେଲା: "${targetQuestion.slice(0, 30)}..."`
-        : `Deleted FAQ: "${targetQuestion.slice(0, 35)}..."`
-    );
-    setFaqToDelete(null);
-  };
-
-  // Immediate reliable delete function for Category Tab
-  const confirmDeleteCategory = () => {
-    if (!categoryToDelete) return;
-    const catName = categoryToDelete;
-    const targets = faqs.filter((f) => f.category === catName);
-    targets.forEach((f) => deleteFAQ(f.id));
-    setSelectedCategory('ALL');
-    setCategoryToDelete(null);
-    showToast(
-      lang === 'or'
-        ? `"${catName}" ବର୍ଗ ଟ୍ୟାବ୍ ର ସମସ୍ତ ${targets.length} ଟି FAQ ସଫଳତାର ସହ ଡିଲିଟ୍ ହେଲା।`
-        : `Deleted "${catName}" tab and all its ${targets.length} FAQs.`
-    );
-  };
-
-  const handleResetDefaultFaqs = () => {
-    const currentQuestions = new Set(faqs.map((f) => f.question.toLowerCase().trim()));
-    let addedCount = 0;
-    DEFAULT_FAQS.forEach((df) => {
-      if (!currentQuestions.has(df.question.toLowerCase().trim())) {
-        addFAQ(df.question, df.answer, df.category);
-        addedCount++;
-      }
-    });
-    showToast(
-      addedCount > 0
-        ? (lang === 'or' ? `${addedCount} ଟି ଡିଫଲ୍ଟ FAQ ପୁନରୁଦ୍ଧାର ହେଲା।` : `Restored ${addedCount} default FAQs.`)
-        : (lang === 'or' ? 'ସମସ୍ତ ଡିଫଲ୍ଟ FAQ ପୂର୍ବରୁ ବିଦ୍ୟମାନ।' : 'All default FAQs are already present.')
-    );
   };
 
   return (
@@ -204,39 +130,14 @@ export const FaqView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsManageMode(!isManageMode)}
-            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center transition border ${
-              isManageMode
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
-                : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
-            }`}
-            title="Toggle Edit / Delete Management controls"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5" />
-            {isManageMode ? t.manageModeOn : t.manageModeOff}
-          </button>
-
-          {isManageMode && (
-            <>
-              <button
-                type="button"
-                onClick={handleOpenAddModal}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs flex items-center shadow-lg shrink-0 transition"
-              >
-                <Plus className="w-4 h-4 mr-1.5" /> {t.addFaq}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleResetDefaultFaqs}
-                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center border border-slate-700 transition"
-                title="Restore official default FAQs if deleted"
-              >
-                <RotateCcw className="w-3.5 h-3.5 mr-1.5 text-amber-400" /> {t.restoreDefaults}
-              </button>
-            </>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs flex items-center shadow-lg shrink-0 transition"
+            >
+              <Plus className="w-4 h-4 mr-1.5" /> {t.addFaq}
+            </button>
           )}
         </div>
       </div>
@@ -271,19 +172,6 @@ export const FaqView: React.FC = () => {
               </button>
             </div>
           ))}
-
-          {/* Delete Category Tab button when a specific category tab is selected */}
-          {selectedCategory !== 'ALL' && (
-            <button
-              type="button"
-              onClick={() => setCategoryToDelete(selectedCategory)}
-              className="ml-2 px-2.5 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 hover:text-red-200 border border-red-500/40 text-xs font-bold flex items-center transition shadow-sm"
-              title={lang === 'or' ? `"${selectedCategory}" ବର୍ଗ ଟ୍ୟାବ୍ ଓ ଏହାର ସମସ୍ତ FAQ ଡିଲିଟ୍ କରନ୍ତୁ` : `Delete "${selectedCategory}" Tab and its FAQs`}
-            >
-              <Trash2 className="w-3.5 h-3.5 mr-1 text-red-400" />
-              {lang === 'or' ? 'ଟ୍ୟାବ୍ ଡିଲିଟ୍ କରନ୍ତୁ' : 'Delete Tab'}
-            </button>
-          )}
         </div>
       </div>
 
@@ -320,28 +208,8 @@ export const FaqView: React.FC = () => {
                     </h3>
                   </div>
 
-                  {/* Right: Controls & Expand/Collapse Toggle Component */}
+                  {/* Right: Expand/Collapse Toggle Component */}
                   <div className="flex items-center space-x-2 shrink-0">
-                    {/* Management Edit & Delete Action Buttons */}
-                    <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditModal(faq)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 text-xs transition border border-slate-700 hover:border-amber-500/40"
-                        title={lang === 'or' ? 'FAQ ସମ୍ପାଦନ କରନ୍ତୁ' : 'Edit FAQ'}
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFaqToDelete(faq)}
-                        className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-300 hover:text-white text-xs transition border border-red-500/40 hover:border-red-500/60"
-                        title={lang === 'or' ? 'FAQ ଡିଲିଟ୍ କରନ୍ତୁ' : 'Delete FAQ'}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
                     {/* Expand / Collapse Toggle Button Component (with distinct styling) */}
                     <span
                       role="button"
@@ -391,7 +259,7 @@ export const FaqView: React.FC = () => {
         ) : (
           <div className="text-center py-12 bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 text-xs space-y-3">
             <p>{lang === 'or' ? 'କୌଣସି FAQ ମିଳିଲା ନାହିଁ।' : `No FAQs found matching "${searchQuery || selectedCategory}".`}</p>
-            {isManageMode && (
+            {isAdmin && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
@@ -404,112 +272,14 @@ export const FaqView: React.FC = () => {
         )}
       </div>
 
-      {/* Delete FAQ Confirmation Modal */}
-      {faqToDelete && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-red-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl text-slate-100 space-y-4">
-            <div className="flex items-center space-x-3 text-red-400">
-              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white font-serif">
-                  {lang === 'or' ? 'FAQ ଡିଲିଟ୍ ନିଶ୍ଚିତ କରନ୍ତୁ' : 'Confirm Delete FAQ'}
-                </h3>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {lang === 'or' ? `ବର୍ଗ: ${translateFaqCategory(faqToDelete.category, lang)}` : `Category: ${faqToDelete.category}`}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-1.5">
-              <span className="text-[10px] uppercase font-mono text-slate-400 block">
-                {lang === 'or' ? 'ଡିଲିଟ୍ ହେବାକୁ ଥିବା ପ୍ରଶ୍ନ:' : 'Question to delete:'}
-              </span>
-              <p className="font-semibold text-slate-200 text-xs leading-snug">&quot;{faqToDelete.question}&quot;</p>
-            </div>
-
-            <p className="text-xs text-slate-400">
-              {lang === 'or'
-                ? 'ଆପଣ ନିଶ୍ଚିତ କି ଏହି FAQ ଟିକୁ ସମ୍ପୂର୍ଣ୍ଣ ଡିଲିଟ୍ କରିବାକୁ ଚାହୁଁଛନ୍ତି? ଏହା ସାମ୍ସ FAQ ଡାଟାବେସରୁ ସବୁଦିନ ପାଇଁ ଅପସାରିତ ହେବ।'
-                : 'Are you sure you want to delete this FAQ item? It will be permanently removed from the SAMS FAQs database across all devices.'}
-            </p>
-
-            <div className="flex justify-end space-x-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setFaqToDelete(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition"
-              >
-                {lang === 'or' ? 'ବାତିଲ କରନ୍ତୁ' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={confirmDeleteFaq}
-                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-lg flex items-center transition"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1.5" /> {lang === 'or' ? 'ହଁ, ଡିଲିଟ୍ କରନ୍ତୁ' : 'Yes, Delete FAQ'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Category Tab Confirmation Modal */}
-      {categoryToDelete && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-red-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl text-slate-100 space-y-4">
-            <div className="flex items-center space-x-3 text-red-400">
-              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white font-serif">
-                  {lang === 'or' ? 'ବର୍ଗ ଟ୍ୟାବ୍ ଡିଲିଟ୍ ନିଶ୍ଚିତ କରନ୍ତୁ' : 'Confirm Delete Category Tab'}
-                </h3>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {lang === 'or' ? `ବର୍ଗ: ${categoryToDelete}` : `Category: ${categoryToDelete}`}
-                </span>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              {lang === 'or'
-                ? `ଆପଣ "${categoryToDelete}" ଟ୍ୟାବ୍ ଏବଂ ଏଥିରେ ଥିବା ସମସ୍ତ FAQ ଡିଲିଟ୍ କରିବାକୁ ନିଶ୍ଚିତ କି? ଏହି କାର୍ଯ୍ୟ ଅପରିବର୍ତ୍ତନୀୟ।`
-                : `Are you sure you want to delete the "${categoryToDelete}" tab and all questions assigned to it? This action will remove all FAQs under this category.`}
-            </p>
-
-            <div className="flex justify-end space-x-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setCategoryToDelete(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition"
-              >
-                {lang === 'or' ? 'ବାତିଲ' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={confirmDeleteCategory}
-                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-lg flex items-center transition"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                {lang === 'or' ? 'ସମସ୍ତ ଡିଲିଟ୍ କରନ୍ତୁ' : 'Delete Tab & FAQs'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add / Edit FAQ Modal */}
+      {/* Add FAQ Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl text-slate-100 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white font-serif flex items-center">
                 <HelpCircle className="w-4 h-4 mr-2 text-amber-400" />
-                {editingId
-                  ? (lang === 'or' ? 'FAQ ସମ୍ପାଦନ କରନ୍ତୁ' : 'Edit FAQ Item')
-                  : (lang === 'or' ? 'ନୂତନ FAQ ଯୋଡ଼ନ୍ତୁ' : 'Add New FAQ Item')}
+                {lang === 'or' ? 'ନୂତନ FAQ ଯୋଡ଼ନ୍ତୁ' : 'Add New FAQ Item'}
               </h3>
               <button
                 type="button"
@@ -577,9 +347,7 @@ export const FaqView: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold shadow-lg"
                 >
-                  {editingId
-                    ? (lang === 'or' ? 'ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ' : 'Save Changes')
-                    : (lang === 'or' ? 'FAQ ପ୍ରକାଶ କରନ୍ତୁ' : 'Publish FAQ')}
+                  {lang === 'or' ? 'FAQ ପ୍ରକାଶ କରନ୍ତୁ' : 'Publish FAQ'}
                 </button>
               </div>
             </form>

@@ -81,7 +81,6 @@ function AppContent() {
           <HomeView
             onNavigateTab={setActiveTab}
             onOpenProspectus={() => setShowProspectus(true)}
-            onOpenAdminModal={() => setShowAdminModal(true)}
           />
         )}
 
